@@ -1,87 +1,138 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { useRouter } from 'next/navigation';
-import BottomNav from '@/components/BottmNav';
+import { doc, getDoc, collection, addDoc, updateDoc } from 'firebase/firestore';
 
-export default function MyMeetupsPage() {
-  const [myMeetups, setMyMeetups] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+function CreateMeetupContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const meetupId = searchParams.get('id'); // URL에 id가 있으면 수정 모드
 
+  const [title, setTitle] = useState('');
+  const [golfCourse, setGolfCourse] = useState('');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+  const [cartCount, setCartCount] = useState(1);
+  const [loading, setLoading] = useState(false);
+
+  // 1. 수정 모드일 때 기존 데이터 불러오기
   useEffect(() => {
-    const fetchMyMeetups = async () => {
-      try {
-        const q = query(collection(db, "meetups"), where("creatorId", "==", "admin_test"));
-        const querySnapshot = await getDocs(q);
-        
-        // 1. 데이터를 가져오면서 즉시 정렬까지 끝낸 배열을 만듭니다.
-        // 타입을 'any'로 명시해서 date 속성에 접근할 때 에러가 나지 않게 합니다.
-        const fetchedData = querySnapshot.docs.map(doc => ({ 
-          id: doc.id, 
-          ...doc.data() 
-        })) as any[];
-        
-        // 2. 안전하게 정렬을 수행합니다.
-        fetchedData.sort((a, b) => {
-          const dateA = a.date ? String(a.date) : "";
-          const dateB = b.date ? String(b.date) : "";
-          return dateB.localeCompare(dateA);
+    if (meetupId) {
+      const fetchMeetup = async () => {
+        try {
+          const docRef = doc(db, 'meetups', meetupId);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setTitle(data.title || '');
+            setGolfCourse(data.golfCourse || '');
+            setDate(data.date || '');
+            setTime(data.time || '');
+            setCartCount(data.cartCount || 1);
+          }
+        } catch (error) {
+          console.error("데이터 불러오기 실패:", error);
+        }
+      };
+      fetchMeetup();
+    }
+  }, [meetupId]);
+
+  const cartOptions = Array.from({ length: 20 }, (_, i) => i + 1);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const meetupData = {
+        title: title || 'WDG 벙개',
+        golfCourse,
+        date,
+        time,
+        cartCount,
+        creatorId: 'admin_test', // 근석님 아이디 고정
+        authorName: '김근석 사장님', // 이름 고정
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (meetupId) {
+        await updateDoc(doc(db, 'meetups', meetupId), meetupData);
+        alert('⛳ 벙개가 수정되었습니다!');
+      } else {
+        await addDoc(collection(db, 'meetups'), {
+          ...meetupData,
+          createdAt: new Date().toISOString(),
+          players: 1,
         });
-        
-        setMyMeetups(fetchedData);
-      } catch (error) {
-        console.error("데이터 로딩 에러:", error);
-      } finally {
-        setLoading(false);
+        alert('⛳ 새로운 벙개가 등록되었습니다!');
       }
-    };
-    fetchMyMeetups();
-  }, []);
+      router.push('/my-meetups');
+    } catch (error) {
+      alert('오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <main className="max-w-md mx-auto bg-gray-50 min-h-screen pb-24 text-gray-900">
+    <main className="max-w-md mx-auto bg-gray-50 min-h-screen pb-20 text-gray-900">
       <header className="p-4 bg-white border-b flex items-center sticky top-0 z-10">
-        <button onClick={() => router.back()} className="mr-4 text-xl p-1 font-bold text-gray-600">←</button>
-        <h1 className="text-xl font-bold text-gray-800">내 벙개 내역</h1>
+        <button type="button" onClick={() => router.back()} className="mr-4 text-xl font-bold text-gray-600">←</button>
+        <h1 className="text-xl font-bold text-green-700">
+          {meetupId ? '벙개 정보 수정' : '새로운 벙개 만들기'}
+        </h1>
       </header>
 
-      <div className="p-4 space-y-4">
-        {loading ? (
-          <div className="text-center py-20">
-            <p className="text-gray-500">데이터를 불러오고 있습니다...</p>
+      <form onSubmit={handleSubmit} className="p-5 space-y-6">
+        <div className="bg-white p-6 rounded-3xl shadow-sm space-y-6">
+          <div>
+            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase">벙개 제목</label>
+            <input 
+              type="text" required value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm"
+            />
           </div>
-        ) : myMeetups.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-300">
-            <p className="text-gray-400">내가 만든 벙개가 없네요. ⛳</p>
+          <div>
+            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase">골프장 이름</label>
+            <input 
+              type="text" required value={golfCourse}
+              onChange={(e) => setGolfCourse(e.target.value)}
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm"
+            />
           </div>
-        ) : (
-          myMeetups.map((item) => (
-            <div 
-              key={item.id} 
-              onClick={() => router.push(`/create-meetup?id=${item.id}`)}
-              className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 cursor-pointer active:scale-[0.98] transition-all"
-            >
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="font-bold text-lg text-gray-800">{item.title || '제목 없음'}</h3>
-                <span className="text-[11px] bg-green-100 text-green-700 px-2 py-1 rounded-lg font-bold">
-                  진행중
-                </span>
-              </div>
-              
-              <div className="flex items-center text-gray-500 text-sm gap-3">
-                <span>📅 {item.date || '날짜 미정'}</span>
-                <span className="text-gray-200">|</span>
-                <span className="text-blue-500 font-medium">상세 수정 〉</span>
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold text-gray-400 block mb-2 uppercase">날짜</label>
+              <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm" />
             </div>
-          ))
-        )}
-      </div>
-
-      <BottomNav active="meetups" />
+            <div>
+              <label className="text-xs font-bold text-gray-400 block mb-2 uppercase">티타임</label>
+              <input type="time" required value={time} onChange={(e) => setTime(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm" />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase">모집 규모</label>
+            <select value={cartCount} onChange={(e) => setCartCount(Number(e.target.value))} className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg">
+              {cartOptions.map(num => <option key={num} value={num}>{num}카트 ({num * 4}명)</option>)}
+            </select>
+          </div>
+        </div>
+        <button type="submit" disabled={loading} className={`w-full text-white p-5 rounded-2xl font-bold shadow-xl ${loading ? 'bg-gray-400' : 'bg-green-600'}`}>
+          {loading ? '처리 중...' : meetupId ? '수정 완료하기 ⛳' : '벙개 등록하기 ⛳'}
+        </button>
+      </form>
     </main>
+  );
+}
+
+export default function CreateMeetupPage() {
+  return (
+    <Suspense fallback={<div className="p-10 text-center">로딩 중...</div>}>
+      <CreateMeetupContent />
+    </Suspense>
   );
 }
