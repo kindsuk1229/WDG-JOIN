@@ -100,7 +100,7 @@ function CreateMeetupContent() {
   };
 
   return (
-    /* ✅ 1. 전체를 하나의 div로 감싸야 에러가 나지 않습니다. */
+    /* 1. 전체 컨테이너: 하단 네비게이션(약 80px)을 제외한 높이만큼만 사용 */
     <div className="flex flex-col h-[calc(100vh-80px)] overflow-hidden relative bg-gray-50">
       
       {/* 2. 고정 헤더 */}
@@ -116,8 +116,8 @@ function CreateMeetupContent() {
         )}
       </header>
 
-      {/* 3. 스크롤 영역: 입력 폼 */}
-      <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-6 pb-44 custom-scrollbar">
+      {/* 3. 스크롤 영역: 입력 폼 (pb-32로 하단 버튼에 가려지지 않게 여백 추가) */}
+      <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-6 pb-32 custom-scrollbar">
         <div className="bg-white p-6 rounded-3xl shadow-sm space-y-6 border border-gray-100">
           <div>
             <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">벙개 제목</label>
@@ -162,13 +162,13 @@ function CreateMeetupContent() {
         </div>
       </form>
 
-      {/* 4. 하단 고정 버튼: form 밖에 두거나 form 안의 absolute 영역에 둡니다. */}
-      <div className="absolute bottom-4 left-0 right-0 px-5 z-30 pointer-events-none">
+      {/* ✅ 4. 하단 고정 버튼: bottom-4를 bottom-6으로 올리고 shadow를 강화했습니다. */}
+      <div className="absolute bottom-6 left-0 right-0 px-5 z-30 pointer-events-none">
         <button 
           type="button" 
           onClick={(e) => handleSubmit(e as any)}
           disabled={loading} 
-          className={`w-full p-4 rounded-2xl font-black text-lg text-white shadow-2xl transition-all active:scale-95 pointer-events-auto ${loading ? 'bg-gray-400' : 'bg-green-600 shadow-green-200 hover:bg-green-700'}`}
+          className={`w-full p-4 rounded-2xl font-black text-lg text-white shadow-[0_10px_25px_rgba(0,0,0,0.1)] transition-all active:scale-95 pointer-events-auto ${loading ? 'bg-gray-400' : 'bg-green-600 shadow-green-200 hover:bg-green-700'}`}
         >
           {loading ? '처리 중...' : meetupId ? '수정 완료하기 ⛳' : '벙개 등록하기 ⛳'}
         </button>
