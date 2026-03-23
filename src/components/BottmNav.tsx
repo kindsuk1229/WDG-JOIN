@@ -13,13 +13,14 @@ export default function BottomNav() {
         <span className="text-[10px] font-bold">홈</span>
       </Link>
       
-      {/* 마이페이지 경로를 /my-meetups로 확실히 지정했습니다 */}
+      {/* '내 벙개' 주소 확인 (폴더명이 my-meetups인지 확인하세요!) */}
       <Link href="/my-meetups" className={`flex flex-col items-center gap-1 ${pathname === '/my-meetups' ? 'text-green-600' : 'text-gray-400'}`}>
         <span className="text-2xl">📝</span>
         <span className="text-[10px] font-bold">내 벙개</span>
       </Link>
 
-      <Link href="/profile" className={`flex flex-col items-center gap-1 ${pathname === '/profile' ? 'text-green-600' : 'text-gray-400'}`}>
+      {/* 마이페이지 경로를 /mypage로 수정했습니다! ⭐ */}
+      <Link href="/mypage" className={`flex flex-col items-center gap-1 ${pathname === '/mypage' ? 'text-green-600' : 'text-gray-400'}`}>
         <span className="text-2xl">👤</span>
         <span className="text-[10px] font-bold">마이</span>
       </Link>
