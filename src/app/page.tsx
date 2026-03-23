@@ -12,7 +12,7 @@ export default function Home() {
   const [meetups, setMeetups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 로그인 상태와 사용자 이름 관리용 상태 추가
+  // 로그인 상태와 사용자 이름 관리용 상태
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userName, setUserName] = useState('회원');
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -24,7 +24,7 @@ export default function Home() {
     
     if (status === 'true') {
       setIsLoggedIn(true);
-      setUserName(savedName || '근석');
+      setUserName(savedName || '회원');
     }
     setCheckingAuth(false);
 
@@ -48,6 +48,14 @@ export default function Home() {
     fetchMeetups();
   }, []);
 
+  // 로그아웃 처리 함수
+  const handleLogout = () => {
+    if (window.confirm('로그아웃 하시겠습니까?')) {
+      localStorage.clear(); // 저장된 로그인 정보 삭제
+      window.location.reload(); // 페이지 새로고침하여 로그인 창으로 이동
+    }
+  };
+
   // 인증 확인 중에는 로딩 화면을 보여줍니다.
   if (checkingAuth) {
     return <div className="flex items-center justify-center min-h-screen">로딩 중...</div>;
@@ -60,11 +68,19 @@ export default function Home() {
 
   return (
     <main className="max-w-md mx-auto bg-gray-50 min-h-screen pb-24 text-gray-900">
-      {/* Header */}
-      <header className="p-4 bg-white flex justify-between items-center sticky top-0 z-10">
+      {/* Header - 로그아웃 버튼 포함 */}
+      <header className="p-4 bg-white flex justify-between items-center sticky top-0 z-10 shadow-sm">
         <h1 className="text-2xl font-black text-green-600 italic">WDG</h1>
-        <div className="px-3 py-1 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 font-bold text-sm">
-          {userName}님
+        <div className="flex items-center gap-3">
+          <div className="px-3 py-1 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 font-bold text-xs">
+            {userName}님
+          </div>
+          <button 
+            onClick={handleLogout}
+            className="text-[11px] text-gray-400 underline decoration-gray-300"
+          >
+            로그아웃
+          </button>
         </div>
       </header>
 
@@ -114,7 +130,8 @@ export default function Home() {
               meetups.map((item) => (
                 <div 
                   key={item.id}
-                  onClick={() => router.push(`/create-meetup?id=${item.id}`)}
+                  // ✅ 수정됨: 상세 보기 페이지(meetup-detail)로 이동합니다.
+                  onClick={() => router.push(`/meetup-detail?id=${item.id}`)}
                   className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer active:bg-gray-50"
                 >
                   <div>
@@ -123,7 +140,7 @@ export default function Home() {
                   </div>
                   <div className="text-right">
                     <p className="text-green-600 font-bold text-sm">{item.cartCount}카트</p>
-                    <p className="text-[10px] text-gray-300">상세보기</p>
+                    <p className="text-[10px] text-gray-300 font-bold">참여하기</p>
                   </div>
                 </div>
               ))
