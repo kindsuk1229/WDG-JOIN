@@ -14,12 +14,11 @@ function CreateMeetupContent() {
   const [golfCourse, setGolfCourse] = useState('');
   const [date, setDate] = useState('');
   const [cartCount, setCartCount] = useState(1);
-  // ✅ 카트별 시간을 저장할 배열 상태 추가
   const [cartTimes, setCartTimes] = useState<string[]>(['']);
   const [loading, setLoading] = useState(false);
   const [creatorId, setCreatorId] = useState('');
 
-  const myId = 'admin_test'; // 김근석 사장님 아이디
+  const myId = 'admin_test'; // 김근석 사장님 계정
 
   useEffect(() => {
     if (meetupId) {
@@ -33,7 +32,6 @@ function CreateMeetupContent() {
             setGolfCourse(data.golfCourse || '');
             setDate(data.date || '');
             setCartCount(data.cartCount || 1);
-            // ✅ 기존 데이터가 있으면 불러오고, 없으면 카트 수만큼 빈 배열 생성
             setCartTimes(data.cartTimes || Array(data.cartCount || 1).fill(''));
             setCreatorId(data.creatorId || '');
           }
@@ -45,45 +43,29 @@ function CreateMeetupContent() {
     }
   }, [meetupId]);
 
-  // ✅ 카트 수 변경 시 시간 입력 칸 개수 조절 핸들러
+  // 카트/시간 핸들러 로직 (동일)
   const handleCartCountChange = (count: number) => {
     setCartCount(count);
     const newTimes = Array(count).fill('').map((_, i) => cartTimes[i] || '');
     setCartTimes(newTimes);
   };
 
-  // ✅ 특정 조의 시간 업데이트 핸들러
   const updateCartTime = (index: number, timeValue: string) => {
     const newTimes = [...cartTimes];
     newTimes[index] = timeValue;
     setCartTimes(newTimes);
   };
 
-  const handleDelete = async () => {
-    if (!window.confirm('정말로 이 벙개를 삭제하시겠습니까?')) return;
-    setLoading(true);
-    try {
-      await deleteDoc(doc(db, 'meetups', meetupId!));
-      alert('⛳ 벙개가 삭제되었습니다.');
-      router.push('/my-meetups');
-    } catch (error) {
-      alert('삭제 중 오류가 발생했습니다.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
     try {
       const meetupData = {
         title: title || 'WDG 벙개',
         golfCourse,
         date,
         cartCount,
-        cartTimes, // ✅ 조별 시간 배열 저장
+        cartTimes,
         creatorId: myId,
         authorName: '김근석 사장님',
         updatedAt: new Date().toISOString(),
@@ -93,11 +75,7 @@ function CreateMeetupContent() {
         await updateDoc(doc(db, 'meetups', meetupId), meetupData);
         alert('⛳ 벙개가 수정되었습니다!');
       } else {
-        await addDoc(collection(db, 'meetups'), {
-          ...meetupData,
-          createdAt: new Date().toISOString(),
-          players: 1,
-        });
+        await addDoc(collection(db, 'meetups'), { ...meetupData, createdAt: new Date().toISOString(), players: 1 });
         alert('⛳ 새로운 벙개가 등록되었습니다!');
       }
       router.push('/my-meetups');
@@ -109,75 +87,69 @@ function CreateMeetupContent() {
   };
 
   return (
-    <main className="max-w-md mx-auto bg-gray-50 min-h-screen pb-20 text-gray-900">
-      <header className="p-4 bg-white border-b flex justify-between items-center sticky top-0 z-10 shadow-sm">
+    // 레이아웃이 h-screen이므로 여기서는 flex로 영역만 나눕니다.
+    <div className="flex flex-col h-full bg-gray-50">
+      {/* 1. 상단 헤더 고정 */}
+      <header className="p-4 bg-white border-b flex justify-between items-center sticky top-0 z-20">
         <div className="flex items-center">
-          <button type="button" onClick={() => router.back()} className="mr-4 text-xl font-bold text-gray-600">←</button>
-          <h1 className="text-xl font-bold text-green-700">
-            {meetupId ? '벙개 정보 수정' : '새로운 벙개 만들기'}
-          </h1>
+          <button type="button" onClick={() => router.back()} className="mr-4 text-xl text-gray-600">←</button>
+          <h1 className="text-lg font-bold text-green-700">{meetupId ? '벙개 수정' : '새로운 벙개'}</h1>
         </div>
-        {meetupId && creatorId === myId && (
-          <button type="button" onClick={handleDelete} className="text-red-500 text-sm font-bold">삭제</button>
-        )}
       </header>
 
-      <form onSubmit={handleSubmit} className="p-5 space-y-6">
-        <div className="bg-white p-6 rounded-3xl shadow-sm space-y-6">
+      {/* 2. 입력 영역 (자동 스크롤) */}
+      <form onSubmit={handleSubmit} className="flex-1 p-5 space-y-6 pb-40">
+        <div className="bg-white p-6 rounded-3xl shadow-sm space-y-5">
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">벙개 제목</label>
-            <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: [WDG] 주말 정기 라운딩" className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all" />
+            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase">벙개 제목</label>
+            <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="제목을 입력하세요" className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm" />
           </div>
 
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">골프장 이름</label>
-            <input type="text" required value={golfCourse} onChange={(e) => setGolfCourse(e.target.value)} placeholder="예: 샤인데일 CC" className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all" />
+            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase">골프장</label>
+            <input type="text" required value={golfCourse} onChange={(e) => setGolfCourse(e.target.value)} placeholder="예: 샤인데일 CC" className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm" />
           </div>
 
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">날짜 선택</label>
-            <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all" />
+            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase">날짜</label>
+            <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm" />
           </div>
 
-          <div className="border-t pt-6">
-            <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">모집 규모 및 조별 티타임</label>
-            <select 
-              value={cartCount} 
-              onChange={(e) => handleCartCountChange(Number(e.target.value))} 
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg mb-4 focus:ring-2 focus:ring-green-500"
-            >
-              {[...Array(10)].map((_, i) => <option key={i+1} value={i+1}>{i+1}카트 ({ (i+1)*4 }명)</option>)}
+          <div className="border-t pt-5">
+            <label className="text-xs font-bold text-gray-400 block mb-3 uppercase">카트 및 티타임</label>
+            <select value={cartCount} onChange={(e) => handleCartCountChange(Number(e.target.value))} className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold mb-4">
+              {[...Array(5)].map((_, i) => <option key={i+1} value={i+1}>{i+1}카트 ({ (i+1)*4 }명)</option>)}
             </select>
 
-            {/* 🕒 선택된 카트 수만큼 시간 입력 필드 생성 */}
-            <div className="grid grid-cols-1 gap-3">
+            <div className="space-y-2">
               {cartTimes.map((time, index) => (
                 <div key={index} className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
-                  <span className="text-[11px] font-black text-green-700 w-10 text-center">{index + 1}조</span>
-                  <input
-                    type="time"
-                    required
-                    value={time}
-                    onChange={(e) => updateCartTime(index, e.target.value)}
-                    className="bg-transparent border-none focus:ring-0 font-bold text-gray-800 flex-1 p-1"
-                  />
+                  <span className="text-xs font-black text-green-700 w-8">{index + 1}조</span>
+                  <input type="time" required value={time} onChange={(e) => updateCartTime(index, e.target.value)} className="bg-transparent border-none font-bold text-gray-800 flex-1" />
                 </div>
               ))}
             </div>
           </div>
         </div>
-
-        <button type="submit" disabled={loading} className={`w-full text-white p-5 rounded-2xl font-bold shadow-xl transition-all active:scale-95 ${loading ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'}`}>
-          {loading ? '처리 중...' : meetupId ? '수정 완료하기 ⛳' : '벙개 등록하기 ⛳'}
-        </button>
       </form>
-    </main>
+
+      {/* 3. 등록 버튼 고정 (BottomNav 바로 위에 띄움) */}
+      <div className="absolute bottom-4 left-0 right-0 px-5 z-30">
+        <button 
+          onClick={(e) => handleSubmit(e as any)}
+          disabled={loading}
+          className="w-full p-4 bg-green-600 text-white rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all"
+        >
+          {loading ? '처리 중...' : meetupId ? '수정 완료 ⛳' : '벙개 등록 완료 ⛳'}
+        </button>
+      </div>
+    </div>
   );
 }
 
 export default function CreateMeetupPage() {
   return (
-    <Suspense fallback={<div className="p-10 text-center">로딩 중...</div>}>
+    <Suspense fallback={<div className="p-10 text-center font-bold text-gray-400">로딩 중...</div>}>
       <CreateMeetupContent />
     </Suspense>
   );
