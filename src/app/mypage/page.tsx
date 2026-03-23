@@ -10,7 +10,6 @@ import BottomNav from '@/components/BottmNav';
 export default function MyPage() {
   const router = useRouter();
   
-  // 상태 관리: 이름, 참여 수, 이번달 수
   const [userName, setUserName] = useState('회원');
   const [stats, setStats] = useState({
     totalCount: 0,
@@ -20,48 +19,48 @@ export default function MyPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. 로컬에서 유저 정보 가져오기
     const savedName = localStorage.getItem('user_name');
-    const savedId = localStorage.getItem('user_id');
     if (savedName) setUserName(savedName);
 
-    // 2. 파이어베이스에서 내 통계 가져오기
-    const fetchMyStats = async () => {
+    const fetchMyData = async () => {
       try {
-        const q = query(collection(db, "meetups"));
-        const querySnapshot = await getDocs(q);
-        
+        // 1. 벙개 참여 정보 가져오기
+        const meetupSnap = await getDocs(collection(db, "meetups"));
         let total = 0;
         let monthly = 0;
-        const currentMonth = new Date().toISOString().substring(0, 7); // "2026-03"
+        const currentMonth = new Date().toISOString().substring(0, 7);
 
-        querySnapshot.forEach((doc) => {
+        meetupSnap.forEach((doc) => {
           const data = doc.data();
-          // 참여자 명단(participants)에 내 ID가 있는지 확인
           const isJoined = data.participants?.some((p: any) => p.name === savedName);
-          
           if (isJoined) {
             total++;
-            // 이번 달 날짜인지 확인
-            if (data.date && data.date.includes(currentMonth)) {
-              monthly++;
-            }
+            if (data.date && data.date.includes(currentMonth)) monthly++;
           }
+        });
+
+        // 2. 정산 내역 합계 가져오기 (settlements 컬렉션이 있다고 가정)
+        const settlementSnap = await getDocs(
+          query(collection(db, "settlements"), where("userName", "==", savedName))
+        );
+        let amount = 0;
+        settlementSnap.forEach((doc) => {
+          amount += (doc.data().totalAmount || 0);
         });
 
         setStats({
           totalCount: total,
           monthlyCount: monthly,
-          totalAmount: 0 // 정산 기능 연동 시 업데이트 가능
+          totalAmount: amount
         });
       } catch (error) {
-        console.error("통계 로딩 실패:", error);
+        console.error("데이터 로딩 실패:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchMyStats();
+    fetchMyData();
   }, []);
 
   const menus = [
@@ -78,7 +77,7 @@ export default function MyPage() {
         <h1 className="text-2xl font-bold mb-6">마이페이지</h1>
 
         {/* Profile */}
-        <div className="flex items-center gap-4 bg-gray-50 rounded-2xl p-5 mb-6">
+        <div className="flex items-center gap-4 bg-gray-50 rounded-2xl p-5 mb-6 shadow-sm">
           <Avatar name={userName} size={56} />
           <div>
             <p className="text-lg font-semibold">{userName} {userName === '김근석' ? '사장님' : '멤버님'}</p>
@@ -86,42 +85,36 @@ export default function MyPage() {
           </div>
         </div>
 
-        {/* Stats - 이제 숫자가 실시간으로 바뀝니다! */}
+        {/* Stats */}
         <div className="grid grid-cols-3 gap-2 mb-6">
           {[
-            { label: '참여 벙개', value: loading ? '-' : stats.totalCount },
-            { label: '이번 달', value: loading ? '-' : stats.monthlyCount },
-            { label: '총 정산', value: '0원' },
+            { label: '참여 벙개', value: loading ? '-' : `${stats.totalCount}회` },
+            { label: '이번 달', value: loading ? '-' : `${stats.monthlyCount}회` },
+            { label: '총 정산', value: loading ? '-' : `${stats.totalAmount.toLocaleString()}원` },
           ].map((s, i) => (
-            <div key={i} className="bg-gray-50 rounded-xl p-3 text-center">
+            <div key={i} className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
               <p className="text-[11px] text-gray-400">{s.label}</p>
-              <p className="text-[18px] font-semibold mt-0.5">{s.value}</p>
+              <p className="text-[16px] font-bold mt-0.5 text-gray-800">{s.value}</p>
             </div>
           ))}
         </div>
 
         {/* Menu */}
-        <div>
+        <div className="space-y-1">
           {menus.map((item, i) => (
             <div 
               key={i} 
-              onClick={() => {
-                if (item.href !== '#') {
-                  router.push(item.href);
-                } else {
-                  alert(`${item.label} 기능은 준비 중입니다.`);
-                }
-              }} 
-              className="flex items-center gap-3 py-4 border-b border-gray-100 last:border-0 cursor-pointer active:bg-gray-50"
+              onClick={() => item.href !== '#' ? router.push(item.href) : alert(`${item.label} 준비 중`)} 
+              className="flex items-center gap-3 py-4 border-b border-gray-50 last:border-0 cursor-pointer active:bg-gray-50 px-2"
             >
               <span className="text-lg w-7">{item.icon}</span>
-              <span className="flex-1 text-[15px]">{item.label}</span>
+              <span className="flex-1 text-[15px] text-gray-700">{item.label}</span>
               <span className="text-gray-300 text-lg">〉</span>
             </div>
           ))}
         </div>
 
-        <p className="text-center text-[12px] text-gray-300 mt-8">우동골 v1.0.0</p>
+        <p className="text-center text-[12px] text-gray-300 mt-12 font-light">우동골 v1.0.0</p>
       </div>
 
       <BottomNav active="my" />
