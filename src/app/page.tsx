@@ -4,15 +4,31 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { collection, query, getDocs, orderBy, limit } from 'firebase/firestore';
-import BottomNav from '@/components/BottmNav'; // 파일명 o 빠진 것 유지
+import BottomNav from '@/components/BottmNav'; 
+import KakaoLoginButton from '@/components/KakaoLogin'; // 로그인 버튼 컴포넌트 호출
 
 export default function Home() {
   const router = useRouter();
   const [meetups, setMeetups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 파이어베이스에서 최신 벙개 리스트 가져오기
+  // 로그인 상태와 사용자 이름 관리용 상태 추가
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userName, setUserName] = useState('회원');
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
   useEffect(() => {
+    // 1. 로그인 상태 확인 (로컬 스토리지 체크)
+    const status = localStorage.getItem('isLoggedIn');
+    const savedName = localStorage.getItem('user_name');
+    
+    if (status === 'true') {
+      setIsLoggedIn(true);
+      setUserName(savedName || '근석');
+    }
+    setCheckingAuth(false);
+
+    // 2. 파이어베이스에서 최신 벙개 리스트 가져오기
     const fetchMeetups = async () => {
       try {
         const q = query(
@@ -32,13 +48,23 @@ export default function Home() {
     fetchMeetups();
   }, []);
 
+  // 인증 확인 중에는 로딩 화면을 보여줍니다.
+  if (checkingAuth) {
+    return <div className="flex items-center justify-center min-h-screen">로딩 중...</div>;
+  }
+
+  // 로그인이 안 되어 있으면 카카오 로그인 화면만 보여줍니다.
+  if (!isLoggedIn) {
+    return <KakaoLoginButton />;
+  }
+
   return (
     <main className="max-w-md mx-auto bg-gray-50 min-h-screen pb-24 text-gray-900">
       {/* Header */}
       <header className="p-4 bg-white flex justify-between items-center sticky top-0 z-10">
         <h1 className="text-2xl font-black text-green-600 italic">WDG</h1>
-        <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 font-bold text-sm">
-          석님
+        <div className="px-3 py-1 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 font-bold text-sm">
+          {userName}님
         </div>
       </header>
 
@@ -46,7 +72,7 @@ export default function Home() {
         {/* Welcome Msg */}
         <div>
           <h2 className="text-xl font-bold leading-tight">
-            반갑습니다, 근석님!<br />
+            반갑습니다, {userName}님!<br />
             오늘의 골프 일정은 어떠신가요? ⛳
           </h2>
         </div>
