@@ -1,6 +1,6 @@
 import './globals.css';
 import Script from 'next/script';
-import BottomNav from '@/components/BottomNav'; // 하단바 불러오기
+import BottomNav from '@/components/BottmNav';
 
 export const metadata = {
   title: 'WDG - 우리동네골프',
