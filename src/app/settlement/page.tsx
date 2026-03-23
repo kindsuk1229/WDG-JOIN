@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { shareToKakao } from '@/lib/kakao'; // 공유 함수 불러오기
+// ✅ Firebase 저장을 위해 추가된 import
+import { db } from '@/lib/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function SettlementPage() {
   const router = useRouter();
@@ -22,64 +25,89 @@ export default function SettlementPage() {
 
   const personOptions = Array.from({ length: 20 }, (_, i) => i + 1);
 
-  // 카톡 공유 버튼 클릭 시 실행될 함수
-  const handleKakaoShare = () => {
+  // ✅ 카톡 공유와 동시에 Firebase에 저장하는 함수
+  const handleKakaoShare = async () => {
     if(totalAmount <= 0) return alert('금액을 입력해주세요!');
     
-    const title = '⛳ WDG 라운딩 정산 요청';
-    const description = `내용: ${memo || '모임 비용'}\n1인당: ${perPerson.toLocaleString()}원 입니다.\n입금 부탁드려요!`;
-    
-    shareToKakao(window.location.href, title, description);
+    try {
+      const savedName = localStorage.getItem('user_name') || '회원';
+
+      // 1. Firebase 'settlements' 컬렉션에 정산 데이터 저장
+      await addDoc(collection(db, "settlements"), {
+        userName: savedName,        // 마이페이지에서 합산할 기준 이름
+        totalAmount: totalAmount,   // 총 결제 금액 저장
+        memo: memo || '모임 비용',
+        playerCount: playerCount,
+        perPerson: perPerson,
+        createdAt: serverTimestamp() // 정산 시점 저장
+      });
+
+      // 2. 기존 카카오톡 공유 실행
+      const title = '⛳ WDG 라운딩 정산 요청';
+      const description = `내용: ${memo || '모임 비용'}\n1인당: ${perPerson.toLocaleString()}원 입니다.\n입금 부탁드려요!`;
+      
+      shareToKakao(window.location.href, title, description);
+      
+      alert('정산 내역이 기록되었습니다! 카카오톡 공유를 시작합니다. ⛳');
+      
+    } catch (error) {
+      console.error("정산 저장 에러:", error);
+      alert('데이터 저장 중 오류가 발생했습니다. (카톡 공유는 진행됩니다)');
+      
+      // 저장 실패해도 공유는 되게끔 처리
+      shareToKakao(window.location.href, '⛳ WDG 라운딩 정산 요청', `1인당 ${perPerson.toLocaleString()}원`);
+    }
   };
 
   return (
     <main className="max-w-md mx-auto bg-gray-50 min-h-screen pb-24 text-gray-900">
-      <header className="p-4 bg-white border-b flex items-center sticky top-0 z-50">
+      <header className="p-4 bg-white border-b flex items-center sticky top-0 z-50 shadow-sm">
         <button onClick={() => router.back()} className="mr-4 text-xl">←</button>
-        <h1 className="text-xl font-bold text-green-700">모임 비용 정산</h1>
+        <h1 className="text-xl font-bold text-green-700 font-sans">모임 비용 정산</h1>
       </header>
 
       <div className="p-5 space-y-6">
-        <div className="bg-slate-800 text-white p-6 rounded-2xl shadow-lg">
-          <p className="text-xs opacity-70 mb-1 font-bold">우리 멤버 1인당</p>
-          <h2 className="text-3xl font-bold text-green-400">
+        {/* Result Card */}
+        <div className="bg-slate-800 text-white p-7 rounded-3xl shadow-xl border-b-4 border-green-600">
+          <p className="text-xs opacity-70 mb-1 font-bold tracking-tight">우리 멤버 1인당</p>
+          <h2 className="text-4xl font-black text-green-400">
             {perPerson.toLocaleString()}원
           </h2>
-          <div className="mt-4 pt-4 border-t border-gray-700 text-xs flex justify-between opacity-80">
+          <div className="mt-5 pt-4 border-t border-gray-700 text-[11px] flex justify-between opacity-80">
             <span>총 지출: {totalAmount.toLocaleString()}원</span>
             <span>{playerCount}명 기준</span>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm space-y-6">
+        <div className="bg-white p-6 rounded-3xl shadow-sm space-y-6 border border-gray-100">
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-2">지출 내용</label>
+            <label className="text-xs font-bold text-gray-400 block mb-2 px-1">지출 내용</label>
             <input 
               type="text" 
               placeholder="예: 그늘집 및 저녁 식사" 
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
-              className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-green-500"
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-green-500 font-medium"
             />
           </div>
 
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-2">총 결제 금액 (원)</label>
+            <label className="text-xs font-bold text-gray-400 block mb-2 px-1">총 결제 금액 (원)</label>
             <input 
               type="number" 
               placeholder="0" 
               value={totalAmount === 0 ? '' : totalAmount}
               onChange={(e) => setTotalAmount(Number(e.target.value))}
-              className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-green-500 text-lg font-bold"
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-green-500 text-xl font-black"
             />
           </div>
 
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-2">나눌 인원 ({playerCount}명)</label>
+            <label className="text-xs font-bold text-gray-400 block mb-2 px-1">나눌 인원 ({playerCount}명)</label>
             <select 
               value={playerCount}
               onChange={(e) => setPlayerCount(Number(e.target.value))}
-              className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-green-500 font-bold text-lg"
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-green-500 font-bold text-lg"
             >
               {personOptions.map((num) => (
                 <option key={num} value={num}>
@@ -93,10 +121,14 @@ export default function SettlementPage() {
         {/* 카카오톡 공유 버튼 */}
         <button 
           onClick={handleKakaoShare}
-          className="w-full bg-[#FEE500] text-[#191919] p-5 rounded-2xl font-bold shadow-xl active:scale-95 transition-all text-lg flex items-center justify-center gap-2"
+          className="w-full bg-[#FEE500] text-[#191919] p-5 rounded-2xl font-black shadow-lg active:scale-95 transition-all text-lg flex items-center justify-center gap-3 border-b-4 border-yellow-600/30"
         >
           <span className="text-2xl">💬</span> 카톡으로 정산 공유
         </button>
+        
+        <p className="text-center text-[11px] text-gray-400 mt-2">
+          공유 버튼을 누르면 마이페이지 정산 내역에 자동 반영됩니다.
+        </p>
       </div>
     </main>
   );
