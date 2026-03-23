@@ -6,7 +6,7 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy, updateDoc, doc } from 'firebase/firestore';
 import { shareToKakao } from '@/lib/kakao';
 
-// ✅ 데이터 타입 정의 (에러 해결 핵심)
+// ✅ 데이터 타입 정의
 interface Settlement {
   id: string;
   userName: string;
@@ -19,34 +19,48 @@ interface Settlement {
 
 export default function SettlementHistoryPage() {
   const router = useRouter();
-  const [history, setHistory] = useState<Settlement[]>([]); // ✅ <Settlement[]> 추가
+  const [history, setHistory] = useState<Settlement[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchHistory = async () => {
-    const savedName = localStorage.getItem('user_name') || '';
-    const q = query(
-      collection(db, "settlements"),
-      where("userName", "==", savedName.trim()),
-      orderBy("createdAt", "desc")
-    );
-    
-    const snap = await getDocs(q);
-    const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Settlement));
-    setHistory(docs);
-    setLoading(false);
+    try {
+      setLoading(true);
+      const rawName = localStorage.getItem('user_name') || '회원';
+      const savedName = rawName.trim();
+      
+      // ✅ 쿼리 실행
+      const q = query(
+        collection(db, "settlements"),
+        where("userName", "==", savedName),
+        orderBy("createdAt", "desc") // 👈 이 부분 때문에 인덱스 생성이 필요합니다.
+      );
+      
+      const snap = await getDocs(q);
+      const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Settlement));
+      setHistory(docs);
+    } catch (error: any) {
+      console.error("데이터 로딩 에러:", error);
+      
+      // ✅ 인덱스 에러 발생 시 알림 (F12 콘솔창 확인 유도)
+      if (error.message.includes("index")) {
+        alert("데이터 정렬을 위한 색인(Index) 설정이 필요합니다. 개발자 도구(F12)의 링크를 클릭해 주세요.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchHistory();
   }, []);
 
-  // ✅ 정산 완료 처리 (누르면 마이페이지 금액에서 빠짐)
+  // ✅ 정산 완료 처리
   const handleComplete = async (id: string) => {
     if (!confirm('정산이 완료되었나요? 완료 시 "받아야 할 금액"에서 제외됩니다.')) return;
     try {
       await updateDoc(doc(db, "settlements", id), { status: 'completed' });
       alert('정산 완료 처리되었습니다.');
-      fetchHistory(); // 목록 새로고침
+      fetchHistory(); 
     } catch (e) {
       alert('상태 업데이트에 실패했습니다.');
     }
@@ -56,7 +70,8 @@ export default function SettlementHistoryPage() {
   const reShare = (item: Settlement) => {
     const title = '⛳ WDG 라운딩 정산 재요청';
     const description = `내용: ${item.memo}\n1인당: ${item.perPerson.toLocaleString()}원\n아직 입금 전이신 분들은 확인 부탁드려요!`;
-    shareToKakao(window.location.href.replace('/history', ''), title, description);
+    // 공유 시 현재 history 주소를 떼고 보냄
+    shareToKakao(window.location.origin + '/settlement', title, description);
   };
 
   return (
@@ -84,7 +99,8 @@ export default function SettlementHistoryPage() {
                 <div>
                   <p className="font-extrabold text-gray-800 text-base">{item.memo}</p>
                   <p className="text-[10px] text-gray-400 mt-0.5">
-                    {item.createdAt?.toDate().toLocaleDateString()}
+                    {/* ✅ createdAt이 null일 경우를 대비한 안전장치 */}
+                    {item.createdAt ? item.createdAt.toDate().toLocaleDateString() : '방금 전'}
                   </p>
                 </div>
                 <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
