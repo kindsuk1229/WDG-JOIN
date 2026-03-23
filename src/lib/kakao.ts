@@ -1,5 +1,14 @@
 // src/lib/kakao.ts
 
+// src/lib/kakao.ts
+
+// 타입스크립트에게 window 객체에 Kakao가 있다는 것을 알려주는 설정입니다.
+declare global {
+  interface Window {
+    Kakao: any;
+  }
+}
+
 export const initKakao = () => {
   if (typeof window !== "undefined" && window.Kakao) {
     if (!window.Kakao.isInitialized()) {
@@ -10,6 +19,7 @@ export const initKakao = () => {
   }
 };
 
+// ... 나머지 shareToKakao 함수 코드는 그대로 두세요!
 export const shareToKakao = (url: string, title: string, description: string) => {
   if (typeof window !== "undefined" && window.Kakao) {
     if (!window.Kakao.isInitialized()) {
