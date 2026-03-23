@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 // 1. UI에서 Avatar만 가져오고, BottomNav는 따로 가져옵니다.
 import { Avatar } from '@/components/UI'; 
 // 2. 경로를 정확히 지정합니다. (파일명이 BottomNav.tsx 일 때)
-import BottomNav from '@/components/BottomNav';
+import BottomNav from '@/components/BottmNav';
 
 export default function MyPage() {
   const router = useRouter();
