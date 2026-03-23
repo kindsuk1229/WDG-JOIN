@@ -1,42 +1,38 @@
 // src/lib/kakao.ts
 
 export const initKakao = () => {
-  if (typeof window !== 'undefined' && (window as any).Kakao) {
-    const Kakao = (window as any).Kakao;
-    if (!Kakao.isInitialized()) {
-      Kakao.init('1782e23ec6181fc57d6c4395f3a06f56');
-      console.log("✅ 카카오 초기화 완료");
+  if (typeof window !== "undefined" && window.Kakao) {
+    if (!window.Kakao.isInitialized()) {
+      // 근석님의 JavaScript 키를 직접 입력했습니다.
+      window.Kakao.init("1782e23ec6181fc57d6c4395f3a06f56");
+      console.log("Kakao SDK Initialized:", window.Kakao.isInitialized());
     }
   }
 };
 
-export const shareToKakao = (title: string, description: string) => {
-  if (typeof window !== 'undefined' && (window as any).Kakao) {
-    const Kakao = (window as any).Kakao;
-    if (!Kakao.isInitialized()) {
-      Kakao.init('1782e23ec6181fc57d6c4395f3a06f56');
+export const shareToKakao = (url: string, title: string, description: string) => {
+  if (typeof window !== "undefined" && window.Kakao) {
+    if (!window.Kakao.isInitialized()) {
+      initKakao();
     }
 
-    const baseUrl = window.location.origin;
-    const currentPath = window.location.pathname;
-
-    Kakao.Share.sendDefault({
+    window.Kakao.Share.sendDefault({
       objectType: 'feed',
       content: {
         title: title,
         description: description,
-        imageUrl: 'https://ifh.cc/g/H0Y9pX.png',
+        imageUrl: 'https://wdg-join.vercel.app/og-image.png', // 실제 이미지 경로로 수정 가능
         link: {
-          mobileWebUrl: baseUrl + currentPath,
-          webUrl: baseUrl + currentPath,
+          mobileWebUrl: url,
+          webUrl: url,
         },
       },
       buttons: [
         {
-          title: '벙개 확인하기',
+          title: '벙개 참여하기',
           link: {
-            mobileWebUrl: baseUrl + currentPath,
-            webUrl: baseUrl + currentPath,
+            mobileWebUrl: url,
+            webUrl: url,
           },
         },
       ],
