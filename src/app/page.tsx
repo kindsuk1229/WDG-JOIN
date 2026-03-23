@@ -1,127 +1,124 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { Avatar } from '@/components/UI';
+import { useRouter } from 'next/navigation';
+import { db } from '@/lib/firebase';
+import { collection, query, getDocs, orderBy, limit } from 'firebase/firestore';
+import BottomNav from '@/components/BottmNav'; // 파일명 o 빠진 것 유지
 
 export default function Home() {
-  const [notice, setNotice] = useState<string>('매너 골프가 즐거운 모임을 만듭니다! ⛳');
-  const [isEditingNotice, setIsEditingNotice] = useState<boolean>(false);
-  const [tempNotice, setTempNotice] = useState<string>(notice);
+  const router = useRouter();
   const [meetups, setMeetups] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // 핵심 수정: 페이지가 보일 때마다 저장소에서 최신 데이터를 새로고침함
+  // 파이어베이스에서 최신 벙개 리스트 가져오기
   useEffect(() => {
-    const loadData = () => {
-      const saved = localStorage.getItem('meetups');
-      if (saved) {
-        try {
-          const parsedData = JSON.parse(saved);
-          // 데이터가 배열인지 확인 후 최신순으로 정렬해서 넣기
-          setMeetups(Array.isArray(parsedData) ? parsedData : []);
-        } catch (e) {
-          console.error("데이터 읽기 오류:", e);
-          setMeetups([]);
-        }
+    const fetchMeetups = async () => {
+      try {
+        const q = query(
+          collection(db, "meetups"), 
+          orderBy("createdAt", "desc"), 
+          limit(5)
+        );
+        const querySnapshot = await getDocs(q);
+        const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setMeetups(data);
+      } catch (error) {
+        console.error("데이터 로딩 실패:", error);
+      } finally {
+        setLoading(false);
       }
     };
-
-    loadData();
-    // 윈도우 포커스가 돌아올 때(창 전환 등) 다시 불러오기
-    window.addEventListener('focus', loadData);
-    return () => window.removeEventListener('focus', loadData);
+    fetchMeetups();
   }, []);
-
-  const saveNotice = () => {
-    setNotice(tempNotice);
-    setIsEditingNotice(false);
-  };
 
   return (
     <main className="max-w-md mx-auto bg-gray-50 min-h-screen pb-24 text-gray-900">
-      <header className="p-5 flex justify-between items-center bg-white sticky top-0 z-30 border-b border-gray-100">
-        <h1 className="text-2xl font-black text-green-700 italic tracking-tighter">WDG</h1>
-        <div className="flex gap-3 items-center">
-          <Avatar name="근석님" size={32} />
+      {/* Header */}
+      <header className="p-4 bg-white flex justify-between items-center sticky top-0 z-10">
+        <h1 className="text-2xl font-black text-green-600 italic">WDG</h1>
+        <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 font-bold text-sm">
+          석님
         </div>
       </header>
 
       <div className="p-5 space-y-8">
-        <section>
-          <h2 className="text-xl font-bold text-gray-800 leading-tight">
+        {/* Welcome Msg */}
+        <div>
+          <h2 className="text-xl font-bold leading-tight">
             반갑습니다, 근석님!<br />
             오늘의 골프 일정은 어떠신가요? ⛳
           </h2>
-          <div className="mt-6">
-            <Link href="/settlement" className="flex items-center justify-between bg-green-600 p-5 rounded-2xl shadow-lg active:scale-95 transition-all text-white">
-              <div>
-                <p className="text-xs opacity-80 mb-1 font-bold">라운딩 후 복잡한 계산은 그만!</p>
-                <h3 className="text-lg font-bold">💰 초간편 정산하기</h3>
-              </div>
-              <span className="text-3xl">→</span>
-            </Link>
-          </div>
-        </section>
+        </div>
 
-        <section>
+        {/* Quick Action */}
+        <div 
+          onClick={() => router.push('/settlement')}
+          className="bg-green-600 p-6 rounded-3xl shadow-lg shadow-green-100 flex justify-between items-center cursor-pointer active:scale-95 transition-all"
+        >
+          <div>
+            <p className="text-green-100 text-xs font-bold mb-1">라운딩 후 복잡한 계산은 그만!</p>
+            <p className="text-white text-xl font-black">💰 초간편 정산하기</p>
+          </div>
+          <span className="text-white text-2xl">→</span>
+        </div>
+
+        {/* My Meetups List */}
+        <div>
           <div className="flex justify-between items-end mb-4">
-            <h3 className="text-lg font-bold text-gray-800">나의 벙개 일정</h3>
-            <Link href="/create-meetup" className="text-xs text-green-600 font-bold">+ 벙개 만들기</Link>
+            <h3 className="text-lg font-bold">나의 벙개 일정</h3>
+            <button 
+              onClick={() => router.push('/create-meetup')}
+              className="text-green-600 text-sm font-bold"
+            >
+              + 벙개 만들기
+            </button>
           </div>
 
-          {meetups.length === 0 ? (
-            <div className="bg-white p-10 rounded-3xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-center">
-              <span className="text-4xl mb-3">🕳️</span>
-              <p className="text-gray-400 text-sm font-medium">아직 예정된 라운딩이 없어요.<br />새로운 벙개를 만들어보세요!</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {meetups.map((m, idx) => (
-                <div key={m.id || idx} className="bg-white p-5 rounded-3xl shadow-sm border border-gray-50">
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="bg-green-100 text-green-700 text-[10px] px-2 py-1 rounded-lg font-bold">모집중</div>
-                    <span className="text-xs text-gray-400 font-medium">{m.golfCourse}</span>
+          <div className="space-y-3">
+            {loading ? (
+              <div className="bg-white p-10 rounded-3xl border border-dashed border-gray-200 text-center text-gray-400">
+                일정을 불러오는 중...
+              </div>
+            ) : meetups.length === 0 ? (
+              <div className="bg-white p-10 rounded-3xl border border-dashed border-gray-200 text-center">
+                <p className="text-gray-400 text-sm">아직 예정된 라운딩이 없어요.<br />새로운 벙개를 만들어보세요!</p>
+              </div>
+            ) : (
+              meetups.map((item) => (
+                <div 
+                  key={item.id}
+                  onClick={() => router.push(`/create-meetup?id=${item.id}`)}
+                  className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer active:bg-gray-50"
+                >
+                  <div>
+                    <p className="font-bold text-gray-800">{item.title}</p>
+                    <p className="text-xs text-gray-400 mt-1">{item.golfCourse} | {item.date} {item.time}</p>
                   </div>
-                  <h4 className="text-lg font-bold text-gray-800 mb-1">{m.title || '무제한 벙개'}</h4>
-                  <p className="text-sm text-gray-500 font-medium">{m.date} · {m.time}</p>
-                  <div className="mt-4 flex justify-between items-center pt-4 border-t border-gray-50">
-                    <span className="text-sm font-extrabold text-green-600">{m.cartCount}카트 모집</span>
-                    <Link 
-                      href={`/meetup/${m.id}`} 
-                      className="bg-gray-900 text-white px-4 py-2 rounded-xl text-xs font-bold active:scale-95 transition-all"
-                    >
-                      상세보기
-                    </Link>
+                  <div className="text-right">
+                    <p className="text-green-600 font-bold text-sm">{item.cartCount}카트</p>
+                    <p className="text-[10px] text-gray-300">상세보기</p>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-          <div className="flex justify-between items-center mb-4 text-gray-900">
-            <h3 className="font-bold text-gray-800 flex items-center gap-2">📢 우동골 공지사항</h3>
-            {!isEditingNotice ? (
-              <button onClick={() => setIsEditingNotice(true)} className="text-xs text-gray-400 font-medium">편집</button>
-            ) : (
-              <div className="flex gap-2">
-                <button onClick={() => setIsEditingNotice(false)} className="text-xs text-gray-400 font-medium font-bold">취소</button>
-                <button onClick={saveNotice} className="text-xs text-green-600 font-bold">저장</button>
-              </div>
+              ))
             )}
           </div>
-          {!isEditingNotice ? (
-            <p className="text-sm text-gray-600 leading-relaxed font-medium">{notice}</p>
-          ) : (
-            <textarea 
-              value={tempNotice}
-              onChange={(e) => setTempNotice(e.target.value)}
-              className="w-full h-24 p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-green-500 text-sm text-gray-900"
-            />
-          )}
-        </section>
+        </div>
+
+        {/* Notice */}
+        <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-50">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-lg">📢</span>
+            <h3 className="font-bold">우동골 공지사항</h3>
+          </div>
+          <p className="text-sm text-gray-500 leading-relaxed">
+            매너 골프가 즐거운 모임을 만듭니다! ⛳<br />
+            노쇼 방지를 위해 최소 3일 전 취소 부탁드립니다.
+          </p>
+        </div>
       </div>
+
+      <BottomNav active="home" />
     </main>
   );
 }
