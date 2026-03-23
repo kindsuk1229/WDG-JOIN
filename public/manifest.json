@@ -1,15 +1,20 @@
 {
-  "name": "우동골 - 우리동네골프모임",
-  "short_name": "우동골",
-  "description": "소규모 동호회 골프 벙개 참여 시스템",
+  "name": "WDG 우리동네골프",
+  "short_name": "WDG",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0F6E56",
-  "theme_color": "#0F6E56",
-  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#16a34a",
   "icons": [
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "/icons/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
   ]
 }
