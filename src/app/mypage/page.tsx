@@ -2,7 +2,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Avatar, BottomNav } from '@/components/UI';
+import { Avatar } from '@/components/UI'; 
+import BottomNav from '@/components/BottomNav'; // 아까 이름을 BottomNav로 고치셨다면 이거!
 
 export default function MyPage() {
   const router = useRouter();
