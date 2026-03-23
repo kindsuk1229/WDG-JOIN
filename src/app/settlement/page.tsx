@@ -29,7 +29,7 @@ export default function SettlementPage() {
     const title = '⛳ WDG 라운딩 정산 요청';
     const description = `내용: ${memo || '모임 비용'}\n1인당: ${perPerson.toLocaleString()}원 입니다.\n입금 부탁드려요!`;
     
-    shareToKakao(title, description);
+    shareToKakao(window.location.href, title, description);
   };
 
   return (
