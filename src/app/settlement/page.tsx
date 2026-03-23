@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { shareToKakao } from '@/lib/kakao'; // 공유 함수 불러오기
-// ✅ Firebase 저장을 위해 추가된 import
+import { shareToKakao } from '@/lib/kakao'; 
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -25,36 +24,38 @@ export default function SettlementPage() {
 
   const personOptions = Array.from({ length: 20 }, (_, i) => i + 1);
 
-  // ✅ 카톡 공유와 동시에 Firebase에 저장하는 함수
+  // ✅ 개선된 저장 및 공유 함수
   const handleKakaoShare = async () => {
     if(totalAmount <= 0) return alert('금액을 입력해주세요!');
     
     try {
-      const savedName = localStorage.getItem('user_name') || '회원';
+      // 1. 이름 매칭 오류 방지를 위해 trim() 적용
+      const rawName = localStorage.getItem('user_name') || '회원';
+      const savedName = rawName.trim(); 
 
-      // 1. Firebase 'settlements' 컬렉션에 정산 데이터 저장
+      // 2. Firebase 'settlements' 컬렉션에 데이터 저장
       await addDoc(collection(db, "settlements"), {
-        userName: savedName,        // 마이페이지에서 합산할 기준 이름
-        totalAmount: totalAmount,   // 총 결제 금액 저장
+        userName: savedName,        // 마이페이지 조회 키
+        totalAmount: Number(totalAmount), // 확실하게 숫자 타입으로 저장
         memo: memo || '모임 비용',
-        playerCount: playerCount,
-        perPerson: perPerson,
-        createdAt: serverTimestamp() // 정산 시점 저장
+        playerCount: Number(playerCount),
+        perPerson: Number(perPerson),
+        createdAt: serverTimestamp() 
       });
 
-      // 2. 기존 카카오톡 공유 실행
+      // 3. 카카오톡 공유 실행
       const title = '⛳ WDG 라운딩 정산 요청';
       const description = `내용: ${memo || '모임 비용'}\n1인당: ${perPerson.toLocaleString()}원 입니다.\n입금 부탁드려요!`;
       
       shareToKakao(window.location.href, title, description);
       
-      alert('정산 내역이 기록되었습니다! 카카오톡 공유를 시작합니다. ⛳');
+      alert('정산 내역이 마이페이지에 기록되었습니다! ⛳');
       
     } catch (error) {
       console.error("정산 저장 에러:", error);
-      alert('데이터 저장 중 오류가 발생했습니다. (카톡 공유는 진행됩니다)');
+      alert('데이터 저장 중 오류가 발생했습니다.');
       
-      // 저장 실패해도 공유는 되게끔 처리
+      // 저장 실패해도 공유는 시도
       shareToKakao(window.location.href, '⛳ WDG 라운딩 정산 요청', `1인당 ${perPerson.toLocaleString()}원`);
     }
   };
@@ -118,7 +119,6 @@ export default function SettlementPage() {
           </div>
         </div>
 
-        {/* 카카오톡 공유 버튼 */}
         <button 
           onClick={handleKakaoShare}
           className="w-full bg-[#FEE500] text-[#191919] p-5 rounded-2xl font-black shadow-lg active:scale-95 transition-all text-lg flex items-center justify-center gap-3 border-b-4 border-yellow-600/30"
@@ -126,8 +126,8 @@ export default function SettlementPage() {
           <span className="text-2xl">💬</span> 카톡으로 정산 공유
         </button>
         
-        <p className="text-center text-[11px] text-gray-400 mt-2">
-          공유 버튼을 누르면 마이페이지 정산 내역에 자동 반영됩니다.
+        <p className="text-center text-[11px] text-gray-400 mt-2 font-medium">
+          버튼 클릭 시 마이페이지 '총 정산'에 즉시 합산됩니다.
         </p>
       </div>
     </main>
