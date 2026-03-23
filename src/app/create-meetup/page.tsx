@@ -6,13 +6,13 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/BottmNav';
 
-// 1. 데이터의 모양(Type)을 미리 알려줍니다.
+// 1. 데이터의 모양을 미리 정의합니다 (이걸 해야 date 에러가 안 납니다)
 interface MeetupData {
   id: string;
   title: string;
   date: string;
   creatorId: string;
-  [key: string]: any; // 다른 데이터가 더 있어도 괜찮다는 뜻
+  [key: string]: any; // 다른 필드들이 더 있어도 허용한다는 뜻
 }
 
 export default function MyMeetupsPage() {
@@ -26,16 +26,17 @@ export default function MyMeetupsPage() {
         const q = query(collection(db, "meetups"), where("creatorId", "==", "admin_test"));
         const querySnapshot = await getDocs(q);
         
-        // 2. 가져온 데이터를 MeetupData 형식으로 명확하게 지정합니다.
+        // 2. 데이터를 가져올 때 MeetupData 타입이라고 명시해줍니다 (as MeetupData[])
         const data = querySnapshot.docs.map(doc => ({ 
           id: doc.id, 
           ...doc.data() 
         })) as MeetupData[];
         
-        // 3. 이제 'date'가 있다는 걸 알기 때문에 에러 없이 정렬됩니다.
+        // 3. 날짜순 정렬 (데이터가 없을 경우를 대비해 안전장치를 추가했습니다)
         const sortedData = data.sort((a, b) => {
-          if (!a.date || !b.date) return 0;
-          return b.date.localeCompare(a.date);
+          const dateA = a.date || "";
+          const dateB = b.date || "";
+          return dateB.localeCompare(dateA);
         });
         
         setMyMeetups(sortedData);
@@ -61,8 +62,8 @@ export default function MyMeetupsPage() {
             <p className="text-gray-500">불러오는 중...</p>
           </div>
         ) : myMeetups.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-2xl border border-dashed">
-            <p className="text-gray-400">내가 만든 벙개가 없습니다. ⛳</p>
+          <div className="text-center py-20 bg-white rounded-2xl border border-dashed text-gray-400">
+            내가 만든 벙개가 없습니다. ⛳
           </div>
         ) : (
           myMeetups.map((item) => (
