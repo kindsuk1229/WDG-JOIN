@@ -13,12 +13,13 @@ function CreateMeetupContent() {
   const [title, setTitle] = useState('');
   const [golfCourse, setGolfCourse] = useState('');
   const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
   const [cartCount, setCartCount] = useState(1);
+  // ✅ 카트별 시간을 저장할 배열 상태 추가
+  const [cartTimes, setCartTimes] = useState<string[]>(['']);
   const [loading, setLoading] = useState(false);
   const [creatorId, setCreatorId] = useState('');
 
-  const myId = 'admin_test'; // 근석님 아이디
+  const myId = 'admin_test'; // 김근석 사장님 아이디
 
   useEffect(() => {
     if (meetupId) {
@@ -31,8 +32,9 @@ function CreateMeetupContent() {
             setTitle(data.title || '');
             setGolfCourse(data.golfCourse || '');
             setDate(data.date || '');
-            setTime(data.time || '');
             setCartCount(data.cartCount || 1);
+            // ✅ 기존 데이터가 있으면 불러오고, 없으면 카트 수만큼 빈 배열 생성
+            setCartTimes(data.cartTimes || Array(data.cartCount || 1).fill(''));
             setCreatorId(data.creatorId || '');
           }
         } catch (error) {
@@ -43,9 +45,22 @@ function CreateMeetupContent() {
     }
   }, [meetupId]);
 
+  // ✅ 카트 수 변경 시 시간 입력 칸 개수 조절 핸들러
+  const handleCartCountChange = (count: number) => {
+    setCartCount(count);
+    const newTimes = Array(count).fill('').map((_, i) => cartTimes[i] || '');
+    setCartTimes(newTimes);
+  };
+
+  // ✅ 특정 조의 시간 업데이트 핸들러
+  const updateCartTime = (index: number, timeValue: string) => {
+    const newTimes = [...cartTimes];
+    newTimes[index] = timeValue;
+    setCartTimes(newTimes);
+  };
+
   const handleDelete = async () => {
     if (!window.confirm('정말로 이 벙개를 삭제하시겠습니까?')) return;
-    
     setLoading(true);
     try {
       await deleteDoc(doc(db, 'meetups', meetupId!));
@@ -67,8 +82,8 @@ function CreateMeetupContent() {
         title: title || 'WDG 벙개',
         golfCourse,
         date,
-        time,
         cartCount,
+        cartTimes, // ✅ 조별 시간 배열 저장
         creatorId: myId,
         authorName: '김근석 사장님',
         updatedAt: new Date().toISOString(),
@@ -95,54 +110,64 @@ function CreateMeetupContent() {
 
   return (
     <main className="max-w-md mx-auto bg-gray-50 min-h-screen pb-20 text-gray-900">
-      <header className="p-4 bg-white border-b flex justify-between items-center sticky top-0 z-10">
+      <header className="p-4 bg-white border-b flex justify-between items-center sticky top-0 z-10 shadow-sm">
         <div className="flex items-center">
           <button type="button" onClick={() => router.back()} className="mr-4 text-xl font-bold text-gray-600">←</button>
           <h1 className="text-xl font-bold text-green-700">
             {meetupId ? '벙개 정보 수정' : '새로운 벙개 만들기'}
           </h1>
         </div>
-        
-        {/* 본인이 올린 글일 때만 삭제 버튼 표시 */}
         {meetupId && creatorId === myId && (
-          <button 
-            type="button" 
-            onClick={handleDelete}
-            className="text-red-500 text-sm font-bold"
-          >
-            삭제
-          </button>
+          <button type="button" onClick={handleDelete} className="text-red-500 text-sm font-bold">삭제</button>
         )}
       </header>
 
       <form onSubmit={handleSubmit} className="p-5 space-y-6">
         <div className="bg-white p-6 rounded-3xl shadow-sm space-y-6">
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase">벙개 제목</label>
-            <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm" />
+            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">벙개 제목</label>
+            <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: [WDG] 주말 정기 라운딩" className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all" />
           </div>
+
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase">골프장 이름</label>
-            <input type="text" required value={golfCourse} onChange={(e) => setGolfCourse(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm" />
+            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">골프장 이름</label>
+            <input type="text" required value={golfCourse} onChange={(e) => setGolfCourse(e.target.value)} placeholder="예: 샤인데일 CC" className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-bold text-gray-400 block mb-2 uppercase">날짜</label>
-              <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm" />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-400 block mb-2 uppercase">티타임</label>
-              <input type="time" required value={time} onChange={(e) => setTime(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm" />
-            </div>
-          </div>
+
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase">모집 규모</label>
-            <select value={cartCount} onChange={(e) => setCartCount(Number(e.target.value))} className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg">
-              {[...Array(20)].map((_, i) => <option key={i+1} value={i+1}>{i+1}카트 ({ (i+1)*4 }명)</option>)}
+            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">날짜 선택</label>
+            <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all" />
+          </div>
+
+          <div className="border-t pt-6">
+            <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">모집 규모 및 조별 티타임</label>
+            <select 
+              value={cartCount} 
+              onChange={(e) => handleCartCountChange(Number(e.target.value))} 
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg mb-4 focus:ring-2 focus:ring-green-500"
+            >
+              {[...Array(10)].map((_, i) => <option key={i+1} value={i+1}>{i+1}카트 ({ (i+1)*4 }명)</option>)}
             </select>
+
+            {/* 🕒 선택된 카트 수만큼 시간 입력 필드 생성 */}
+            <div className="grid grid-cols-1 gap-3">
+              {cartTimes.map((time, index) => (
+                <div key={index} className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
+                  <span className="text-[11px] font-black text-green-700 w-10 text-center">{index + 1}조</span>
+                  <input
+                    type="time"
+                    required
+                    value={time}
+                    onChange={(e) => updateCartTime(index, e.target.value)}
+                    className="bg-transparent border-none focus:ring-0 font-bold text-gray-800 flex-1 p-1"
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-        <button type="submit" disabled={loading} className={`w-full text-white p-5 rounded-2xl font-bold shadow-xl ${loading ? 'bg-gray-400' : 'bg-green-600'}`}>
+
+        <button type="submit" disabled={loading} className={`w-full text-white p-5 rounded-2xl font-bold shadow-xl transition-all active:scale-95 ${loading ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'}`}>
           {loading ? '처리 중...' : meetupId ? '수정 완료하기 ⛳' : '벙개 등록하기 ⛳'}
         </button>
       </form>
