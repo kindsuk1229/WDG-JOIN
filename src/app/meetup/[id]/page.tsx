@@ -66,7 +66,7 @@ export default function MeetupDetailPage() {
     if (!meetup) return;
     const title = `⛳ [WDG] 벙개: ${meetup.title}`;
     const desc = `📍 장소: ${meetup.golfCourse}\n📅 일시: ${meetup.date} ${meetup.time}\n👥 참여: ${participants.length}명`;
-    shareToKakao(window.location.href, title, description);
+    shareToKakao(window.location.href, title, desc);
   };
 
   if (loading) {
