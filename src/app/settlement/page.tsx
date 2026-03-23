@@ -36,10 +36,11 @@ export default function SettlementPage() {
       // 2. Firebase 'settlements' 컬렉션에 데이터 저장
       await addDoc(collection(db, "settlements"), {
         userName: savedName,        // 마이페이지 조회 키
-        totalAmount: Number(totalAmount), // 확실하게 숫자 타입으로 저장
+        totalAmount: Number(totalAmount), // 숫자 타입 강제
         memo: memo || '모임 비용',
         playerCount: Number(playerCount),
         perPerson: Number(perPerson),
+        status: 'pending',          // ✅ 마이페이지/히스토리 노출을 위한 핵심 필드 추가
         createdAt: serverTimestamp() 
       });
 
@@ -49,7 +50,7 @@ export default function SettlementPage() {
       
       shareToKakao(window.location.href, title, description);
       
-      alert('정산 내역이 마이페이지에 기록되었습니다! ⛳');
+      alert('정산 내역이 기록되었습니다! ⛳');
       
     } catch (error) {
       console.error("정산 저장 에러:", error);
@@ -127,7 +128,7 @@ export default function SettlementPage() {
         </button>
         
         <p className="text-center text-[11px] text-gray-400 mt-2 font-medium">
-          버튼 클릭 시 마이페이지 '총 정산'에 즉시 합산됩니다.
+          공유 시 '미정산' 상태로 기록되며 마이페이지에 합산됩니다.
         </p>
       </div>
     </main>
