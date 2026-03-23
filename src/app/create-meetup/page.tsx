@@ -6,13 +6,13 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/BottmNav';
 
-// 1. 데이터의 모양을 미리 정의합니다 (이걸 해야 date 에러가 안 납니다)
+// 데이터 구조 정의
 interface MeetupData {
   id: string;
   title: string;
   date: string;
   creatorId: string;
-  [key: string]: any; // 다른 필드들이 더 있어도 허용한다는 뜻
+  [key: string]: any;
 }
 
 export default function MyMeetupsPage() {
@@ -26,16 +26,16 @@ export default function MyMeetupsPage() {
         const q = query(collection(db, "meetups"), where("creatorId", "==", "admin_test"));
         const querySnapshot = await getDocs(q);
         
-        // 2. 데이터를 가져올 때 MeetupData 타입이라고 명시해줍니다 (as MeetupData[])
+        // 1. 데이터를 가져올 때 타입을 명시합니다.
         const data = querySnapshot.docs.map(doc => ({ 
           id: doc.id, 
           ...doc.data() 
-        })) as MeetupData[];
+        })) as any[]; // 일단 any로 받아서 정렬 시 자유도를 줍니다.
         
-        // 3. 날짜순 정렬 (데이터가 없을 경우를 대비해 안전장치를 추가했습니다)
+        // 2. 정렬 로직을 가장 안전한 방식으로 변경했습니다.
         const sortedData = data.sort((a, b) => {
-          const dateA = a.date || "";
-          const dateB = b.date || "";
+          const dateA = String(a.date || "");
+          const dateB = String(b.date || "");
           return dateB.localeCompare(dateA);
         });
         
