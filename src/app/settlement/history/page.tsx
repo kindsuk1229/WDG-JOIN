@@ -14,7 +14,7 @@ interface Settlement {
   memo: string;
   status: 'pending' | 'completed';
   playerCount: number;
-  paidMembers?: string[]; // 입금 완료한 사람 명단 (아이디 또는 순번)
+  paidMembers?: string[]; 
   createdAt: any;
 }
 
@@ -44,52 +44,44 @@ export default function SettlementHistoryPage() {
       setHistory(docs);
     } catch (error: any) {
       console.error("로딩 에러:", error);
+      if (error.message.includes("index")) {
+        alert("데이터 정렬을 위한 색인 설정이 필요합니다. F12 콘솔의 링크를 클릭해주세요.");
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchHistory();
-  }, []);
+  useEffect(() => { fetchHistory(); }, []);
 
-  // ✅ 1. 정산 내역 삭제
   const handleDelete = async (id: string) => {
-    if (!confirm('이 정산 내역을 완전히 삭제하시겠습니까?')) return;
-    try {
-      await deleteDoc(doc(db, "settlements", id));
-      alert('삭제되었습니다.');
-      fetchHistory();
-    } catch (e) {
-      alert('삭제에 실패했습니다.');
-    }
+    if (!confirm('이 내역을 삭제할까요? 마이페이지 합계에서도 제외됩니다.')) return;
+    await deleteDoc(doc(db, "settlements", id));
+    fetchHistory();
   };
 
-  // ✅ 2. 입금자 체크 (명단 관리)
   const togglePaid = async (item: Settlement, index: number) => {
     const memberId = `member_${index}`;
     let newPaidMembers = [...(item.paidMembers || [])];
-
     if (newPaidMembers.includes(memberId)) {
       newPaidMembers = newPaidMembers.filter(m => m !== memberId);
     } else {
       newPaidMembers.push(memberId);
     }
-
-    try {
-      await updateDoc(doc(db, "settlements", item.id), {
-        paidMembers: newPaidMembers
-      });
-      fetchHistory(); // 화면 갱신
-    } catch (e) {
-      alert('업데이트 실패');
-    }
+    await updateDoc(doc(db, "settlements", item.id), { paidMembers: newPaidMembers });
+    fetchHistory();
   };
 
   const handleComplete = async (id: string) => {
-    if (!confirm('모든 인원이 입금 완료했나요? 완료 시 총액에서 제외됩니다.')) return;
+    if (!confirm('모든 인원이 입금했나요? 완료 시 리스트가 흐려지며 합계에서 제외됩니다.')) return;
     await updateDoc(doc(db, "settlements", id), { status: 'completed' });
     fetchHistory();
+  };
+
+  const reShare = (item: Settlement) => {
+    const title = '⛳ WDG 라운딩 정산 재요청';
+    const description = `내용: ${item.memo}\n1인당: ${item.perPerson.toLocaleString()}원\n미입금하신 분들은 확인 부탁드려요!`;
+    shareToKakao(window.location.origin + '/settlement', title, description);
   };
 
   return (
@@ -102,29 +94,31 @@ export default function SettlementHistoryPage() {
 
       <div className="p-4 space-y-5">
         {loading ? (
-          <div className="text-center py-20 text-gray-400">내역을 불러오는 중...</div>
+          <div className="text-center py-20 text-gray-400">내역 로딩 중...</div>
         ) : history.map((item) => (
-          <div key={item.id} className={`bg-white rounded-3xl shadow-sm border overflow-hidden ${item.status === 'completed' ? 'opacity-60' : 'border-green-100'}`}>
+          <div key={item.id} className={`bg-white rounded-3xl shadow-sm border overflow-hidden ${item.status === 'completed' ? 'opacity-50' : 'border-green-100'}`}>
             <div className="p-5">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h3 className="font-black text-lg">{item.memo}</h3>
-                  <p className="text-[11px] text-gray-400">{item.createdAt?.toDate().toLocaleString()}</p>
+                  <h3 className="font-black text-lg text-gray-800">{item.memo}</h3>
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    {item.createdAt ? item.createdAt.toDate().toLocaleString() : '방금 전'}
+                  </p>
                 </div>
-                <button onClick={() => handleDelete(item.id)} className="text-gray-300 hover:text-red-500 text-sm">삭제</button>
+                <button onClick={() => handleDelete(item.id)} className="text-gray-300 hover:text-red-500 text-xs font-bold p-1">삭제</button>
               </div>
 
               {/* 👥 입금 명단 체크 섹션 */}
-              <div className="bg-gray-50 rounded-2xl p-4 mb-4">
-                <p className="text-[11px] font-bold text-gray-400 mb-3">입금 확인 명단 ({item.paidMembers?.length}/{item.playerCount})</p>
+              <div className="bg-gray-50 rounded-2xl p-4 mb-5 border border-gray-100">
+                <p className="text-[11px] font-black text-gray-400 mb-3 uppercase tracking-wider">입금 확인 ({item.paidMembers?.length}/{item.playerCount})</p>
                 <div className="flex flex-wrap gap-2">
                   {Array.from({ length: item.playerCount }).map((_, i) => (
                     <button
                       key={i}
                       onClick={() => togglePaid(item, i)}
-                      className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                      className={`px-3 py-2 rounded-xl text-[11px] font-black transition-all ${
                         item.paidMembers?.includes(`member_${i}`)
-                          ? 'bg-green-500 text-white shadow-md'
+                          ? 'bg-green-600 text-white shadow-md border-green-600'
                           : 'bg-white text-gray-400 border border-gray-200'
                       }`}
                     >
@@ -134,19 +128,18 @@ export default function SettlementHistoryPage() {
                 </div>
               </div>
 
-              <div className="flex justify-between items-end border-t pt-4">
+              <div className="flex justify-between items-end border-t border-dashed pt-4">
                 <div>
-                  <p className="text-[10px] text-gray-400">1인당 금액</p>
-                  <p className="text-xl font-black text-green-700">{item.perPerson.toLocaleString()}원</p>
+                  <p className="text-[10px] text-gray-500 font-bold">받을 금액 (나 제외)</p>
+                  {/* ✅ (전체 - 1인분) 금액 표시 */}
+                  <p className="text-xl font-black text-green-700">
+                    {(item.totalAmount - item.perPerson).toLocaleString()}원
+                  </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-1.5">
+                  <button onClick={() => reShare(item)} className="bg-yellow-50 text-yellow-700 px-3 py-2 rounded-xl text-[11px] font-black border border-yellow-100">재공유</button>
                   {item.status === 'pending' && (
-                    <button 
-                      onClick={() => handleComplete(item.id)}
-                      className="bg-gray-800 text-white px-4 py-2 rounded-xl text-xs font-bold"
-                    >
-                      전체 완료
-                    </button>
+                    <button onClick={() => handleComplete(item.id)} className="bg-gray-900 text-white px-3 py-2 rounded-xl text-[11px] font-black shadow-lg">전체 완료</button>
                   )}
                 </div>
               </div>
