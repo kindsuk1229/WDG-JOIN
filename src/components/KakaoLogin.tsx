@@ -4,7 +4,7 @@ import KakaoLogin from 'react-kakao-login';
 
 export default function KakaoLoginButton() {
   // ⚠️ 카카오 개발자 센터에서 복사한 'JavaScript 키'를 아래에 넣으세요
-  const kakaoJavascriptKey = '여기에_복사한_키를_붙여넣으세요';
+  const kakaoJavascriptKey = '1782e23ec6181fc57d6c4395f3a06f56';
 
   const successKakao = (res: any) => {
     // 로그인 성공 시 카카오에서 준 정보를 브라우저에 저장합니다.
