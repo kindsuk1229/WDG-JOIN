@@ -17,7 +17,7 @@ export default function ChatPage() {
   ]);
   const [text, setText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
-  const myUid = 'me'; // TODO: auth
+  const myUid = 'me';
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: 999999, behavior: 'smooth' }); }, [msgs.length]);
 
@@ -28,14 +28,17 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-white safe-top">
+    // ✅ 핵심 수정: h-screen → h-full
+    // h-screen은 layout의 main 컨테이너 높이와 충돌해 이중 스크롤 발생
+    // h-full은 부모(layout main)의 높이를 그대로 사용
+    <div className="flex flex-col h-full bg-white">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 shrink-0">
         <button onClick={() => router.back()} className="text-gray-400 text-[13px]">← 뒤로</button>
         <h1 className="text-[16px] font-semibold">채팅</h1>
       </div>
 
-      {/* Messages */}
+      {/* Messages - 이 영역만 스크롤 */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 scrollbar-hide">
         {msgs.map(m => {
           const isMe = m.sender === myUid;
@@ -56,8 +59,8 @@ export default function ChatPage() {
         })}
       </div>
 
-      {/* Input */}
-      <div className="flex gap-2 px-4 py-3 border-t border-gray-100 safe-bottom bg-white">
+      {/* Input - 하단 고정 */}
+      <div className="flex gap-2 px-4 py-3 border-t border-gray-100 bg-white shrink-0">
         <input
           value={text} onChange={e => setText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') send(); }}

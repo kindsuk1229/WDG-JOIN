@@ -4,10 +4,9 @@ import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
-import BottomNav from '@/components/BottmNav';
+// ✅ BottomNav 임포트 제거 - layout.tsx에서 이미 렌더링됨
 
 export default function MyMeetupsPage() {
-  // 타입을 any로 지정해서 컴파일러의 간섭을 완전히 차단합니다.
   const [myMeetups, setMyMeetups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -17,20 +16,17 @@ export default function MyMeetupsPage() {
       try {
         const q = query(collection(db, "meetups"), where("creatorId", "==", "admin_test"));
         const querySnapshot = await getDocs(q);
-        
-        // 데이터를 가져올 때 아예 타입을 묻지 않도록 처리
-        const fetchedData = querySnapshot.docs.map(doc => ({ 
-          id: doc.id, 
-          ...doc.data() 
+        const fetchedData = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
         })) as any[];
-        
-        // 정렬 시에도 속성 존재 여부를 일일이 확인하여 에러 방지
+
         fetchedData.sort((a, b) => {
           const dateA = a && a.date ? String(a.date) : "";
           const dateB = b && b.date ? String(b.date) : "";
           return dateB.localeCompare(dateA);
         });
-        
+
         setMyMeetups(fetchedData);
       } catch (error) {
         console.error("데이터 로딩 에러:", error);
@@ -42,7 +38,9 @@ export default function MyMeetupsPage() {
   }, []);
 
   return (
-    <main className="max-w-md mx-auto bg-gray-50 min-h-screen pb-24 text-gray-900">
+    // ✅ 수정: max-w-md, min-h-screen, pb-24 제거 (layout이 처리)
+    // ✅ BottomNav 렌더링 제거
+    <div className="bg-gray-50 text-gray-900">
       <header className="p-4 bg-white border-b flex items-center sticky top-0 z-10">
         <button onClick={() => router.back()} className="mr-4 text-xl p-1 font-bold text-gray-600">←</button>
         <h1 className="text-xl font-bold text-gray-800">내 벙개 내역</h1>
@@ -59,8 +57,8 @@ export default function MyMeetupsPage() {
           </div>
         ) : (
           myMeetups.map((item: any) => (
-            <div 
-              key={item.id} 
+            <div
+              key={item.id}
               onClick={() => router.push(`/create-meetup?id=${item.id}`)}
               className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 cursor-pointer active:scale-[0.98] transition-all"
             >
@@ -70,7 +68,6 @@ export default function MyMeetupsPage() {
                   진행중
                 </span>
               </div>
-              
               <div className="flex items-center text-gray-500 text-sm gap-3">
                 <span>📅 {item.date || '날짜 미정'}</span>
                 <span className="text-gray-200">|</span>
@@ -80,8 +77,6 @@ export default function MyMeetupsPage() {
           ))
         )}
       </div>
-
-      <BottomNav active="meetups" />
-    </main>
+    </div>
   );
 }

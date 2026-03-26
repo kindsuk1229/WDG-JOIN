@@ -18,7 +18,7 @@ function CreateMeetupContent() {
   const [loading, setLoading] = useState(false);
   const [creatorId, setCreatorId] = useState('');
 
-  const myId = 'admin_test'; // 김근석 사장님 계정
+  const myId = 'admin_test';
 
   useEffect(() => {
     if (meetupId) {
@@ -100,11 +100,14 @@ function CreateMeetupContent() {
   };
 
   return (
-    /* 1. 전체 컨테이너: 하단 네비게이션 공간 확보 */
-    <div className="flex flex-col h-[calc(100vh-80px)] overflow-hidden relative bg-gray-50">
-      
-      {/* 2. 고정 헤더 */}
-      <header className="p-4 bg-white border-b flex justify-between items-center shrink-0 z-10 shadow-sm">
+    // ✅ 핵심 수정:
+    // - h-[calc(100vh-80px)] 제거 → layout의 main이 높이를 관리
+    // - overflow-hidden 제거 → 스크롤을 막는 주범
+    // - absolute 버튼 제거 → 자연스러운 문서 흐름으로 배치
+    <div className="bg-gray-50 min-h-full">
+
+      {/* 고정 헤더 */}
+      <header className="p-4 bg-white border-b flex justify-between items-center sticky top-0 z-10 shadow-sm">
         <div className="flex items-center">
           <button type="button" onClick={() => router.back()} className="mr-4 text-xl font-bold text-gray-600">←</button>
           <h1 className="text-xl font-bold text-green-700">
@@ -116,8 +119,8 @@ function CreateMeetupContent() {
         )}
       </header>
 
-      {/* 3. 스크롤 영역: 입력 폼 (버튼 위치가 올라갔으므로 pb-48로 여백을 더 확보) */}
-      <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-6 pb-48 custom-scrollbar">
+      {/* ✅ 스크롤 영역: 더 이상 overflow-y-auto 불필요, layout의 main이 처리 */}
+      <form onSubmit={handleSubmit} className="p-5 space-y-6 pb-6">
         <div className="bg-white p-6 rounded-3xl shadow-sm space-y-6 border border-gray-100">
           <div>
             <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">벙개 제목</label>
@@ -136,9 +139,9 @@ function CreateMeetupContent() {
 
           <div className="border-t pt-6">
             <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">모집 규모 및 조별 티타임</label>
-            <select 
-              value={cartCount} 
-              onChange={(e) => handleCartCountChange(Number(e.target.value))} 
+            <select
+              value={cartCount}
+              onChange={(e) => handleCartCountChange(Number(e.target.value))}
               className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg mb-4 focus:ring-2 focus:ring-green-500 text-gray-900"
             >
               {[...Array(10)].map((_, i) => <option key={i+1} value={i+1}>{i+1}카트 ({ (i+1)*4 }명)</option>)}
@@ -160,19 +163,18 @@ function CreateMeetupContent() {
             </div>
           </div>
         </div>
-      </form>
 
-      {/* ✅ 4. 하단 고정 버튼: 탭 바 위로 확실하게 보일 수 있도록 bottom-24 적용 */}
-      <div className="absolute bottom-24 left-0 right-0 px-5 z-30 pointer-events-none">
-        <button 
-          type="button" 
-          onClick={(e) => handleSubmit(e as any)}
-          disabled={loading} 
-          className={`w-full p-4 rounded-2xl font-black text-lg text-white shadow-[0_10px_30px_rgba(0,0,0,0.2)] transition-all active:scale-95 pointer-events-auto ${loading ? 'bg-gray-400' : 'bg-green-600 shadow-green-200 hover:bg-green-700'}`}
+        {/* ✅ 버튼: absolute 제거하고 자연스러운 흐름으로 배치 */}
+        <button
+          type="submit"
+          disabled={loading}
+          className={`w-full p-4 rounded-2xl font-black text-lg text-white transition-all active:scale-95 ${
+            loading ? 'bg-gray-400' : 'bg-green-600 shadow-lg shadow-green-200 hover:bg-green-700'
+          }`}
         >
           {loading ? '처리 중...' : meetupId ? '수정 완료하기 ⛳' : '벙개 등록하기 ⛳'}
         </button>
-      </div>
+      </form>
     </div>
   );
 }

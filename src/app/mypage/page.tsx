@@ -4,28 +4,28 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { collection, query, getDocs, where } from 'firebase/firestore';
-import { Avatar } from '@/components/UI'; 
-import BottomNav from '@/components/BottmNav';
+import { Avatar } from '@/components/UI';
+// ✅ BottomNav 임포트 제거 - layout.tsx에서 이미 렌더링됨
 
 export default function MyPage() {
   const router = useRouter();
-  
+
   const [userName, setUserName] = useState('회원');
-  const [userNickname, setUserNickname] = useState(''); // ✅ 닉네임 상태 추가
-  const [isEditing, setIsEditing] = useState(false); // ✅ 수정 모드 상태
-  const [tempNickname, setTempNickname] = useState(''); // ✅ 입력 임시 저장
+  const [userNickname, setUserNickname] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [tempNickname, setTempNickname] = useState('');
 
   const [stats, setStats] = useState({
     totalCount: 0,
     monthlyCount: 0,
-    pendingAmount: 0 
+    pendingAmount: 0
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const rawName = localStorage.getItem('user_name') || '회원';
     const rawNickname = localStorage.getItem('user_nickname') || '';
-    
+
     setUserName(rawName.trim());
     setUserNickname(rawNickname.trim());
     setTempNickname(rawNickname.trim());
@@ -35,7 +35,6 @@ export default function MyPage() {
         setLoading(true);
         const savedName = rawName.trim();
 
-        // 1. 벙개 참여 정보 가져오기 (실명 기준)
         const meetupSnap = await getDocs(collection(db, "meetups"));
         let total = 0;
         let monthly = 0;
@@ -50,15 +49,14 @@ export default function MyPage() {
           }
         });
 
-        // 2. 정산 내역 중 '미정산' 상태 가져오기 (실명 기준)
         const settlementSnap = await getDocs(
           query(
-            collection(db, "settlements"), 
+            collection(db, "settlements"),
             where("userName", "==", savedName),
-            where("status", "==", "pending") 
+            where("status", "==", "pending")
           )
         );
-        
+
         let pendingTotal = 0;
         settlementSnap.forEach((doc) => {
           const data = doc.data();
@@ -67,11 +65,7 @@ export default function MyPage() {
           pendingTotal += (totalAmount - perPerson);
         });
 
-        setStats({
-          totalCount: total,
-          monthlyCount: monthly,
-          pendingAmount: pendingTotal
-        });
+        setStats({ totalCount: total, monthlyCount: monthly, pendingAmount: pendingTotal });
       } catch (error) {
         console.error("데이터 로딩 실패:", error);
       } finally {
@@ -82,7 +76,6 @@ export default function MyPage() {
     fetchMyData();
   }, []);
 
-  // ✅ 프로필 닉네임 저장 로직
   const handleSaveProfile = () => {
     localStorage.setItem('user_nickname', tempNickname);
     setUserNickname(tempNickname);
@@ -94,13 +87,15 @@ export default function MyPage() {
     { label: '내 벙개 내역', icon: '📋', href: '/my-meetups' },
     { label: '정산 내역', icon: '💰', href: '/settlement/history' },
     { label: '알림 설정', icon: '🔔', href: '#' },
-    { label: '프로필 수정', icon: '✏️', onClick: () => setIsEditing(true) }, // ✅ 클릭 시 수정 모드
+    { label: '프로필 수정', icon: '✏️', onClick: () => setIsEditing(true) },
     { label: '앱 정보', icon: 'ℹ️', href: '#' },
   ];
 
   return (
-    <div className="min-h-screen bg-white safe-top pb-20">
-      <div className="px-5 pt-6">
+    // ✅ 수정: min-h-screen 제거 (layout이 처리), pb-20 → layout pb-20이 처리
+    // ✅ BottomNav 렌더링 제거
+    <div className="bg-white">
+      <div className="px-5 pt-6 pb-6">
         <h1 className="text-2xl font-bold mb-6">마이페이지</h1>
 
         {/* Profile Card */}
@@ -117,7 +112,7 @@ export default function MyPage() {
               </p>
             </div>
           </div>
-          <button 
+          <button
             onClick={() => setIsEditing(true)}
             className="absolute top-5 right-5 text-[11px] font-bold text-green-600 bg-green-50 px-2.5 py-1 rounded-full border border-green-100"
           >
@@ -125,12 +120,12 @@ export default function MyPage() {
           </button>
         </div>
 
-        {/* Stats Section */}
+        {/* Stats */}
         <div className="grid grid-cols-3 gap-2 mb-6">
           {[
             { label: '참여 벙개', value: loading ? '-' : `${stats.totalCount}회` },
             { label: '이번 달', value: loading ? '-' : `${stats.monthlyCount}회` },
-            { label: '받아야 할 금액', value: loading ? '-' : `${stats.pendingAmount.toLocaleString()}원` }, 
+            { label: '받아야 할 금액', value: loading ? '-' : `${stats.pendingAmount.toLocaleString()}원` },
           ].map((s, i) => (
             <div key={i} className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
               <p className="text-[11px] text-gray-400 font-medium">{s.label}</p>
@@ -144,13 +139,13 @@ export default function MyPage() {
         {/* Menu List */}
         <div className="space-y-1">
           {menus.map((item, i) => (
-            <div 
-              key={i} 
+            <div
+              key={i}
               onClick={() => {
                 if (item.onClick) item.onClick();
-                else if (item.href !== '#') router.push(item.href);
+                else if (item.href !== '#') router.push(item.href!);
                 else alert(`${item.label} 준비 중`);
-              }} 
+              }}
               className="flex items-center gap-3 py-4 border-b border-gray-100 last:border-0 cursor-pointer active:bg-gray-50 px-2 transition-all"
             >
               <span className="text-lg w-7">{item.icon}</span>
@@ -163,29 +158,29 @@ export default function MyPage() {
         <p className="text-center text-[12px] text-gray-300 mt-12 font-light italic">우동골 v1.0.0</p>
       </div>
 
-      {/* ✅ 프로필 수정 바텀 시트 (Modal) */}
+      {/* 프로필 수정 바텀 시트 */}
       {isEditing && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center">
           <div className="w-full max-w-md bg-white rounded-t-[32px] p-8 animate-in slide-in-from-bottom duration-300">
             <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
             <h3 className="text-xl font-black mb-6">프로필 수정</h3>
-            
+
             <div className="space-y-6">
               <div>
                 <label className="text-[11px] font-black text-gray-400 uppercase tracking-wider">정산용 실명 (수정 불가)</label>
-                <input 
-                  type="text" 
-                  value={userName} 
-                  disabled 
+                <input
+                  type="text"
+                  value={userName}
+                  disabled
                   className="w-full mt-2 p-4 bg-gray-50 rounded-2xl border-none text-gray-400 font-bold"
                 />
               </div>
 
               <div>
                 <label className="text-[11px] font-black text-gray-400 uppercase tracking-wider">활동 닉네임 설정</label>
-                <input 
-                  type="text" 
-                  value={tempNickname} 
+                <input
+                  type="text"
+                  value={tempNickname}
                   onChange={(e) => setTempNickname(e.target.value)}
                   placeholder="닉네임을 입력하세요"
                   className="w-full mt-2 p-4 bg-gray-100 rounded-2xl border-none font-bold text-gray-800 focus:ring-2 focus:ring-green-500"
@@ -203,8 +198,6 @@ export default function MyPage() {
           </div>
         </div>
       )}
-
-      <BottomNav active="my" />
     </div>
   );
 }
