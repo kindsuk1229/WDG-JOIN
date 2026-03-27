@@ -161,37 +161,46 @@ export default function MyPage() {
       {/* 프로필 수정 바텀 시트 */}
       {isEditing && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center">
-          <div className="w-full max-w-md bg-white rounded-t-[32px] p-8 animate-in slide-in-from-bottom duration-300">
-            <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
-            <h3 className="text-xl font-black mb-6">프로필 수정</h3>
+          {/* ✅ 바텀시트 내부를 overflow-y-auto로 스크롤 가능하게 */}
+          <div className="w-full max-w-md bg-white rounded-t-[32px] flex flex-col max-h-[85vh] animate-in slide-in-from-bottom duration-300">
+            
+            {/* 고정 헤더 */}
+            <div className="px-8 pt-8 pb-4 shrink-0">
+              <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
+              <h3 className="text-xl font-black">프로필 수정</h3>
+            </div>
 
-            <div className="space-y-6">
-              <div>
-                <label className="text-[11px] font-black text-gray-400 uppercase tracking-wider">정산용 실명 (수정 불가)</label>
-                <input
-                  type="text"
-                  value={userName}
-                  disabled
-                  className="w-full mt-2 p-4 bg-gray-50 rounded-2xl border-none text-gray-400 font-bold"
-                />
-              </div>
+            {/* ✅ 스크롤 되는 콘텐츠 영역 */}
+            <div className="flex-1 overflow-y-auto px-8 pb-4">
+              <div className="space-y-6">
+                <div>
+                  <label className="text-[11px] font-black text-gray-400 uppercase tracking-wider">정산용 실명 (수정 불가)</label>
+                  <input
+                    type="text"
+                    value={userName}
+                    disabled
+                    className="w-full mt-2 p-4 bg-gray-50 rounded-2xl border-none text-gray-400 font-bold"
+                  />
+                </div>
 
-              <div>
-                <label className="text-[11px] font-black text-gray-400 uppercase tracking-wider">활동 닉네임 설정</label>
-                <input
-                  type="text"
-                  value={tempNickname}
-                  onChange={(e) => setTempNickname(e.target.value)}
-                  placeholder="닉네임을 입력하세요"
-                  className="w-full mt-2 p-4 bg-gray-100 rounded-2xl border-none font-bold text-gray-800 focus:ring-2 focus:ring-green-500"
-                />
-                <p className="text-[10px] text-green-600 mt-3 font-medium bg-green-50 p-2 rounded-lg">
-                  💡 벙개 명단에는 닉네임이 우선 표시되지만, 모든 정산 데이터는 실명({userName})을 기준으로 안전하게 처리됩니다.
-                </p>
+                <div>
+                  <label className="text-[11px] font-black text-gray-400 uppercase tracking-wider">활동 닉네임 설정</label>
+                  <input
+                    type="text"
+                    value={tempNickname}
+                    onChange={(e) => setTempNickname(e.target.value)}
+                    placeholder="닉네임을 입력하세요"
+                    className="w-full mt-2 p-4 bg-gray-100 rounded-2xl border-none font-bold text-gray-800 focus:ring-2 focus:ring-green-500"
+                  />
+                  <p className="text-[10px] text-green-600 mt-3 font-medium bg-green-50 p-2 rounded-lg">
+                    💡 벙개 명단에는 닉네임이 우선 표시되지만, 모든 정산 데이터는 실명({userName})을 기준으로 안전하게 처리됩니다.
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="flex gap-3 mt-8">
+            {/* ✅ 버튼은 항상 하단에 고정 - pb-10으로 탭바 위 여백 확보 */}
+            <div className="flex gap-3 px-8 pt-4 pb-10 shrink-0 border-t border-gray-100">
               <button onClick={() => setIsEditing(false)} className="flex-1 p-4 bg-gray-100 rounded-2xl font-bold text-gray-500">취소</button>
               <button onClick={handleSaveProfile} className="flex-1 p-4 bg-green-600 rounded-2xl font-bold text-white shadow-lg shadow-green-100">저장하기 ⛳</button>
             </div>
