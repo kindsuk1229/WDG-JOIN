@@ -21,9 +21,13 @@ export default function Home() {
   const [tempNotice, setTempNotice] = useState('');
   const [savingNotice, setSavingNotice] = useState(false);
 
+  // PWA 설치 안내 팝업
+  const [showInstallGuide, setShowInstallGuide] = useState(false);
+
   useEffect(() => {
     const status = localStorage.getItem('isLoggedIn');
     const savedName = localStorage.getItem('user_name') || '회원';
+
     if (status === 'true') {
       setIsLoggedIn(true);
       setUserName(savedName);
@@ -38,6 +42,14 @@ export default function Home() {
         }
       };
       checkAdmin();
+
+      // PWA 설치 안내: 처음 접속 시에만 표시
+      const installGuideShown = localStorage.getItem('installGuideShown');
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+      if (!installGuideShown && !isStandalone) {
+        // 1초 뒤에 팝업 표시 (자연스럽게)
+        setTimeout(() => setShowInstallGuide(true), 1000);
+      }
     }
     setCheckingAuth(false);
 
@@ -77,7 +89,6 @@ export default function Home() {
     }
   };
 
-  // 공지사항 저장
   const handleSaveNotice = async () => {
     setSavingNotice(true);
     try {
@@ -91,6 +102,14 @@ export default function Home() {
       alert('저장 중 오류가 발생했습니다.');
     } finally {
       setSavingNotice(false);
+    }
+  };
+
+  const handleInstallGuideClose = (confirmed: boolean) => {
+    setShowInstallGuide(false);
+    // "확인 완료" 누르면 다시 안 뜨게, "다음에 하기"는 다음 로그인 때 또 뜸
+    if (confirmed) {
+      localStorage.setItem('installGuideShown', 'true');
     }
   };
 
@@ -108,13 +127,10 @@ export default function Home() {
       <header className="p-4 bg-white flex justify-between items-center sticky top-0 z-10 shadow-sm">
         <h1 className="text-2xl font-black text-green-600 italic">WDG</h1>
         <div className="flex items-center gap-3">
-          <div className="px-3 py-1 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 font-bold text-xs">
+          <div className="px-3 py-1 bg-orange-100 rounded-full text-orange-600 font-bold text-xs">
             {userName}님
           </div>
-          <button
-            onClick={handleLogout}
-            className="text-[11px] text-gray-400 underline decoration-gray-300"
-          >
+          <button onClick={handleLogout} className="text-[11px] text-gray-400 underline decoration-gray-300">
             로그아웃
           </button>
         </div>
@@ -145,10 +161,7 @@ export default function Home() {
         <div>
           <div className="flex justify-between items-end mb-4">
             <h3 className="text-lg font-bold">나의 벙개 일정</h3>
-            <button
-              onClick={() => router.push('/create-meetup')}
-              className="text-green-600 text-sm font-bold"
-            >
+            <button onClick={() => router.push('/create-meetup')} className="text-green-600 text-sm font-bold">
               + 벙개 만들기
             </button>
           </div>
@@ -190,13 +203,9 @@ export default function Home() {
               <span className="text-lg">📢</span>
               <h3 className="font-bold">우동골 공지사항</h3>
             </div>
-            {/* ✅ 관리자만 수정 버튼 표시 */}
             {isAdmin && !isEditingNotice && (
               <button
-                onClick={() => {
-                  setTempNotice(notice);
-                  setIsEditingNotice(true);
-                }}
+                onClick={() => { setTempNotice(notice); setIsEditingNotice(true); }}
                 className="text-[11px] font-bold text-green-600 bg-green-50 px-2.5 py-1 rounded-full border border-green-100"
               >
                 ✏️ 수정
@@ -205,7 +214,6 @@ export default function Home() {
           </div>
 
           {isEditingNotice ? (
-            // 수정 모드
             <div className="space-y-3">
               <textarea
                 value={tempNotice}
@@ -214,29 +222,82 @@ export default function Home() {
                 className="w-full p-3 bg-gray-50 rounded-2xl text-sm text-gray-700 leading-relaxed border border-gray-200 focus:ring-2 focus:ring-green-500 focus:outline-none resize-none"
               />
               <div className="flex gap-2">
-                <button
-                  onClick={() => setIsEditingNotice(false)}
-                  className="flex-1 py-2.5 bg-gray-100 rounded-xl text-sm font-bold text-gray-500"
-                >
-                  취소
-                </button>
-                <button
-                  onClick={handleSaveNotice}
-                  disabled={savingNotice}
-                  className="flex-1 py-2.5 bg-green-600 rounded-xl text-sm font-bold text-white"
-                >
+                <button onClick={() => setIsEditingNotice(false)} className="flex-1 py-2.5 bg-gray-100 rounded-xl text-sm font-bold text-gray-500">취소</button>
+                <button onClick={handleSaveNotice} disabled={savingNotice} className="flex-1 py-2.5 bg-green-600 rounded-xl text-sm font-bold text-white">
                   {savingNotice ? '저장 중...' : '저장하기'}
                 </button>
               </div>
             </div>
           ) : (
-            // 표시 모드
             <p className="text-sm text-gray-500 leading-relaxed whitespace-pre-line">
               {notice || '공지사항이 없습니다.'}
             </p>
           )}
         </div>
       </div>
+
+      {/* ✅ PWA 설치 안내 팝업 */}
+      {showInstallGuide && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center px-5">
+          <div className="w-full max-w-sm bg-white rounded-3xl overflow-hidden shadow-2xl">
+            
+            {/* 헤더 */}
+            <div className="bg-green-600 px-6 py-5 flex justify-between items-start">
+              <div>
+                <p className="text-[11px] text-green-200 font-bold mb-1">WDG 우동골</p>
+                <p className="text-lg font-black text-white leading-snug">앱으로 설치하면<br />더 편리해요!</p>
+              </div>
+              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">⛳</div>
+            </div>
+
+            {/* 혜택 */}
+            <div className="px-6 py-5 border-b border-gray-100 space-y-4">
+              {[
+                { icon: '🔔', title: '푸시 알림 수신', desc: '벙개 & 정산 알림을 바로 받아요' },
+                { icon: '⚡', title: '빠른 실행', desc: '홈 화면에서 바로 접속' },
+                { icon: '📶', title: '오프라인 지원', desc: '인터넷 없어도 기본 기능 사용' },
+              ].map((item, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-green-50 rounded-xl flex items-center justify-center text-base flex-shrink-0">{item.icon}</div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">{item.title}</p>
+                    <p className="text-[11px] text-gray-400">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 설치 방법 */}
+            <div className="px-6 py-4 border-b border-gray-100 space-y-2">
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">설치 방법</p>
+              <div className="bg-gray-50 rounded-2xl p-3">
+                <p className="text-[13px] font-bold text-gray-700 mb-1">iPhone (Safari)</p>
+                <p className="text-[12px] text-gray-500 leading-relaxed">하단 공유버튼(□↑) 탭 → "홈 화면에 추가" 선택</p>
+              </div>
+              <div className="bg-gray-50 rounded-2xl p-3">
+                <p className="text-[13px] font-bold text-gray-700 mb-1">Android (Chrome)</p>
+                <p className="text-[12px] text-gray-500 leading-relaxed">우측 상단 메뉴(⋮) → "앱 설치" 선택</p>
+              </div>
+            </div>
+
+            {/* 버튼 */}
+            <div className="px-6 py-4 flex gap-2">
+              <button
+                onClick={() => handleInstallGuideClose(false)}
+                className="flex-1 py-3 bg-gray-100 rounded-2xl text-sm font-bold text-gray-500 active:scale-95 transition-all"
+              >
+                다음에 하기
+              </button>
+              <button
+                onClick={() => handleInstallGuideClose(true)}
+                className="flex-2 py-3 px-5 bg-green-600 rounded-2xl text-sm font-bold text-white active:scale-95 transition-all"
+              >
+                확인 완료
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
