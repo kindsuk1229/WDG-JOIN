@@ -11,11 +11,20 @@ function CreateMeetupContent() {
   const searchParams = useSearchParams();
   const meetupId = searchParams.get('id');
 
+  // 벙개 타입: 'field' = 필드, 'screen' = 스크린
+  const [meetupType, setMeetupType] = useState<'field' | 'screen'>('field');
+
   const [title, setTitle] = useState('');
   const [golfCourse, setGolfCourse] = useState('');
   const [date, setDate] = useState('');
+
+  // 필드용
   const [cartCount, setCartCount] = useState(1);
   const [cartTimes, setCartTimes] = useState<string[]>(['']);
+
+  // 스크린용
+  const [playerCount, setPlayerCount] = useState(4);
+
   const [loading, setLoading] = useState(false);
   const [creatorId, setCreatorId] = useState('');
 
@@ -32,8 +41,10 @@ function CreateMeetupContent() {
             setTitle(data.title || '');
             setGolfCourse(data.golfCourse || '');
             setDate(data.date || '');
+            setMeetupType(data.meetupType || 'field');
             setCartCount(data.cartCount || 1);
             setCartTimes(data.cartTimes || Array(data.cartCount || 1).fill(''));
+            setPlayerCount(data.playerCount || 4);
             setCreatorId(data.creatorId || '');
           }
         } catch (error) {
@@ -74,16 +85,26 @@ function CreateMeetupContent() {
     if (e) e.preventDefault();
     setLoading(true);
     try {
-      const meetupData = {
+      const meetupData: any = {
         title: title || 'WDG 벙개',
         golfCourse,
         date,
-        cartCount,
-        cartTimes,
+        meetupType,
         creatorId: myId,
         authorName: '김근석 사장님',
         updatedAt: new Date().toISOString(),
       };
+
+      // 타입별 데이터 추가
+      if (meetupType === 'field') {
+        meetupData.cartCount = cartCount;
+        meetupData.cartTimes = cartTimes;
+        meetupData.maxPlayers = cartCount * 4;
+      } else {
+        meetupData.playerCount = playerCount;
+        meetupData.cartCount = 0;
+        meetupData.maxPlayers = playerCount;
+      }
 
       if (meetupId) {
         await updateDoc(doc(db, 'meetups', meetupId), meetupData);
@@ -95,10 +116,9 @@ function CreateMeetupContent() {
           players: 1,
         });
 
-        // ✅ 전체 멤버에게 푸시 알림 (본인 제외)
         await sendNotificationToAll({
-          title: '⛳ 새로운 벙개가 열렸어요!',
-          body: `${golfCourse} | ${date} | ${cartCount}카트`,
+          title: `⛳ 새로운 ${meetupType === 'screen' ? '스크린' : '필드'} 벙개가 열렸어요!`,
+          body: `${golfCourse} | ${date} | ${meetupType === 'field' ? `${cartCount}카트` : `${playerCount}명`}`,
           url: `/meetup-detail?id=${newDoc.id}`,
           excludeUserName: '김근석',
         });
@@ -128,36 +148,131 @@ function CreateMeetupContent() {
       </header>
 
       <form onSubmit={handleSubmit} className="p-5 space-y-6 pb-6">
-        <div className="bg-white p-6 rounded-3xl shadow-sm space-y-6 border border-gray-100">
-          <div>
-            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">벙개 제목</label>
-            <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: [WDG] 주말 정기 라운딩" className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all text-gray-900" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">골프장 이름</label>
-            <input type="text" required value={golfCourse} onChange={(e) => setGolfCourse(e.target.value)} placeholder="예: 샤인데일 CC" className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all text-gray-900" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">날짜 선택</label>
-            <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all text-gray-900" />
-          </div>
-          <div className="border-t pt-6">
-            <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">모집 규모 및 조별 티타임</label>
-            <select value={cartCount} onChange={(e) => handleCartCountChange(Number(e.target.value))} className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg mb-4 focus:ring-2 focus:ring-green-500 text-gray-900">
-              {[...Array(10)].map((_, i) => <option key={i+1} value={i+1}>{i+1}카트 ({ (i+1)*4 }명)</option>)}
-            </select>
-            <div className="grid grid-cols-1 gap-3">
-              {cartTimes.map((time, index) => (
-                <div key={index} className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
-                  <span className="text-[11px] font-black text-green-700 w-10 text-center">{index + 1}조</span>
-                  <input type="time" required value={time} onChange={(e) => updateCartTime(index, e.target.value)} className="bg-transparent border-none focus:ring-0 font-bold text-gray-800 flex-1 p-1" />
-                </div>
-              ))}
+
+        {/* ✅ 벙개 타입 선택 */}
+        {!meetupId && (
+          <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
+            <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">벙개 종류</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setMeetupType('field')}
+                className={`p-4 rounded-2xl border-2 text-center transition-all ${
+                  meetupType === 'field'
+                    ? 'border-green-500 bg-green-50'
+                    : 'border-gray-100 bg-gray-50'
+                }`}
+              >
+                <p className="text-2xl mb-1">⛳</p>
+                <p className={`text-sm font-black ${meetupType === 'field' ? 'text-green-700' : 'text-gray-500'}`}>필드</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">카트 단위 모집</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMeetupType('screen')}
+                className={`p-4 rounded-2xl border-2 text-center transition-all ${
+                  meetupType === 'screen'
+                    ? 'border-green-500 bg-green-50'
+                    : 'border-gray-100 bg-gray-50'
+                }`}
+              >
+                <p className="text-2xl mb-1">🖥️</p>
+                <p className={`text-sm font-black ${meetupType === 'screen' ? 'text-green-700' : 'text-gray-500'}`}>스크린</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">인원 단위 모집</p>
+              </button>
             </div>
           </div>
+        )}
+
+        <div className="bg-white p-6 rounded-3xl shadow-sm space-y-6 border border-gray-100">
+          {/* 제목 */}
+          <div>
+            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">벙개 제목</label>
+            <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)}
+              placeholder="예: [WDG] 주말 정기 라운딩"
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all text-gray-900" />
+          </div>
+
+          {/* 골프장 */}
+          <div>
+            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">
+              {meetupType === 'screen' ? '스크린 골프장 이름' : '골프장 이름'}
+            </label>
+            <input type="text" required value={golfCourse} onChange={(e) => setGolfCourse(e.target.value)}
+              placeholder={meetupType === 'screen' ? '예: 골프존 강남점' : '예: 샤인데일 CC'}
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all text-gray-900" />
+          </div>
+
+          {/* 날짜 */}
+          <div>
+            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">날짜 선택</label>
+            <input type="date" required value={date} onChange={(e) => setDate(e.target.value)}
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all text-gray-900" />
+          </div>
+
+          {/* ✅ 필드: 카트 수 (최대 15카트) */}
+          {meetupType === 'field' && (
+            <div className="border-t pt-6">
+              <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">모집 규모 및 조별 티타임</label>
+              <select
+                value={cartCount}
+                onChange={(e) => handleCartCountChange(Number(e.target.value))}
+                className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg mb-4 focus:ring-2 focus:ring-green-500 text-gray-900"
+              >
+                {[...Array(15)].map((_, i) => (
+                  <option key={i+1} value={i+1}>{i+1}카트 ({(i+1)*4}명)</option>
+                ))}
+              </select>
+
+              <div className="grid grid-cols-1 gap-3">
+                {cartTimes.map((time, index) => (
+                  <div key={index} className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
+                    <span className="text-[11px] font-black text-green-700 w-10 text-center">{index + 1}조</span>
+                    <input
+                      type="time"
+                      required
+                      value={time}
+                      onChange={(e) => updateCartTime(index, e.target.value)}
+                      className="bg-transparent border-none focus:ring-0 font-bold text-gray-800 flex-1 p-1"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ✅ 스크린: 인원 수 (1~40명) */}
+          {meetupType === 'screen' && (
+            <div className="border-t pt-6">
+              <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">
+                모집 인원 <span className="font-normal text-gray-400 normal-case">(최대 40명)</span>
+              </label>
+              <select
+                value={playerCount}
+                onChange={(e) => setPlayerCount(Number(e.target.value))}
+                className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg focus:ring-2 focus:ring-green-500 text-gray-900"
+              >
+                {[...Array(40)].map((_, i) => (
+                  <option key={i+1} value={i+1}>{i+1}명</option>
+                ))}
+              </select>
+
+              <div className="mt-4 bg-green-50 rounded-2xl p-3 border border-green-100">
+                <p className="text-[12px] text-green-700 font-bold text-center">
+                  🖥️ 스크린 {playerCount}명 모집
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
-        <button type="submit" disabled={loading} className={`w-full p-4 rounded-2xl font-black text-lg text-white transition-all active:scale-95 ${loading ? 'bg-gray-400' : 'bg-green-600 shadow-lg shadow-green-200 hover:bg-green-700'}`}>
+        <button
+          type="submit"
+          disabled={loading}
+          className={`w-full p-4 rounded-2xl font-black text-lg text-white transition-all active:scale-95 ${
+            loading ? 'bg-gray-400' : 'bg-green-600 shadow-lg shadow-green-200 hover:bg-green-700'
+          }`}
+        >
           {loading ? '처리 중...' : meetupId ? '수정 완료하기 ⛳' : '벙개 등록하기 ⛳'}
         </button>
       </form>
