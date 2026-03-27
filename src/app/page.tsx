@@ -272,11 +272,11 @@ export default function Home() {
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">설치 방법</p>
               <div className="bg-gray-50 rounded-2xl p-3">
                 <p className="text-[13px] font-bold text-gray-700 mb-1">iPhone (Safari)</p>
-                <p className="text-[12px] text-gray-500 leading-relaxed">하단 공유버튼(□↑) 탭 → "홈 화면에 추가" 선택</p>
+                <p className="text-[12px] text-gray-500 leading-relaxed">① 하단 공유버튼(□↑) 탭<br />② 아래로 스크롤 → "홈 화면에 추가" 선택<br />③ 우측 상단 "추가" 탭</p>
               </div>
               <div className="bg-gray-50 rounded-2xl p-3">
                 <p className="text-[13px] font-bold text-gray-700 mb-1">Android (Chrome)</p>
-                <p className="text-[12px] text-gray-500 leading-relaxed">우측 상단 메뉴(⋮) → "홈 화면에 추가" 선택</p>
+                <p className="text-[12px] text-gray-500 leading-relaxed">① 우측 상단 메뉴(⋮) 탭<br />② "홈 화면에 추가" 선택<br />③ "추가" 버튼 탭</p>
               </div>
             </div>
 
