@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, query, getDocs, where } from 'firebase/firestore';
+import { collection, query, getDocs, where, doc, setDoc, getDoc } from 'firebase/firestore';
 import { Avatar } from '@/components/UI';
 
 export default function MyPage() {
@@ -75,9 +75,36 @@ export default function MyPage() {
     fetchMyData();
   }, []);
 
-  const handleSaveProfile = () => {
-    localStorage.setItem('user_nickname', tempNickname);
-    setUserNickname(tempNickname);
+  const handleSaveProfile = async () => {
+    const trimmedNickname = tempNickname.trim();
+
+    // 1. 로컬스토리지에 저장
+    localStorage.setItem('user_nickname', trimmedNickname);
+    setUserNickname(trimmedNickname);
+
+    // ✅ 2. Firebase users 컬렉션에도 저장
+    try {
+      const userRef = doc(db, 'users', userName.trim());
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        await setDoc(userRef, {
+          ...userSnap.data(),
+          nickname: trimmedNickname,
+          updatedAt: new Date().toISOString(),
+        });
+      } else {
+        await setDoc(userRef, {
+          name: userName.trim(),
+          nickname: trimmedNickname,
+          joinedAt: new Date().toISOString(),
+          lastLoginAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    } catch (error) {
+      console.error('Firebase 닉네임 저장 실패:', error);
+    }
+
     setIsEditing(false);
     alert('닉네임이 설정되었습니다! ⛳');
   };
@@ -100,7 +127,6 @@ export default function MyPage() {
           <div className="flex items-center gap-4">
             <Avatar name={userName} size={60} />
             <div>
-              {/* ✅ 닉네임만 표시, 사장님/멤버님 제거 */}
               <p className="text-lg font-black text-gray-800">
                 {userNickname || userName}
               </p>
@@ -161,28 +187,17 @@ export default function MyPage() {
             style={{ maxHeight: 'calc(100vh - 128px)' }}
             onTouchMove={e => e.stopPropagation()}
           >
-            {/* 고정 헤더 */}
             <div className="px-8 pt-8 pb-4 shrink-0">
               <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
               <h3 className="text-xl font-black">프로필 수정</h3>
             </div>
 
-            {/* 스크롤 가능한 콘텐츠 */}
-            <div
-              className="flex-1 overflow-y-auto px-8 pb-4"
-              style={{ WebkitOverflowScrolling: 'touch' }}
-            >
+            <div className="flex-1 overflow-y-auto px-8 pb-4" style={{ WebkitOverflowScrolling: 'touch' }}>
               <div className="space-y-6">
                 <div>
                   <label className="text-[11px] font-black text-gray-400 uppercase tracking-wider">정산용 실명 (수정 불가)</label>
-                  <input
-                    type="text"
-                    value={userName}
-                    disabled
-                    className="w-full mt-2 p-4 bg-gray-50 rounded-2xl border-none text-gray-400 font-bold"
-                  />
+                  <input type="text" value={userName} disabled className="w-full mt-2 p-4 bg-gray-50 rounded-2xl border-none text-gray-400 font-bold" />
                 </div>
-
                 <div>
                   <label className="text-[11px] font-black text-gray-400 uppercase tracking-wider">활동 닉네임 설정</label>
                   <input
@@ -193,26 +208,15 @@ export default function MyPage() {
                     className="w-full mt-2 p-4 bg-gray-100 rounded-2xl border-none font-bold text-gray-800 focus:ring-2 focus:ring-green-500"
                   />
                   <p className="text-[10px] text-green-600 mt-3 font-medium bg-green-50 p-2 rounded-lg">
-                    💡 벙개 명단에는 닉네임이 우선 표시되지만, 모든 정산 데이터는 실명({userName})을 기준으로 안전하게 처리됩니다.
+                    💡 닉네임은 모든 기기에서 자동으로 동기화됩니다. 벙개 명단에는 닉네임이 우선 표시되며, 정산은 실명({userName}) 기준으로 처리됩니다.
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* 하단 고정 버튼 */}
             <div className="flex gap-3 px-8 pt-4 pb-8 shrink-0 border-t border-gray-100">
-              <button
-                onClick={() => setIsEditing(false)}
-                className="flex-1 p-4 bg-gray-100 rounded-2xl font-bold text-gray-500"
-              >
-                취소
-              </button>
-              <button
-                onClick={handleSaveProfile}
-                className="flex-1 p-4 bg-green-600 rounded-2xl font-bold text-white shadow-lg shadow-green-100"
-              >
-                저장하기 ⛳
-              </button>
+              <button onClick={() => setIsEditing(false)} className="flex-1 p-4 bg-gray-100 rounded-2xl font-bold text-gray-500">취소</button>
+              <button onClick={handleSaveProfile} className="flex-1 p-4 bg-green-600 rounded-2xl font-bold text-white shadow-lg shadow-green-100">저장하기 ⛳</button>
             </div>
           </div>
         </div>

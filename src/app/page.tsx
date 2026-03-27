@@ -29,6 +29,7 @@ export default function Home() {
       setIsLoggedIn(true);
       setUserName(savedName);
 
+      // 관리자 여부 확인
       const checkAdmin = async () => {
         try {
           const adminDoc = await getDoc(doc(db, 'admins', savedName.trim()));
@@ -39,13 +40,14 @@ export default function Home() {
       };
       checkAdmin();
 
-      // ✅ users 컬렉션에 자동 저장 (로그인 시마다 업데이트)
-      const registerUser = async () => {
+      // ✅ Firebase에서 유저 정보 불러오기 (닉네임 동기화)
+      const syncUserFromFirebase = async () => {
         try {
           const userRef = doc(db, 'users', savedName.trim());
           const userSnap = await getDoc(userRef);
+
           if (!userSnap.exists()) {
-            // 최초 가입
+            // 최초 가입 - Firebase에 저장
             await setDoc(userRef, {
               name: savedName.trim(),
               nickname: localStorage.getItem('user_nickname') || '',
@@ -53,18 +55,21 @@ export default function Home() {
               lastLoginAt: new Date().toISOString(),
             });
           } else {
-            // 재로그인 시 마지막 접속일만 업데이트
+            // ✅ Firebase에서 닉네임 불러와서 로컬에 저장
+            const firebaseNickname = userSnap.data().nickname || '';
+            localStorage.setItem('user_nickname', firebaseNickname);
+
+            // 마지막 접속일 업데이트
             await setDoc(userRef, {
               ...userSnap.data(),
-              nickname: localStorage.getItem('user_nickname') || userSnap.data().nickname || '',
               lastLoginAt: new Date().toISOString(),
             });
           }
         } catch (error) {
-          console.error('유저 등록 실패:', error);
+          console.error('유저 동기화 실패:', error);
         }
       };
-      registerUser();
+      syncUserFromFirebase();
 
       const installGuideShown = localStorage.getItem('installGuideShown');
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
@@ -75,18 +80,12 @@ export default function Home() {
     setCheckingAuth(false);
 
     const unsubscribe = onSnapshot(doc(db, 'notice', 'main'), (docSnap) => {
-      if (docSnap.exists()) {
-        setNotice(docSnap.data().content || '');
-      }
+      if (docSnap.exists()) setNotice(docSnap.data().content || '');
     });
 
     const fetchMeetups = async () => {
       try {
-        const q = query(
-          collection(db, "meetups"),
-          orderBy("createdAt", "desc"),
-          limit(5)
-        );
+        const q = query(collection(db, "meetups"), orderBy("createdAt", "desc"), limit(5));
         const querySnapshot = await getDocs(q);
         const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setMeetups(data);
@@ -103,7 +102,11 @@ export default function Home() {
 
   const handleLogout = () => {
     if (window.confirm('로그아웃 하시겠습니까?')) {
+      // ✅ localStorage.clear() 대신 로그인 관련 정보만 삭제
+      // installGuideShown은 유지 (다시 팝업 안 뜨게)
+      const installGuideShown = localStorage.getItem('installGuideShown');
       localStorage.clear();
+      if (installGuideShown) localStorage.setItem('installGuideShown', installGuideShown);
       window.location.reload();
     }
   };
@@ -163,7 +166,6 @@ export default function Home() {
 
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-3">
-          {/* 정산하기 */}
           <div
             onClick={() => router.push('/settlement')}
             className="bg-green-600 p-5 rounded-3xl shadow-lg shadow-green-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-all col-span-2"
@@ -175,7 +177,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* ✅ 멤버 버튼 */}
           <div
             onClick={() => router.push('/members')}
             className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex flex-col gap-2 cursor-pointer active:scale-95 transition-all"
@@ -185,7 +186,6 @@ export default function Home() {
             <p className="text-[11px] text-gray-400">가입자 명단 보기</p>
           </div>
 
-          {/* 벙개 만들기 */}
           <div
             onClick={() => router.push('/create-meetup')}
             className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex flex-col gap-2 cursor-pointer active:scale-95 transition-all"
@@ -201,7 +201,6 @@ export default function Home() {
           <div className="flex justify-between items-end mb-4">
             <h3 className="text-lg font-bold">나의 벙개 일정</h3>
           </div>
-
           <div className="space-y-3">
             {loading ? (
               <div className="bg-white p-10 rounded-3xl border border-dashed border-gray-200 text-center text-gray-400">
@@ -255,7 +254,6 @@ export default function Home() {
               </button>
             )}
           </div>
-
           {isEditingNotice ? (
             <div className="space-y-3">
               <textarea
@@ -290,7 +288,6 @@ export default function Home() {
               </div>
               <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">⛳</div>
             </div>
-
             <div className="px-6 py-5 border-b border-gray-100 space-y-4">
               {[
                 { icon: '🔔', title: '푸시 알림 수신', desc: '벙개 & 정산 알림을 바로 받아요' },
@@ -306,7 +303,6 @@ export default function Home() {
                 </div>
               ))}
             </div>
-
             <div className="px-6 py-4 border-b border-gray-100 space-y-2">
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">설치 방법</p>
               <div className="bg-gray-50 rounded-2xl p-3">
@@ -318,7 +314,6 @@ export default function Home() {
                 <p className="text-[12px] text-gray-500 leading-relaxed">① 우측 상단 메뉴(⋮) 탭<br />② "홈 화면에 추가" 선택<br />③ "추가" 버튼 탭</p>
               </div>
             </div>
-
             <div className="px-6 py-4 flex gap-2">
               <button onClick={() => handleInstallGuideClose(false)} className="flex-1 py-3 bg-gray-100 rounded-2xl text-sm font-bold text-gray-500 active:scale-95 transition-all">
                 다음에 하기
