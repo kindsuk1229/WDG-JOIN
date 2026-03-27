@@ -29,7 +29,6 @@ export default function Home() {
       setIsLoggedIn(true);
       setUserName(savedName);
 
-      // 관리자 여부 확인
       const checkAdmin = async () => {
         try {
           const adminDoc = await getDoc(doc(db, 'admins', savedName.trim()));
@@ -40,14 +39,11 @@ export default function Home() {
       };
       checkAdmin();
 
-      // ✅ Firebase에서 유저 정보 불러오기 (닉네임 동기화)
       const syncUserFromFirebase = async () => {
         try {
           const userRef = doc(db, 'users', savedName.trim());
           const userSnap = await getDoc(userRef);
-
           if (!userSnap.exists()) {
-            // 최초 가입 - Firebase에 저장
             await setDoc(userRef, {
               name: savedName.trim(),
               nickname: localStorage.getItem('user_nickname') || '',
@@ -55,11 +51,8 @@ export default function Home() {
               lastLoginAt: new Date().toISOString(),
             });
           } else {
-            // ✅ Firebase에서 닉네임 불러와서 로컬에 저장
             const firebaseNickname = userSnap.data().nickname || '';
             localStorage.setItem('user_nickname', firebaseNickname);
-
-            // 마지막 접속일 업데이트
             await setDoc(userRef, {
               ...userSnap.data(),
               lastLoginAt: new Date().toISOString(),
@@ -85,7 +78,7 @@ export default function Home() {
 
     const fetchMeetups = async () => {
       try {
-        const q = query(collection(db, "meetups"), orderBy("createdAt", "desc"), limit(5));
+        const q = query(collection(db, "meetups"), orderBy("createdAt", "desc"), limit(3));
         const querySnapshot = await getDocs(q);
         const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setMeetups(data);
@@ -102,8 +95,6 @@ export default function Home() {
 
   const handleLogout = () => {
     if (window.confirm('로그아웃 하시겠습니까?')) {
-      // ✅ localStorage.clear() 대신 로그인 관련 정보만 삭제
-      // installGuideShown은 유지 (다시 팝업 안 뜨게)
       const installGuideShown = localStorage.getItem('installGuideShown');
       localStorage.clear();
       if (installGuideShown) localStorage.setItem('installGuideShown', installGuideShown);
@@ -196,11 +187,18 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Meetups */}
+        {/* ✅ 현재 벙개 일정 (최근 3개 미리보기) */}
         <div>
           <div className="flex justify-between items-end mb-4">
-            <h3 className="text-lg font-bold">나의 벙개 일정</h3>
+            <h3 className="text-lg font-bold">현재 벙개 일정</h3>
+            <button
+              onClick={() => router.push('/meetups')}
+              className="text-green-600 text-sm font-bold"
+            >
+              전체보기 →
+            </button>
           </div>
+
           <div className="space-y-3">
             {loading ? (
               <div className="bg-white p-10 rounded-3xl border border-dashed border-gray-200 text-center text-gray-400">
