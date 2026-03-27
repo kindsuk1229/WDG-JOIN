@@ -85,7 +85,7 @@ export default function MyPage() {
   const menus = [
     { label: '내 벙개 내역', icon: '📋', href: '/my-meetups' },
     { label: '정산 내역', icon: '💰', href: '/settlement/history' },
-    { label: '알림 설정', icon: '🔔', href: '/notification-settings' },
+    { label: '알림 설정', icon: '🔔', href: '#' },
     { label: '프로필 수정', icon: '✏️', onClick: () => setIsEditing(true) },
     { label: '앱 정보', icon: 'ℹ️', href: '#' },
   ];
@@ -96,12 +96,13 @@ export default function MyPage() {
         <h1 className="text-2xl font-bold mb-6">마이페이지</h1>
 
         {/* Profile Card */}
-        <div className="bg-gray-50 rounded-3xl p-5 mb-6 shadow-sm border border-gray-100 relative overflow-hidden">
-          <div className="flex items-center gap-4 relative z-10">
+        <div className="bg-gray-50 rounded-3xl p-5 mb-6 shadow-sm border border-gray-100">
+          <div className="flex items-center gap-4">
             <Avatar name={userName} size={60} />
             <div>
+              {/* ✅ 닉네임만 표시, 사장님/멤버님 제거 */}
               <p className="text-lg font-black text-gray-800">
-                {userNickname || userName} {userName === '김근석' ? '사장님' : '멤버님'}
+                {userNickname || userName}
               </p>
               <p className="text-[12px] text-gray-400 mt-0.5 font-medium italic">
                 {userName === '김근석' ? '우동골 관리자' : '우동골 정회원'}
@@ -109,12 +110,6 @@ export default function MyPage() {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => setIsEditing(true)}
-            className="absolute top-5 right-5 text-[11px] font-bold text-green-600 bg-green-50 px-2.5 py-1 rounded-full border border-green-100"
-          >
-            수정
-          </button>
         </div>
 
         {/* Stats */}

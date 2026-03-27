@@ -14,13 +14,16 @@ function MeetupDetailContent() {
   const [loading, setLoading] = useState(true);
   const [myId, setMyId] = useState('');
   const [myName, setMyName] = useState('');
+  const [myNickname, setMyNickname] = useState('');
 
   useEffect(() => {
     const savedId = localStorage.getItem('user_id') || 'user_' + Math.random().toString(36).substr(2, 9);
     const savedName = localStorage.getItem('user_name') || '익명';
+    const savedNickname = localStorage.getItem('user_nickname') || '';
     setMyId(savedId);
-    setMyName(savedName);
-    if(!localStorage.getItem('user_id')) localStorage.setItem('user_id', savedId);
+    setMyName(savedName.trim());
+    setMyNickname(savedNickname.trim());
+    if (!localStorage.getItem('user_id')) localStorage.setItem('user_id', savedId);
 
     if (meetupId) {
       const fetchDetail = async () => {
@@ -46,15 +49,18 @@ function MeetupDetailContent() {
     try {
       const meetupRef = doc(db, 'meetups', meetupId);
       if (isJoined) {
-        // 참여 취소
-        await updateDoc(meetupRef, {
-          participants: arrayRemove({ id: myId, name: myName })
-        });
+        // ✅ 취소 시 id 기준으로 제거 (닉네임 변경돼도 안전하게)
+        const updatedParticipants = meetup.participants.filter((p: any) => p.id !== myId);
+        await updateDoc(meetupRef, { participants: updatedParticipants });
         alert('참여가 취소되었습니다. ⛳');
       } else {
-        // 참여 하기
+        // ✅ 참여 시 닉네임도 함께 저장
         await updateDoc(meetupRef, {
-          participants: arrayUnion({ id: myId, name: myName })
+          participants: arrayUnion({
+            id: myId,
+            name: myName,
+            nickname: myNickname, // 닉네임 추가
+          })
         });
         alert('참여 신청이 완료되었습니다! ⛳');
       }
@@ -71,7 +77,7 @@ function MeetupDetailContent() {
   const isJoined = participants.some((p: any) => p.id === myId);
 
   return (
-    <main className="max-w-md mx-auto bg-gray-50 min-h-screen pb-24 text-gray-900">
+    <div className="bg-gray-50 text-gray-900">
       <header className="p-4 bg-white border-b flex items-center sticky top-0 z-10">
         <button onClick={() => router.back()} className="mr-4 text-xl font-bold">←</button>
         <h1 className="text-xl font-bold">벙개 상세 정보</h1>
@@ -81,7 +87,7 @@ function MeetupDetailContent() {
         <div className="bg-white p-6 rounded-3xl shadow-sm">
           <h2 className="text-2xl font-black text-gray-800 mb-2">{meetup.title}</h2>
           <p className="text-green-600 font-bold mb-4">{meetup.golfCourse}</p>
-          
+
           <div className="grid grid-cols-2 gap-4 text-sm text-gray-500 border-t pt-4">
             <div>📅 {meetup.date}</div>
             <div>⏰ {meetup.time}</div>
@@ -92,25 +98,26 @@ function MeetupDetailContent() {
         <div className="bg-white p-6 rounded-3xl shadow-sm">
           <h3 className="font-bold mb-4 flex justify-between">
             <span>참여 멤버 ({participants.length}명)</span>
-            <span className="text-gray-400 font-normal text-sm font-sans">
+            <span className="text-gray-400 font-normal text-sm">
               최대 {meetup.cartCount * 4}명
             </span>
           </h3>
-          
+
           <div className="flex flex-wrap gap-2">
             {participants.length === 0 ? (
               <p className="text-gray-400 text-sm py-2">가장 먼저 참여해보세요! ⛳</p>
             ) : (
               participants.map((p: any, idx: number) => (
                 <span key={idx} className="px-4 py-2 bg-gray-100 rounded-full text-sm font-bold">
-                  {p.name}
+                  {/* ✅ 닉네임 있으면 닉네임, 없으면 실명 표시 */}
+                  {p.nickname || p.name}
                 </span>
               ))
             )}
           </div>
         </div>
 
-        <button 
+        <button
           onClick={handleJoin}
           className={`w-full p-5 rounded-2xl font-bold shadow-xl transition-all ${
             isJoined ? 'bg-gray-200 text-gray-600' : 'bg-green-600 text-white'
@@ -119,7 +126,7 @@ function MeetupDetailContent() {
           {isJoined ? '참여 취소하기' : '나도 갈래요! ⛳'}
         </button>
       </div>
-    </main>
+    </div>
   );
 }
 

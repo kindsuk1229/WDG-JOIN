@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, query, getDocs, orderBy, limit } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, limit, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import KakaoLoginButton from '@/components/KakaoLogin';
 
 export default function Home() {
@@ -14,15 +14,41 @@ export default function Home() {
   const [userName, setUserName] = useState('회원');
   const [checkingAuth, setCheckingAuth] = useState(true);
 
+  // 공지사항
+  const [notice, setNotice] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isEditingNotice, setIsEditingNotice] = useState(false);
+  const [tempNotice, setTempNotice] = useState('');
+  const [savingNotice, setSavingNotice] = useState(false);
+
   useEffect(() => {
     const status = localStorage.getItem('isLoggedIn');
-    const savedName = localStorage.getItem('user_name');
+    const savedName = localStorage.getItem('user_name') || '회원';
     if (status === 'true') {
       setIsLoggedIn(true);
-      setUserName(savedName || '회원');
+      setUserName(savedName);
+
+      // 관리자 여부 확인
+      const checkAdmin = async () => {
+        try {
+          const adminDoc = await getDoc(doc(db, 'admins', savedName.trim()));
+          setIsAdmin(adminDoc.exists());
+        } catch (error) {
+          console.error('관리자 확인 실패:', error);
+        }
+      };
+      checkAdmin();
     }
     setCheckingAuth(false);
 
+    // 공지사항 실시간 구독
+    const unsubscribe = onSnapshot(doc(db, 'notice', 'main'), (docSnap) => {
+      if (docSnap.exists()) {
+        setNotice(docSnap.data().content || '');
+      }
+    });
+
+    // 벙개 목록
     const fetchMeetups = async () => {
       try {
         const q = query(
@@ -40,12 +66,31 @@ export default function Home() {
       }
     };
     fetchMeetups();
+
+    return () => unsubscribe();
   }, []);
 
   const handleLogout = () => {
     if (window.confirm('로그아웃 하시겠습니까?')) {
       localStorage.clear();
       window.location.reload();
+    }
+  };
+
+  // 공지사항 저장
+  const handleSaveNotice = async () => {
+    setSavingNotice(true);
+    try {
+      await setDoc(doc(db, 'notice', 'main'), {
+        content: tempNotice,
+        updatedAt: new Date().toISOString(),
+        updatedBy: userName,
+      });
+      setIsEditingNotice(false);
+    } catch (error) {
+      alert('저장 중 오류가 발생했습니다.');
+    } finally {
+      setSavingNotice(false);
     }
   };
 
@@ -58,10 +103,6 @@ export default function Home() {
   }
 
   return (
-    // ✅ 핵심 수정:
-    // - max-w-md, min-h-screen 제거 (layout.tsx가 이미 처리)
-    // - pb-24 제거 (layout의 pb-20이 처리)
-    // - BottomNav 임포트/렌더링 완전 제거 (layout.tsx에서만 렌더링)
     <div className="bg-gray-50 text-gray-900">
       {/* Header */}
       <header className="p-4 bg-white flex justify-between items-center sticky top-0 z-10 shadow-sm">
@@ -80,7 +121,7 @@ export default function Home() {
       </header>
 
       <div className="p-5 space-y-8">
-        {/* Welcome Msg */}
+        {/* Welcome */}
         <div>
           <h2 className="text-xl font-bold leading-tight">
             반갑습니다, {userName}님!<br />
@@ -100,7 +141,7 @@ export default function Home() {
           <span className="text-white text-2xl">→</span>
         </div>
 
-        {/* My Meetups List */}
+        {/* Meetups */}
         <div>
           <div className="flex justify-between items-end mb-4">
             <h3 className="text-lg font-bold">나의 벙개 일정</h3>
@@ -142,16 +183,58 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Notice */}
+        {/* 공지사항 */}
         <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-50">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-lg">📢</span>
-            <h3 className="font-bold">우동골 공지사항</h3>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">📢</span>
+              <h3 className="font-bold">우동골 공지사항</h3>
+            </div>
+            {/* ✅ 관리자만 수정 버튼 표시 */}
+            {isAdmin && !isEditingNotice && (
+              <button
+                onClick={() => {
+                  setTempNotice(notice);
+                  setIsEditingNotice(true);
+                }}
+                className="text-[11px] font-bold text-green-600 bg-green-50 px-2.5 py-1 rounded-full border border-green-100"
+              >
+                ✏️ 수정
+              </button>
+            )}
           </div>
-          <p className="text-sm text-gray-500 leading-relaxed">
-            매너 골프가 즐거운 모임을 만듭니다! ⛳<br />
-            노쇼 방지를 위해 최소 3일 전 취소 부탁드립니다.
-          </p>
+
+          {isEditingNotice ? (
+            // 수정 모드
+            <div className="space-y-3">
+              <textarea
+                value={tempNotice}
+                onChange={(e) => setTempNotice(e.target.value)}
+                rows={4}
+                className="w-full p-3 bg-gray-50 rounded-2xl text-sm text-gray-700 leading-relaxed border border-gray-200 focus:ring-2 focus:ring-green-500 focus:outline-none resize-none"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIsEditingNotice(false)}
+                  className="flex-1 py-2.5 bg-gray-100 rounded-xl text-sm font-bold text-gray-500"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleSaveNotice}
+                  disabled={savingNotice}
+                  className="flex-1 py-2.5 bg-green-600 rounded-xl text-sm font-bold text-white"
+                >
+                  {savingNotice ? '저장 중...' : '저장하기'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            // 표시 모드
+            <p className="text-sm text-gray-500 leading-relaxed whitespace-pre-line">
+              {notice || '공지사항이 없습니다.'}
+            </p>
+          )}
         </div>
       </div>
     </div>
