@@ -14,14 +14,11 @@ export default function Home() {
   const [userName, setUserName] = useState('회원');
   const [checkingAuth, setCheckingAuth] = useState(true);
 
-  // 공지사항
   const [notice, setNotice] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEditingNotice, setIsEditingNotice] = useState(false);
   const [tempNotice, setTempNotice] = useState('');
   const [savingNotice, setSavingNotice] = useState(false);
-
-  // PWA 설치 안내 팝업
   const [showInstallGuide, setShowInstallGuide] = useState(false);
 
   useEffect(() => {
@@ -32,7 +29,6 @@ export default function Home() {
       setIsLoggedIn(true);
       setUserName(savedName);
 
-      // 관리자 여부 확인
       const checkAdmin = async () => {
         try {
           const adminDoc = await getDoc(doc(db, 'admins', savedName.trim()));
@@ -43,24 +39,47 @@ export default function Home() {
       };
       checkAdmin();
 
-      // PWA 설치 안내: 처음 접속 시에만 표시
+      // ✅ users 컬렉션에 자동 저장 (로그인 시마다 업데이트)
+      const registerUser = async () => {
+        try {
+          const userRef = doc(db, 'users', savedName.trim());
+          const userSnap = await getDoc(userRef);
+          if (!userSnap.exists()) {
+            // 최초 가입
+            await setDoc(userRef, {
+              name: savedName.trim(),
+              nickname: localStorage.getItem('user_nickname') || '',
+              joinedAt: new Date().toISOString(),
+              lastLoginAt: new Date().toISOString(),
+            });
+          } else {
+            // 재로그인 시 마지막 접속일만 업데이트
+            await setDoc(userRef, {
+              ...userSnap.data(),
+              nickname: localStorage.getItem('user_nickname') || userSnap.data().nickname || '',
+              lastLoginAt: new Date().toISOString(),
+            });
+          }
+        } catch (error) {
+          console.error('유저 등록 실패:', error);
+        }
+      };
+      registerUser();
+
       const installGuideShown = localStorage.getItem('installGuideShown');
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
       if (!installGuideShown && !isStandalone) {
-        // 1초 뒤에 팝업 표시 (자연스럽게)
         setTimeout(() => setShowInstallGuide(true), 1000);
       }
     }
     setCheckingAuth(false);
 
-    // 공지사항 실시간 구독
     const unsubscribe = onSnapshot(doc(db, 'notice', 'main'), (docSnap) => {
       if (docSnap.exists()) {
         setNotice(docSnap.data().content || '');
       }
     });
 
-    // 벙개 목록
     const fetchMeetups = async () => {
       try {
         const q = query(
@@ -107,10 +126,7 @@ export default function Home() {
 
   const handleInstallGuideClose = (confirmed: boolean) => {
     setShowInstallGuide(false);
-    // "확인 완료" 누르면 다시 안 뜨게, "다음에 하기"는 다음 로그인 때 또 뜸
-    if (confirmed) {
-      localStorage.setItem('installGuideShown', 'true');
-    }
+    if (confirmed) localStorage.setItem('installGuideShown', 'true');
   };
 
   if (checkingAuth) {
@@ -145,25 +161,45 @@ export default function Home() {
           </h2>
         </div>
 
-        {/* Quick Action */}
-        <div
-          onClick={() => router.push('/settlement')}
-          className="bg-green-600 p-6 rounded-3xl shadow-lg shadow-green-100 flex justify-between items-center cursor-pointer active:scale-95 transition-all"
-        >
-          <div>
+        {/* Quick Actions */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* 정산하기 */}
+          <div
+            onClick={() => router.push('/settlement')}
+            className="bg-green-600 p-5 rounded-3xl shadow-lg shadow-green-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-all col-span-2"
+          >
             <p className="text-green-100 text-xs font-bold mb-1">라운딩 후 복잡한 계산은 그만!</p>
-            <p className="text-white text-xl font-black">💰 초간편 정산하기</p>
+            <div className="flex justify-between items-center">
+              <p className="text-white text-xl font-black">💰 초간편 정산하기</p>
+              <span className="text-white text-2xl">→</span>
+            </div>
           </div>
-          <span className="text-white text-2xl">→</span>
+
+          {/* ✅ 멤버 버튼 */}
+          <div
+            onClick={() => router.push('/members')}
+            className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex flex-col gap-2 cursor-pointer active:scale-95 transition-all"
+          >
+            <span className="text-2xl">👥</span>
+            <p className="font-black text-gray-800">멤버</p>
+            <p className="text-[11px] text-gray-400">가입자 명단 보기</p>
+          </div>
+
+          {/* 벙개 만들기 */}
+          <div
+            onClick={() => router.push('/create-meetup')}
+            className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex flex-col gap-2 cursor-pointer active:scale-95 transition-all"
+          >
+            <span className="text-2xl">⛳</span>
+            <p className="font-black text-gray-800">벙개 만들기</p>
+            <p className="text-[11px] text-gray-400">새 라운딩 개설</p>
+          </div>
         </div>
 
         {/* Meetups */}
         <div>
           <div className="flex justify-between items-end mb-4">
             <h3 className="text-lg font-bold">나의 벙개 일정</h3>
-            <button onClick={() => router.push('/create-meetup')} className="text-green-600 text-sm font-bold">
-              + 벙개 만들기
-            </button>
           </div>
 
           <div className="space-y-3">
@@ -183,11 +219,18 @@ export default function Home() {
                   className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer active:bg-gray-50"
                 >
                   <div>
-                    <p className="font-bold text-gray-800">{item.title}</p>
-                    <p className="text-xs text-gray-400 mt-1">{item.golfCourse} | {item.date} {item.time}</p>
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-bold text-gray-800">{item.title}</p>
+                      {item.meetupType === 'screen' && (
+                        <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md font-bold">스크린</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400">{item.golfCourse} | {item.date}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-green-600 font-bold text-sm">{item.cartCount}카트</p>
+                    <p className="text-green-600 font-bold text-sm">
+                      {item.meetupType === 'screen' ? `${item.playerCount}명` : `${item.cartCount}카트`}
+                    </p>
                     <p className="text-[10px] text-gray-300 font-bold">참여하기</p>
                   </div>
                 </div>
@@ -236,12 +279,10 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ✅ PWA 설치 안내 팝업 */}
+      {/* PWA 설치 안내 팝업 */}
       {showInstallGuide && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center px-5">
           <div className="w-full max-w-sm bg-white rounded-3xl overflow-hidden shadow-2xl">
-            
-            {/* 헤더 */}
             <div className="bg-green-600 px-6 py-5 flex justify-between items-start">
               <div>
                 <p className="text-[11px] text-green-200 font-bold mb-1">WDG 우동골</p>
@@ -250,7 +291,6 @@ export default function Home() {
               <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">⛳</div>
             </div>
 
-            {/* 혜택 */}
             <div className="px-6 py-5 border-b border-gray-100 space-y-4">
               {[
                 { icon: '🔔', title: '푸시 알림 수신', desc: '벙개 & 정산 알림을 바로 받아요' },
@@ -267,7 +307,6 @@ export default function Home() {
               ))}
             </div>
 
-            {/* 설치 방법 */}
             <div className="px-6 py-4 border-b border-gray-100 space-y-2">
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">설치 방법</p>
               <div className="bg-gray-50 rounded-2xl p-3">
@@ -280,18 +319,11 @@ export default function Home() {
               </div>
             </div>
 
-            {/* 버튼 */}
             <div className="px-6 py-4 flex gap-2">
-              <button
-                onClick={() => handleInstallGuideClose(false)}
-                className="flex-1 py-3 bg-gray-100 rounded-2xl text-sm font-bold text-gray-500 active:scale-95 transition-all"
-              >
+              <button onClick={() => handleInstallGuideClose(false)} className="flex-1 py-3 bg-gray-100 rounded-2xl text-sm font-bold text-gray-500 active:scale-95 transition-all">
                 다음에 하기
               </button>
-              <button
-                onClick={() => handleInstallGuideClose(true)}
-                className="flex-2 py-3 px-5 bg-green-600 rounded-2xl text-sm font-bold text-white active:scale-95 transition-all"
-              >
+              <button onClick={() => handleInstallGuideClose(true)} className="flex-1 py-3 bg-green-600 rounded-2xl text-sm font-bold text-white active:scale-95 transition-all">
                 확인 완료
               </button>
             </div>
