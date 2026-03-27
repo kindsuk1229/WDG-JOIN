@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, collection, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { sendNotificationToAll } from '@/lib/fcm';
 
 function CreateMeetupContent() {
   const router = useRouter();
@@ -88,7 +89,20 @@ function CreateMeetupContent() {
         await updateDoc(doc(db, 'meetups', meetupId), meetupData);
         alert('⛳ 벙개가 수정되었습니다!');
       } else {
-        await addDoc(collection(db, 'meetups'), { ...meetupData, createdAt: new Date().toISOString(), players: 1 });
+        const newDoc = await addDoc(collection(db, 'meetups'), {
+          ...meetupData,
+          createdAt: new Date().toISOString(),
+          players: 1,
+        });
+
+        // ✅ 전체 멤버에게 푸시 알림 (본인 제외)
+        await sendNotificationToAll({
+          title: '⛳ 새로운 벙개가 열렸어요!',
+          body: `${golfCourse} | ${date} | ${cartCount}카트`,
+          url: `/meetup-detail?id=${newDoc.id}`,
+          excludeUserName: '김근석',
+        });
+
         alert('⛳ 새로운 벙개가 등록되었습니다!');
       }
       router.push('/my-meetups');
@@ -100,13 +114,7 @@ function CreateMeetupContent() {
   };
 
   return (
-    // ✅ 핵심 수정:
-    // - h-[calc(100vh-80px)] 제거 → layout의 main이 높이를 관리
-    // - overflow-hidden 제거 → 스크롤을 막는 주범
-    // - absolute 버튼 제거 → 자연스러운 문서 흐름으로 배치
     <div className="bg-gray-50 min-h-full">
-
-      {/* 고정 헤더 */}
       <header className="p-4 bg-white border-b flex justify-between items-center sticky top-0 z-10 shadow-sm">
         <div className="flex items-center">
           <button type="button" onClick={() => router.back()} className="mr-4 text-xl font-bold text-gray-600">←</button>
@@ -119,59 +127,37 @@ function CreateMeetupContent() {
         )}
       </header>
 
-      {/* ✅ 스크롤 영역: 더 이상 overflow-y-auto 불필요, layout의 main이 처리 */}
       <form onSubmit={handleSubmit} className="p-5 space-y-6 pb-6">
         <div className="bg-white p-6 rounded-3xl shadow-sm space-y-6 border border-gray-100">
           <div>
             <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">벙개 제목</label>
             <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: [WDG] 주말 정기 라운딩" className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all text-gray-900" />
           </div>
-
           <div>
             <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">골프장 이름</label>
             <input type="text" required value={golfCourse} onChange={(e) => setGolfCourse(e.target.value)} placeholder="예: 샤인데일 CC" className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all text-gray-900" />
           </div>
-
           <div>
             <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">날짜 선택</label>
             <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all text-gray-900" />
           </div>
-
           <div className="border-t pt-6">
             <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">모집 규모 및 조별 티타임</label>
-            <select
-              value={cartCount}
-              onChange={(e) => handleCartCountChange(Number(e.target.value))}
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg mb-4 focus:ring-2 focus:ring-green-500 text-gray-900"
-            >
+            <select value={cartCount} onChange={(e) => handleCartCountChange(Number(e.target.value))} className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg mb-4 focus:ring-2 focus:ring-green-500 text-gray-900">
               {[...Array(10)].map((_, i) => <option key={i+1} value={i+1}>{i+1}카트 ({ (i+1)*4 }명)</option>)}
             </select>
-
             <div className="grid grid-cols-1 gap-3">
               {cartTimes.map((time, index) => (
                 <div key={index} className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
                   <span className="text-[11px] font-black text-green-700 w-10 text-center">{index + 1}조</span>
-                  <input
-                    type="time"
-                    required
-                    value={time}
-                    onChange={(e) => updateCartTime(index, e.target.value)}
-                    className="bg-transparent border-none focus:ring-0 font-bold text-gray-800 flex-1 p-1"
-                  />
+                  <input type="time" required value={time} onChange={(e) => updateCartTime(index, e.target.value)} className="bg-transparent border-none focus:ring-0 font-bold text-gray-800 flex-1 p-1" />
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        {/* ✅ 버튼: absolute 제거하고 자연스러운 흐름으로 배치 */}
-        <button
-          type="submit"
-          disabled={loading}
-          className={`w-full p-4 rounded-2xl font-black text-lg text-white transition-all active:scale-95 ${
-            loading ? 'bg-gray-400' : 'bg-green-600 shadow-lg shadow-green-200 hover:bg-green-700'
-          }`}
-        >
+        <button type="submit" disabled={loading} className={`w-full p-4 rounded-2xl font-black text-lg text-white transition-all active:scale-95 ${loading ? 'bg-gray-400' : 'bg-green-600 shadow-lg shadow-green-200 hover:bg-green-700'}`}>
           {loading ? '처리 중...' : meetupId ? '수정 완료하기 ⛳' : '벙개 등록하기 ⛳'}
         </button>
       </form>
