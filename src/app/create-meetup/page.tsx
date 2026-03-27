@@ -241,26 +241,44 @@ function CreateMeetupContent() {
             </div>
           )}
 
-          {/* ✅ 스크린: 인원 수 (1~40명) */}
+          {/* ✅ 스크린: 인원 수 (1~40명) + 시간 */}
           {meetupType === 'screen' && (
-            <div className="border-t pt-6">
-              <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">
-                모집 인원 <span className="font-normal text-gray-400 normal-case">(최대 40명)</span>
-              </label>
-              <select
-                value={playerCount}
-                onChange={(e) => setPlayerCount(Number(e.target.value))}
-                className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg focus:ring-2 focus:ring-green-500 text-gray-900"
-              >
-                {[...Array(40)].map((_, i) => (
-                  <option key={i+1} value={i+1}>{i+1}명</option>
-                ))}
-              </select>
+            <div className="border-t pt-6 space-y-4">
+              {/* 시간 */}
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">시작 시간</label>
+                <div className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
+                  <span className="text-[11px] font-black text-green-700">시작</span>
+                  <input
+                    type="time"
+                    required
+                    value={cartTimes[0] || ''}
+                    onChange={(e) => setCartTimes([e.target.value])}
+                    className="bg-transparent border-none focus:ring-0 font-bold text-gray-800 flex-1 p-1"
+                  />
+                </div>
+              </div>
 
-              <div className="mt-4 bg-green-50 rounded-2xl p-3 border border-green-100">
-                <p className="text-[12px] text-green-700 font-bold text-center">
-                  🖥️ 스크린 {playerCount}명 모집
-                </p>
+              {/* 인원 */}
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">
+                  모집 인원 <span className="font-normal text-gray-400 normal-case">(최대 50명)</span>
+                </label>
+                <select
+                  value={playerCount}
+                  onChange={(e) => setPlayerCount(Number(e.target.value))}
+                  className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg focus:ring-2 focus:ring-green-500 text-gray-900"
+                >
+                  {[...Array(50)].map((_, i) => (
+                    <option key={i+1} value={i+1}>{i+1}명</option>
+                  ))}
+                </select>
+
+                <div className="mt-3 bg-green-50 rounded-2xl p-3 border border-green-100">
+                  <p className="text-[12px] text-green-700 font-bold text-center">
+                    🖥️ 스크린 {playerCount}명 모집
+                  </p>
+                </div>
               </div>
             </div>
           )}
