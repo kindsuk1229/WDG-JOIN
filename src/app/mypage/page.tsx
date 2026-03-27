@@ -162,7 +162,10 @@ export default function MyPage() {
       {isEditing && (
         {/* ✅ bottom-16: 탭바(64px) 높이만큼 위로 올림 */}
         <div className="fixed inset-0 bottom-16 bg-black/60 z-50 flex items-end justify-center">
-          <div className="w-full max-w-md bg-white rounded-t-[32px] flex flex-col max-h-[85vh] animate-in slide-in-from-bottom duration-300">
+          <div 
+            className="w-full max-w-md bg-white rounded-t-[32px] flex flex-col max-h-[85vh] animate-in slide-in-from-bottom duration-300"
+            onTouchMove={e => e.stopPropagation()}
+          >
             
             {/* 고정 헤더 */}
             <div className="px-8 pt-8 pb-4 shrink-0">
