@@ -276,7 +276,7 @@ export default function Home() {
               </div>
               <div className="bg-gray-50 rounded-2xl p-3">
                 <p className="text-[13px] font-bold text-gray-700 mb-1">Android (Chrome)</p>
-                <p className="text-[12px] text-gray-500 leading-relaxed">우측 상단 메뉴(⋮) → "앱 설치" 선택</p>
+                <p className="text-[12px] text-gray-500 leading-relaxed">우측 상단 메뉴(⋮) → "홈 화면에 추가" 선택</p>
               </div>
             </div>
 
