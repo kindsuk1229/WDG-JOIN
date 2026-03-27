@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 function MeetupDetailContent() {
   const router = useRouter();
@@ -12,18 +12,14 @@ function MeetupDetailContent() {
 
   const [meetup, setMeetup] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [myId, setMyId] = useState('');
   const [myName, setMyName] = useState('');
   const [myNickname, setMyNickname] = useState('');
 
   useEffect(() => {
-    const savedId = localStorage.getItem('user_id') || 'user_' + Math.random().toString(36).substr(2, 9);
-    const savedName = localStorage.getItem('user_name') || '익명';
-    const savedNickname = localStorage.getItem('user_nickname') || '';
-    setMyId(savedId);
-    setMyName(savedName.trim());
-    setMyNickname(savedNickname.trim());
-    if (!localStorage.getItem('user_id')) localStorage.setItem('user_id', savedId);
+    const savedName = (localStorage.getItem('user_name') || '익명').trim();
+    const savedNickname = (localStorage.getItem('user_nickname') || '').trim();
+    setMyName(savedName);
+    setMyNickname(savedNickname);
 
     if (meetupId) {
       const fetchDetail = async () => {
@@ -44,24 +40,27 @@ function MeetupDetailContent() {
 
   const handleJoin = async () => {
     if (!meetupId) return;
-    const isJoined = meetup.participants?.some((p: any) => p.id === myId);
+
+    // ✅ 실명 기준으로 중복 체크 (기기 달라도 동일인 판별)
+    const isJoined = meetup.participants?.some((p: any) => p.name === myName);
 
     try {
       const meetupRef = doc(db, 'meetups', meetupId);
+
       if (isJoined) {
-        // ✅ 취소 시 id 기준으로 제거 (닉네임 변경돼도 안전하게)
-        const updatedParticipants = meetup.participants.filter((p: any) => p.id !== myId);
+        // 참여 취소 - 실명 기준으로 제거
+        const updatedParticipants = meetup.participants.filter(
+          (p: any) => p.name !== myName
+        );
         await updateDoc(meetupRef, { participants: updatedParticipants });
         alert('참여가 취소되었습니다. ⛳');
       } else {
-        // ✅ 참여 시 닉네임도 함께 저장
-        await updateDoc(meetupRef, {
-          participants: arrayUnion({
-            id: myId,
-            name: myName,
-            nickname: myNickname, // 닉네임 추가
-          })
-        });
+        // 참여 - 실명 + 닉네임 저장
+        const updatedParticipants = [
+          ...(meetup.participants || []),
+          { name: myName, nickname: myNickname },
+        ];
+        await updateDoc(meetupRef, { participants: updatedParticipants });
         alert('참여 신청이 완료되었습니다! ⛳');
       }
       window.location.reload();
@@ -74,7 +73,8 @@ function MeetupDetailContent() {
   if (!meetup) return <div className="p-10 text-center">존재하지 않는 벙개입니다.</div>;
 
   const participants = meetup.participants || [];
-  const isJoined = participants.some((p: any) => p.id === myId);
+  // ✅ 실명 기준으로 참여 여부 확인
+  const isJoined = participants.some((p: any) => p.name === myName);
 
   return (
     <div className="bg-gray-50 text-gray-900">
@@ -91,7 +91,10 @@ function MeetupDetailContent() {
           <div className="grid grid-cols-2 gap-4 text-sm text-gray-500 border-t pt-4">
             <div>📅 {meetup.date}</div>
             <div>⏰ {meetup.time}</div>
-            <div>🛒 {meetup.cartCount}카트 ({meetup.cartCount * 4}명 정원)</div>
+            <div>🛒 {meetup.meetupType === 'screen'
+              ? `${meetup.playerCount}명 모집`
+              : `${meetup.cartCount}카트 (${meetup.cartCount * 4}명 정원)`}
+            </div>
           </div>
         </div>
 
@@ -99,7 +102,7 @@ function MeetupDetailContent() {
           <h3 className="font-bold mb-4 flex justify-between">
             <span>참여 멤버 ({participants.length}명)</span>
             <span className="text-gray-400 font-normal text-sm">
-              최대 {meetup.cartCount * 4}명
+              최대 {meetup.meetupType === 'screen' ? meetup.playerCount : meetup.cartCount * 4}명
             </span>
           </h3>
 
@@ -108,8 +111,12 @@ function MeetupDetailContent() {
               <p className="text-gray-400 text-sm py-2">가장 먼저 참여해보세요! ⛳</p>
             ) : (
               participants.map((p: any, idx: number) => (
-                <span key={idx} className="px-4 py-2 bg-gray-100 rounded-full text-sm font-bold">
-                  {/* ✅ 닉네임 있으면 닉네임, 없으면 실명 표시 */}
+                <span key={idx} className={`px-4 py-2 rounded-full text-sm font-bold ${
+                  p.name === myName
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-gray-100 text-gray-700'
+                }`}>
+                  {/* ✅ 닉네임 우선 표시 */}
                   {p.nickname || p.name}
                 </span>
               ))
@@ -119,7 +126,7 @@ function MeetupDetailContent() {
 
         <button
           onClick={handleJoin}
-          className={`w-full p-5 rounded-2xl font-bold shadow-xl transition-all ${
+          className={`w-full p-5 rounded-2xl font-bold shadow-xl transition-all active:scale-95 ${
             isJoined ? 'bg-gray-200 text-gray-600' : 'bg-green-600 text-white'
           }`}
         >
