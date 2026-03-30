@@ -80,7 +80,10 @@ export default function Home() {
       try {
         const q = query(collection(db, "meetups"), orderBy("createdAt", "desc"), limit(3));
         const querySnapshot = await getDocs(q);
-        const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        // ✅ cancelled, completed 제외
+        const data = querySnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter((m: any) => m.status !== 'cancelled' && m.status !== 'completed');
         setMeetups(data);
       } catch (error) {
         console.error("데이터 로딩 실패:", error);

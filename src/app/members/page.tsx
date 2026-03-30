@@ -31,13 +31,15 @@ export default function MembersPage() {
         // 관리자 목록
         const adminNames = new Set(adminsSnap.docs.map(d => d.id));
 
-        // ✅ 벙개별 참여자 카운트 (올해 기준)
+        // ✅ 벙개별 참여자 카운트 (올해 기준, completed만)
         const currentYear = new Date().getFullYear().toString();
         const meetupCountMap: Record<string, number> = {};
         meetupsSnap.forEach((d) => {
           const data = d.data();
           // 올해 벙개만 카운트
           if (!data.date || !data.date.startsWith(currentYear)) return;
+          // ✅ cancelled 제외, completed만 카운트
+          if (data.status === 'cancelled') return;
           const participants = data.participants || [];
           participants.forEach((p: any) => {
             const name = p.name || '';
