@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 function MeetupDetailContent() {
   const router = useRouter();
@@ -14,12 +14,24 @@ function MeetupDetailContent() {
   const [loading, setLoading] = useState(true);
   const [myName, setMyName] = useState('');
   const [myNickname, setMyNickname] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const savedName = (localStorage.getItem('user_name') || '익명').trim();
     const savedNickname = (localStorage.getItem('user_nickname') || '').trim();
     setMyName(savedName);
     setMyNickname(savedNickname);
+
+    // 관리자 여부 확인
+    const checkAdmin = async () => {
+      try {
+        const adminDoc = await getDoc(doc(db, 'admins', savedName));
+        setIsAdmin(adminDoc.exists());
+      } catch (error) {
+        console.error('관리자 확인 실패:', error);
+      }
+    };
+    checkAdmin();
 
     if (meetupId) {
       const fetchDetail = async () => {
@@ -37,6 +49,17 @@ function MeetupDetailContent() {
       fetchDetail();
     }
   }, [meetupId]);
+
+  const handleDelete = async () => {
+    if (!window.confirm('이 벙개를 삭제하시겠습니까?')) return;
+    try {
+      await deleteDoc(doc(db, 'meetups', meetupId!));
+      alert('벙개가 삭제되었습니다.');
+      router.push('/meetups');
+    } catch (error) {
+      alert('삭제 중 오류가 발생했습니다.');
+    }
+  };
 
   const handleJoin = async () => {
     if (!meetupId) return;
@@ -78,9 +101,20 @@ function MeetupDetailContent() {
 
   return (
     <div className="bg-gray-50 text-gray-900">
-      <header className="p-4 bg-white border-b flex items-center sticky top-0 z-10">
-        <button onClick={() => router.back()} className="mr-4 text-xl font-bold">←</button>
-        <h1 className="text-xl font-bold">벙개 상세 정보</h1>
+      <header className="p-4 bg-white border-b flex items-center justify-between sticky top-0 z-10">
+        <div className="flex items-center">
+          <button onClick={() => router.back()} className="mr-4 text-xl font-bold">←</button>
+          <h1 className="text-xl font-bold">벙개 상세 정보</h1>
+        </div>
+        {/* ✅ 관리자 또는 등록자만 삭제 버튼 표시 */}
+        {(isAdmin || meetup?.creatorId === myName) && (
+          <button
+            onClick={handleDelete}
+            className="text-red-500 text-sm font-bold px-3 py-1.5 bg-red-50 rounded-lg"
+          >
+            삭제
+          </button>
+        )}
       </header>
 
       <div className="p-5 space-y-6">
