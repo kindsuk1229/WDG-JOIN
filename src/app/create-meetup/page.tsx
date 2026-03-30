@@ -6,8 +6,7 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc, collection, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { sendNotificationToAll } from '@/lib/fcm';
 
-// ✅ 시간 입력 컴포넌트 - 오전/오후 + 시 + 분 직접 입력
-function TimeInput({ value, onChange, label }: { value: string; onChange: (v: string) => void; label?: string }) {
+function TimeInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const totalMinutes = value ? (() => {
     const [h, m] = value.split(':').map(Number);
     return h * 60 + (m || 0);
@@ -28,7 +27,6 @@ function TimeInput({ value, onChange, label }: { value: string; onChange: (v: st
 
   return (
     <div className="flex items-center gap-2 flex-1">
-      {/* 오전/오후 */}
       <select
         value={isPM ? 'PM' : 'AM'}
         onChange={(e) => {
@@ -39,8 +37,6 @@ function TimeInput({ value, onChange, label }: { value: string; onChange: (v: st
         <option value="AM">오전</option>
         <option value="PM">오후</option>
       </select>
-
-      {/* 시 */}
       <input
         type="text"
         inputMode="numeric"
@@ -51,14 +47,11 @@ function TimeInput({ value, onChange, label }: { value: string; onChange: (v: st
           const v = e.target.value.replace(/[^0-9]/g, '');
           setHourStr(v);
           const h = parseInt(v);
-          if (v && h >= 1 && h <= 12) {
-            onChange(buildTime(isPM, h, parseInt(minStr) || 0));
-          }
+          if (v && h >= 1 && h <= 12) onChange(buildTime(isPM, h, parseInt(minStr) || 0));
         }}
         className="w-12 bg-white border border-gray-200 rounded-xl px-2 py-2 text-sm font-bold text-gray-800 text-center focus:ring-2 focus:ring-green-500"
       />
       <span className="text-gray-400 font-bold">:</span>
-      {/* 분 */}
       <input
         type="text"
         inputMode="numeric"
@@ -69,9 +62,7 @@ function TimeInput({ value, onChange, label }: { value: string; onChange: (v: st
           const v = e.target.value.replace(/[^0-9]/g, '');
           setMinStr(v);
           const m = parseInt(v);
-          if (hourStr && v.length === 2 && m >= 0 && m <= 59) {
-            onChange(buildTime(isPM, parseInt(hourStr), m));
-          }
+          if (hourStr && v.length === 2 && m >= 0 && m <= 59) onChange(buildTime(isPM, parseInt(hourStr), m));
         }}
         className="w-12 bg-white border border-gray-200 rounded-xl px-2 py-2 text-sm font-bold text-gray-800 text-center focus:ring-2 focus:ring-green-500"
       />
@@ -90,6 +81,7 @@ function CreateMeetupContent() {
   const [date, setDate] = useState('');
   const [cartCount, setCartCount] = useState(1);
   const [cartTimes, setCartTimes] = useState<string[]>(['07:00']);
+  const [greenFee, setGreenFee] = useState<number>(0);
   const [playerCount, setPlayerCount] = useState(4);
   const [loading, setLoading] = useState(false);
   const [creatorId, setCreatorId] = useState('');
@@ -112,13 +104,13 @@ function CreateMeetupContent() {
             setMeetupType(data.meetupType || 'field');
             setCartCount(data.cartCount || 1);
             setCartTimes(data.cartTimes || Array(data.cartCount || 1).fill('07:00'));
+            setGreenFee(data.greenFee || 0);
             setPlayerCount(data.playerCount || 4);
             setCreatorId(data.creatorId || '');
 
             const adminDoc = await getDoc(doc(db, 'admins', savedName));
             const isAdminUser = adminDoc.exists();
             const isCreator = data.creatorId === savedName;
-            // ✅ 참여자도 수정 가능
             const isParticipant = (data.participants || []).some((p: any) => p.name === savedName);
             setCanEdit(isCreator || isAdminUser || isParticipant);
           }
@@ -174,6 +166,7 @@ function CreateMeetupContent() {
       if (meetupType === 'field') {
         meetupData.cartCount = cartCount;
         meetupData.cartTimes = cartTimes;
+        meetupData.greenFee = greenFee;
         meetupData.maxPlayers = cartCount * 4;
       } else {
         meetupData.playerCount = playerCount;
@@ -217,7 +210,7 @@ function CreateMeetupContent() {
       <div className="flex flex-col items-center justify-center min-h-full p-10 text-center">
         <p className="text-4xl mb-4">🚫</p>
         <p className="font-black text-gray-800 mb-2">접근 권한이 없어요</p>
-        <p className="text-sm text-gray-400 mb-6">벙개 등록자 또는 관리자만 수정할 수 있어요.</p>
+        <p className="text-sm text-gray-400 mb-6">벙개 참여자, 등록자 또는 관리자만 수정할 수 있어요.</p>
         <button onClick={() => router.back()} className="px-6 py-3 bg-green-600 text-white rounded-2xl font-bold">돌아가기</button>
       </div>
     );
@@ -239,7 +232,6 @@ function CreateMeetupContent() {
 
       <form onSubmit={handleSubmit} className="p-5 space-y-6 pb-6">
 
-        {/* 벙개 타입 선택 */}
         {!meetupId && (
           <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
             <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">벙개 종류</label>
@@ -283,24 +275,49 @@ function CreateMeetupContent() {
               className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all text-gray-900" />
           </div>
 
-          {/* 필드: 카트 수 + 티타임 */}
+          {/* 필드: 그린피 + 카트 수 + 티타임 */}
           {meetupType === 'field' && (
-            <div className="border-t pt-6">
-              <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">모집 규모 및 조별 티타임</label>
-              <select value={cartCount} onChange={(e) => handleCartCountChange(Number(e.target.value))}
-                className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg mb-4 focus:ring-2 focus:ring-green-500 text-gray-900">
-                {[...Array(15)].map((_, i) => (
-                  <option key={i+1} value={i+1}>{i+1}카트 ({(i+1)*4}명)</option>
-                ))}
-              </select>
+            <div className="border-t pt-6 space-y-5">
 
-              <div className="grid grid-cols-1 gap-3">
-                {cartTimes.map((time, index) => (
-                  <div key={index} className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
-                    <span className="text-[11px] font-black text-green-700 w-10 text-center flex-shrink-0">{index + 1}조</span>
-                    <TimeInput value={time} onChange={(v) => updateCartTime(index, v)} />
-                  </div>
-                ))}
+              {/* ✅ 그린피 */}
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">그린피 (1인)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={greenFee || ''}
+                    onChange={(e) => setGreenFee(Number(e.target.value))}
+                    placeholder="예: 180000"
+                    step="10000"
+                    className="flex-1 p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 text-gray-900"
+                  />
+                  <span className="text-gray-400 font-bold pr-2">원</span>
+                </div>
+                {greenFee > 0 && (
+                  <p className="text-[11px] text-green-600 mt-1.5 font-bold">
+                    💰 1인 {greenFee.toLocaleString()}원
+                  </p>
+                )}
+              </div>
+
+              {/* 카트 수 */}
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">모집 규모 및 조별 티타임</label>
+                <select value={cartCount} onChange={(e) => handleCartCountChange(Number(e.target.value))}
+                  className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg mb-4 focus:ring-2 focus:ring-green-500 text-gray-900">
+                  {[...Array(15)].map((_, i) => (
+                    <option key={i+1} value={i+1}>{i+1}카트 ({(i+1)*4}명)</option>
+                  ))}
+                </select>
+
+                <div className="grid grid-cols-1 gap-3">
+                  {cartTimes.map((time, index) => (
+                    <div key={index} className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
+                      <span className="text-[11px] font-black text-green-700 w-10 text-center flex-shrink-0">{index + 1}조</span>
+                      <TimeInput value={time} onChange={(v) => updateCartTime(index, v)} />
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -315,7 +332,6 @@ function CreateMeetupContent() {
                   <TimeInput value={cartTimes[0] || '07:00'} onChange={(v) => setCartTimes([v])} />
                 </div>
               </div>
-
               <div>
                 <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">
                   모집 인원 <span className="font-normal text-gray-400 normal-case">(최대 50명)</span>
