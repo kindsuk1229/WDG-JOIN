@@ -6,6 +6,10 @@ import AuthGuard from '@/components/AuthGuard';
 export const metadata = {
   title: 'WDG - 우리동네골프',
   description: '골프 벙개 및 정기 라운드 관리',
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/icons/icon-192.png',
+  },
 };
 
 export default function RootLayout({
