@@ -16,6 +16,7 @@ function MeetupDetailContent() {
   const [myName, setMyName] = useState('');
   const [myNickname, setMyNickname] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [joining, setJoining] = useState(false); // ✅ 중복 클릭 방지
 
   useEffect(() => {
     if (typeof initKakao === 'function') initKakao();
@@ -64,7 +65,8 @@ function MeetupDetailContent() {
   };
 
   const handleJoin = async () => {
-    if (!meetupId) return;
+    if (!meetupId || joining) return; // ✅ 중복 클릭 방지
+    setJoining(true);
     const isJoined = meetup.participants?.some((p: any) => p.name === myName);
     try {
       const meetupRef = doc(db, 'meetups', meetupId);
@@ -110,6 +112,8 @@ function MeetupDetailContent() {
       window.location.reload();
     } catch (error) {
       alert('처리 중 오류가 발생했습니다.');
+    } finally {
+      setJoining(false);
     }
   };
 
@@ -308,11 +312,12 @@ function MeetupDetailContent() {
           {/* 참여/취소 버튼 */}
           <button
             onClick={handleJoin}
+            disabled={joining}
             className={`flex-1 p-4 rounded-2xl font-bold transition-all active:scale-95 ${
-              isJoined ? 'bg-gray-200 text-gray-600' : 'bg-green-600 text-white shadow-lg shadow-green-200'
+              joining ? 'bg-gray-300 text-gray-400' : isJoined ? 'bg-gray-200 text-gray-600' : 'bg-green-600 text-white shadow-lg shadow-green-200'
             }`}
           >
-            {isJoined ? '참여 취소하기' : '나도 갈래요! ⛳'}
+            {joining ? '처리 중...' : isJoined ? '참여 취소하기' : '나도 갈래요! ⛳'}
           </button>
         </div>
       </div>
