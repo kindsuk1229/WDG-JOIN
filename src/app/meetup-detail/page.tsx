@@ -146,15 +146,14 @@ function MeetupDetailContent() {
 
     const participantStr = `👤 현재 ${(meetup.participants || []).length}명 참여중`;
 
-    // ✅ 제목은 벙개 제목으로
-    const title = `⛳ [WDG] ${meetup.title}`;
+    const title = `[WDG] ${meetup.title}`;
+    // ✅ 카카오 미리보기 3줄 최적화
+    const participantNames = (meetup.participants || [])
+      .map((p: any) => p.nickname || p.name)
+      .join(', ');
     const description = [
-      `📍 ${meetup.golfCourse}`,
-      `📅 ${dateStr}${timeStr ? ` ${timeStr}` : ''}`,
-      capacityStr,
-      greenFeeStr,
-      participantStr,
-      ``,
+      `📅 ${dateStr}${timeStr ? ` ${timeStr}` : ''} | 📍 ${meetup.golfCourse}`,
+      participantNames ? `참석 멤버: ${participantNames}` : '',
       `👉 지금 참여하기!`,
     ].filter(Boolean).join('\n');
 
