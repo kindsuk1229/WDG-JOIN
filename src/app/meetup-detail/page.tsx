@@ -151,8 +151,7 @@ function MeetupDetailContent() {
       participantStr,
       ``,
       `👉 지금 참여하기!`,
-    ].filter(Boolean).join('
-');
+    ].filter(Boolean).join('\n');
 
     shareToKakao(window.location.href, title, description);
   };
