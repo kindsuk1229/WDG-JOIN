@@ -11,26 +11,36 @@ function CreateMeetupContent() {
   const searchParams = useSearchParams();
   const meetupId = searchParams.get('id');
 
-  // 벙개 타입: 'field' = 필드, 'screen' = 스크린
   const [meetupType, setMeetupType] = useState<'field' | 'screen'>('field');
-
   const [title, setTitle] = useState('');
   const [golfCourse, setGolfCourse] = useState('');
   const [date, setDate] = useState('');
-
-  // 필드용
   const [cartCount, setCartCount] = useState(1);
   const [cartTimes, setCartTimes] = useState<string[]>(['']);
-
-  // 스크린용
   const [playerCount, setPlayerCount] = useState(4);
-
   const [loading, setLoading] = useState(false);
   const [creatorId, setCreatorId] = useState('');
 
-  const myId = 'admin_test';
+  // ✅ 현재 로그인한 사람 실명 + 관리자 여부
+  const [myName, setMyName] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
 
   useEffect(() => {
+    const savedName = (localStorage.getItem('user_name') || '').trim();
+    setMyName(savedName);
+
+    // 관리자 여부 확인
+    const checkAdmin = async () => {
+      try {
+        const adminDoc = await getDoc(doc(db, 'admins', savedName));
+        setIsAdmin(adminDoc.exists());
+      } catch (error) {
+        console.error('관리자 확인 실패:', error);
+      }
+    };
+    checkAdmin();
+
     if (meetupId) {
       const fetchMeetup = async () => {
         try {
@@ -46,6 +56,11 @@ function CreateMeetupContent() {
             setCartTimes(data.cartTimes || Array(data.cartCount || 1).fill(''));
             setPlayerCount(data.playerCount || 4);
             setCreatorId(data.creatorId || '');
+
+            // ✅ 등록자 or 관리자만 수정 가능
+            const adminDoc = await getDoc(doc(db, 'admins', savedName));
+            const isAdminUser = adminDoc.exists();
+            setCanEdit(data.creatorId === savedName || isAdminUser);
           }
         } catch (error) {
           console.error("데이터 불러오기 실패:", error);
@@ -68,6 +83,11 @@ function CreateMeetupContent() {
   };
 
   const handleDelete = async () => {
+    // ✅ 등록자 or 관리자만 삭제 가능
+    if (!canEdit) {
+      alert('삭제 권한이 없습니다.');
+      return;
+    }
     if (!window.confirm('정말로 이 벙개를 삭제하시겠습니까?')) return;
     setLoading(true);
     try {
@@ -83,6 +103,13 @@ function CreateMeetupContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     if (e) e.preventDefault();
+
+    // ✅ 수정 시 권한 체크
+    if (meetupId && !canEdit) {
+      alert('수정 권한이 없습니다.');
+      return;
+    }
+
     setLoading(true);
     try {
       const meetupData: any = {
@@ -90,18 +117,17 @@ function CreateMeetupContent() {
         golfCourse,
         date,
         meetupType,
-        creatorId: myId,
-        authorName: '김근석 사장님',
+        authorName: myName,
         updatedAt: new Date().toISOString(),
       };
 
-      // 타입별 데이터 추가
       if (meetupType === 'field') {
         meetupData.cartCount = cartCount;
         meetupData.cartTimes = cartTimes;
         meetupData.maxPlayers = cartCount * 4;
       } else {
         meetupData.playerCount = playerCount;
+        meetupData.cartTimes = cartTimes;
         meetupData.cartCount = 0;
         meetupData.maxPlayers = playerCount;
       }
@@ -110,8 +136,10 @@ function CreateMeetupContent() {
         await updateDoc(doc(db, 'meetups', meetupId), meetupData);
         alert('⛳ 벙개가 수정되었습니다!');
       } else {
+        // ✅ 등록자 ID를 실명으로 저장
         const newDoc = await addDoc(collection(db, 'meetups'), {
           ...meetupData,
+          creatorId: myName,
           createdAt: new Date().toISOString(),
           players: 1,
         });
@@ -120,18 +148,32 @@ function CreateMeetupContent() {
           title: `⛳ 새로운 ${meetupType === 'screen' ? '스크린' : '필드'} 벙개가 열렸어요!`,
           body: `${golfCourse} | ${date} | ${meetupType === 'field' ? `${cartCount}카트` : `${playerCount}명`}`,
           url: `/meetup-detail?id=${newDoc.id}`,
-          excludeUserName: '김근석',
+          excludeUserName: myName,
         });
 
         alert('⛳ 새로운 벙개가 등록되었습니다!');
       }
-      router.push('/my-meetups');
+      router.push('/meetups');
     } catch (error) {
       alert('오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
   };
+
+  // ✅ 수정 페이지인데 권한 없으면 접근 차단
+  if (meetupId && creatorId && !canEdit) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-full p-10 text-center">
+        <p className="text-4xl mb-4">🚫</p>
+        <p className="font-black text-gray-800 mb-2">접근 권한이 없어요</p>
+        <p className="text-sm text-gray-400 mb-6">벙개 등록자 또는 관리자만 수정할 수 있어요.</p>
+        <button onClick={() => router.back()} className="px-6 py-3 bg-green-600 text-white rounded-2xl font-bold">
+          돌아가기
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-gray-50 min-h-full">
@@ -142,14 +184,15 @@ function CreateMeetupContent() {
             {meetupId ? '벙개 정보 수정' : '새로운 벙개 만들기'}
           </h1>
         </div>
-        {meetupId && creatorId === myId && (
+        {/* ✅ 수정 페이지에서 권한 있을 때만 삭제 버튼 표시 */}
+        {meetupId && canEdit && (
           <button type="button" onClick={handleDelete} className="text-red-500 text-sm font-bold px-2 py-1 bg-red-50 rounded-lg">삭제</button>
         )}
       </header>
 
       <form onSubmit={handleSubmit} className="p-5 space-y-6 pb-6">
 
-        {/* ✅ 벙개 타입 선택 */}
+        {/* 벙개 타입 선택 (등록 시에만) */}
         {!meetupId && (
           <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
             <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">벙개 종류</label>
@@ -158,9 +201,7 @@ function CreateMeetupContent() {
                 type="button"
                 onClick={() => setMeetupType('field')}
                 className={`p-4 rounded-2xl border-2 text-center transition-all ${
-                  meetupType === 'field'
-                    ? 'border-green-500 bg-green-50'
-                    : 'border-gray-100 bg-gray-50'
+                  meetupType === 'field' ? 'border-green-500 bg-green-50' : 'border-gray-100 bg-gray-50'
                 }`}
               >
                 <p className="text-2xl mb-1">⛳</p>
@@ -171,9 +212,7 @@ function CreateMeetupContent() {
                 type="button"
                 onClick={() => setMeetupType('screen')}
                 className={`p-4 rounded-2xl border-2 text-center transition-all ${
-                  meetupType === 'screen'
-                    ? 'border-green-500 bg-green-50'
-                    : 'border-gray-100 bg-gray-50'
+                  meetupType === 'screen' ? 'border-green-500 bg-green-50' : 'border-gray-100 bg-gray-50'
                 }`}
               >
                 <p className="text-2xl mb-1">🖥️</p>
@@ -185,7 +224,6 @@ function CreateMeetupContent() {
         )}
 
         <div className="bg-white p-6 rounded-3xl shadow-sm space-y-6 border border-gray-100">
-          {/* 제목 */}
           <div>
             <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">벙개 제목</label>
             <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)}
@@ -193,7 +231,6 @@ function CreateMeetupContent() {
               className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all text-gray-900" />
           </div>
 
-          {/* 골프장 */}
           <div>
             <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">
               {meetupType === 'screen' ? '스크린 골프장 이름' : '골프장 이름'}
@@ -203,77 +240,57 @@ function CreateMeetupContent() {
               className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all text-gray-900" />
           </div>
 
-          {/* 날짜 */}
           <div>
             <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">날짜 선택</label>
             <input type="date" required value={date} onChange={(e) => setDate(e.target.value)}
               className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all text-gray-900" />
           </div>
 
-          {/* ✅ 필드: 카트 수 (최대 15카트) */}
+          {/* 필드: 카트 수 (최대 15카트) */}
           {meetupType === 'field' && (
             <div className="border-t pt-6">
               <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">모집 규모 및 조별 티타임</label>
-              <select
-                value={cartCount}
-                onChange={(e) => handleCartCountChange(Number(e.target.value))}
-                className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg mb-4 focus:ring-2 focus:ring-green-500 text-gray-900"
-              >
+              <select value={cartCount} onChange={(e) => handleCartCountChange(Number(e.target.value))}
+                className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg mb-4 focus:ring-2 focus:ring-green-500 text-gray-900">
                 {[...Array(15)].map((_, i) => (
                   <option key={i+1} value={i+1}>{i+1}카트 ({(i+1)*4}명)</option>
                 ))}
               </select>
-
               <div className="grid grid-cols-1 gap-3">
                 {cartTimes.map((time, index) => (
                   <div key={index} className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
                     <span className="text-[11px] font-black text-green-700 w-10 text-center">{index + 1}조</span>
-                    <input
-                      type="time"
-                      required
-                      value={time}
+                    <input type="time" required value={time}
                       onChange={(e) => updateCartTime(index, e.target.value)}
-                      className="bg-transparent border-none focus:ring-0 font-bold text-gray-800 flex-1 p-1"
-                    />
+                      className="bg-transparent border-none focus:ring-0 font-bold text-gray-800 flex-1 p-1" />
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* ✅ 스크린: 인원 수 (1~40명) + 시간 */}
+          {/* 스크린: 시간 + 인원 */}
           {meetupType === 'screen' && (
             <div className="border-t pt-6 space-y-4">
-              {/* 시간 */}
               <div>
                 <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">시작 시간</label>
                 <div className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
                   <span className="text-[11px] font-black text-green-700">시작</span>
-                  <input
-                    type="time"
-                    required
-                    value={cartTimes[0] || ''}
+                  <input type="time" required value={cartTimes[0] || ''}
                     onChange={(e) => setCartTimes([e.target.value])}
-                    className="bg-transparent border-none focus:ring-0 font-bold text-gray-800 flex-1 p-1"
-                  />
+                    className="bg-transparent border-none focus:ring-0 font-bold text-gray-800 flex-1 p-1" />
                 </div>
               </div>
-
-              {/* 인원 */}
               <div>
                 <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">
                   모집 인원 <span className="font-normal text-gray-400 normal-case">(최대 50명)</span>
                 </label>
-                <select
-                  value={playerCount}
-                  onChange={(e) => setPlayerCount(Number(e.target.value))}
-                  className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg focus:ring-2 focus:ring-green-500 text-gray-900"
-                >
+                <select value={playerCount} onChange={(e) => setPlayerCount(Number(e.target.value))}
+                  className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg focus:ring-2 focus:ring-green-500 text-gray-900">
                   {[...Array(50)].map((_, i) => (
                     <option key={i+1} value={i+1}>{i+1}명</option>
                   ))}
                 </select>
-
                 <div className="mt-3 bg-green-50 rounded-2xl p-3 border border-green-100">
                   <p className="text-[12px] text-green-700 font-bold text-center">
                     🖥️ 스크린 {playerCount}명 모집
@@ -284,13 +301,10 @@ function CreateMeetupContent() {
           )}
         </div>
 
-        <button
-          type="submit"
-          disabled={loading}
+        <button type="submit" disabled={loading}
           className={`w-full p-4 rounded-2xl font-black text-lg text-white transition-all active:scale-95 ${
             loading ? 'bg-gray-400' : 'bg-green-600 shadow-lg shadow-green-200 hover:bg-green-700'
-          }`}
-        >
+          }`}>
           {loading ? '처리 중...' : meetupId ? '수정 완료하기 ⛳' : '벙개 등록하기 ⛳'}
         </button>
       </form>
