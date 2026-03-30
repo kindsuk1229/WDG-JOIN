@@ -106,15 +106,26 @@ function MeetupDetailContent() {
           <button onClick={() => router.back()} className="mr-4 text-xl font-bold">←</button>
           <h1 className="text-xl font-bold">벙개 상세 정보</h1>
         </div>
-        {/* ✅ 관리자 또는 등록자만 삭제 버튼 표시 */}
-        {(isAdmin || meetup?.creatorId === myName) && (
-          <button
-            onClick={handleDelete}
-            className="text-red-500 text-sm font-bold px-3 py-1.5 bg-red-50 rounded-lg"
-          >
-            삭제
-          </button>
-        )}
+        <div className="flex gap-2">
+          {/* ✅ 참여자, 등록자, 관리자 수정 가능 */}
+          {(isAdmin || meetup?.creatorId === myName || meetup?.participants?.some((p: any) => p.name === myName)) && (
+            <button
+              onClick={() => router.push(`/create-meetup?id=${meetup?.id}`)}
+              className="text-green-600 text-sm font-bold px-3 py-1.5 bg-green-50 rounded-lg"
+            >
+              수정
+            </button>
+          )}
+          {/* ✅ 관리자 또는 등록자만 삭제 */}
+          {(isAdmin || meetup?.creatorId === myName) && (
+            <button
+              onClick={handleDelete}
+              className="text-red-500 text-sm font-bold px-3 py-1.5 bg-red-50 rounded-lg"
+            >
+              삭제
+            </button>
+          )}
+        </div>
       </header>
 
       <div className="p-5 space-y-6">

@@ -116,7 +116,11 @@ function CreateMeetupContent() {
             setCreatorId(data.creatorId || '');
 
             const adminDoc = await getDoc(doc(db, 'admins', savedName));
-            setCanEdit(data.creatorId === savedName || adminDoc.exists());
+            const isAdminUser = adminDoc.exists();
+            const isCreator = data.creatorId === savedName;
+            // ✅ 참여자도 수정 가능
+            const isParticipant = (data.participants || []).some((p: any) => p.name === savedName);
+            setCanEdit(isCreator || isAdminUser || isParticipant);
           }
         } catch (error) {
           console.error("데이터 불러오기 실패:", error);
