@@ -152,7 +152,7 @@ export default function SettlementPage() {
               toUserName: m.name,
               title: '💰 정산 요청이 왔어요!',
               body: `${myNickname || myName} → ${m.nickname || m.name}: ${m.amount.toLocaleString()}원${accountNumber ? ` (${accountNumber})` : ''}`,
-              url: '/settlement/my',
+              url: '/settlement/history',
             }),
           })
         )
