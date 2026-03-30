@@ -286,7 +286,11 @@ export default function SettlementPage() {
       {/* ✅ 멤버 선택 바텀시트 */}
       {showMemberPicker && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center">
-          <div className="w-full max-w-md bg-white rounded-t-[32px] flex flex-col" style={{ maxHeight: '70vh' }}>
+          <div
+            className="w-full max-w-md bg-white rounded-t-[32px] flex flex-col"
+            style={{ maxHeight: '70vh' }}
+            onTouchMove={e => e.stopPropagation()}
+          >
             <div className="px-6 pt-6 pb-4 shrink-0">
               <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-4" />
               <div className="flex justify-between items-center">
@@ -301,7 +305,10 @@ export default function SettlementPage() {
               <p className="text-[11px] text-gray-400 mt-1">선택한 멤버가 정산에 포함됩니다</p>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 pb-8">
+            <div
+              className="flex-1 overflow-y-auto px-6 pb-8"
+              style={{ WebkitOverflowScrolling: 'touch', overflowY: 'auto' }}
+            >
               <div className="space-y-2">
                 {appMembers.map((appMember, i) => {
                   const isSelected = members.some(m => m.name === appMember.name);
