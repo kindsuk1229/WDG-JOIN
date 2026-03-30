@@ -117,6 +117,7 @@ function MeetupDetailContent() {
   const handleShare = () => {
     if (!meetup) return;
 
+    // 시간 포맷
     const timeStr = meetup.cartTimes?.[0] ? (() => {
       const [h, m] = meetup.cartTimes[0].split(':').map(Number);
       const isPM = h >= 12;
@@ -124,20 +125,34 @@ function MeetupDetailContent() {
       return `${isPM ? '오후' : '오전'} ${hour12}:${String(m).padStart(2, '0')}`;
     })() : '';
 
+    // 날짜 요일 포맷
+    const dateStr = meetup.date ? (() => {
+      const d = new Date(meetup.date + 'T00:00:00');
+      const days = ['일', '월', '화', '수', '목', '금', '토'];
+      return `${meetup.date} (${days[d.getDay()]})`;
+    })() : '';
+
     const greenFeeStr = meetup.greenFee > 0
-      ? `\n💰 그린피: ${meetup.greenFee.toLocaleString()}원`
+      ? `💰 그린피: ${meetup.greenFee.toLocaleString()}원`
       : '';
 
-    const title = `⛳ WDG 벙개 참여 안내`;
+    const capacityStr = meetup.meetupType === 'screen'
+      ? `👥 ${meetup.playerCount}명 모집`
+      : `🛒 ${meetup.cartCount}카트 (${meetup.cartCount * 4}명 정원)`;
+
+    const participantStr = `👤 현재 ${(meetup.participants || []).length}명 참여중`;
+
+    // ✅ 제목에 골프장 + 날짜 포함
+    const title = `⛳ [WDG] ${meetup.golfCourse} 벙개`;
     const description = [
-      `📍 ${meetup.golfCourse}`,
-      `📅 ${meetup.date}${timeStr ? ` ${timeStr}` : ''}`,
-      meetup.meetupType === 'screen'
-        ? `👥 ${meetup.playerCount}명 모집`
-        : `🛒 ${meetup.cartCount}카트 (${meetup.cartCount * 4}명 정원)`,
+      `📅 ${dateStr}${timeStr ? ` ${timeStr}` : ''}`,
+      capacityStr,
       greenFeeStr,
-      `\n지금 참여하세요! ⛳`,
-    ].filter(Boolean).join('\n');
+      participantStr,
+      ``,
+      `👉 지금 참여하기!`,
+    ].filter(Boolean).join('
+');
 
     shareToKakao(window.location.href, title, description);
   };
