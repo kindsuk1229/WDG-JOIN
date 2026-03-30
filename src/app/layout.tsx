@@ -4,7 +4,7 @@ import BottomNav from '@/components/BottmNav';
 import AuthGuard from '@/components/AuthGuard';
 
 export const metadata = {
-  title: 'WDG - 우리동네골프',
+  title: 'WDG 우동골벙개앱',
   description: '골프 벙개 및 정기 라운드 관리',
   icons: {
     icon: '/favicon.ico',
