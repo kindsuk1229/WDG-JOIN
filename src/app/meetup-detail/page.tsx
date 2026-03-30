@@ -146,15 +146,21 @@ function MeetupDetailContent() {
 
     const participantStr = `👤 현재 ${(meetup.participants || []).length}명 참여중`;
 
-    const title = `[WDG] ${meetup.title}`;
-    // ✅ 카카오 미리보기 3줄 최적화
+    // 월일만 추출 (연도 제외)
+    const shortDate = meetup.date ? (() => {
+      const d = new Date(meetup.date + 'T00:00:00');
+      const days = ['일', '월', '화', '수', '목', '금', '토'];
+      return `${d.getMonth() + 1}/${d.getDate()}(${days[d.getDay()]})`;
+    })() : '';
+
+    const title = `${meetup.title} ! ${meetup.golfCourse}`;
     const participantNames = (meetup.participants || [])
       .map((p: any) => p.nickname || p.name)
       .join(', ');
     const description = [
-      `📅 ${dateStr}${timeStr ? ` ${timeStr}` : ''} | 📍 ${meetup.golfCourse}`,
-      participantNames ? `참석 멤버: ${participantNames}` : '',
-      `👉 지금 참여하기!`,
+      `${shortDate}${timeStr ? ` ${timeStr}` : ''}`,
+      participantNames ? `참 : ${participantNames}` : '',
+      `👉 벙개 참여하기`,
     ].filter(Boolean).join('\n');
 
     shareToKakao(window.location.href, title, description);
