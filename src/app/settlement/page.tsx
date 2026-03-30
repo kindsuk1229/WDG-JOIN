@@ -198,9 +198,9 @@ export default function SettlementPage() {
 
         {/* 요약 카드 */}
         <div className="bg-slate-800 text-white p-6 rounded-3xl shadow-xl border-b-4 border-green-600">
-          <p className="text-xs opacity-70 mb-1 font-bold">총 지출</p>
+          <p className="text-base opacity-70 mb-1 font-bold">총 지출</p>
           <h2 className="text-4xl font-black text-green-400">{totalAmount.toLocaleString()}원</h2>
-          <div className="mt-4 pt-4 border-t border-gray-700 flex justify-between text-[11px] opacity-80">
+          <div className="mt-4 pt-4 border-t border-gray-700 flex justify-between text-[17px] opacity-80">
             <span>{members.length}명 기준</span>
             <span className={isBalanced ? 'text-green-400' : 'text-red-400'}>
               {isBalanced ? '✅ 배분 완료' : `⚠️ ${(totalAmount - totalAssigned).toLocaleString()}원 차이`}
@@ -211,17 +211,17 @@ export default function SettlementPage() {
         {/* 기본 정보 */}
         <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 space-y-4">
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-2">지출 내용</label>
+            <label className="text-base font-bold text-gray-400 block mb-2">지출 내용</label>
             <input
               type="text"
               placeholder="예: 그늘집 및 저녁 식사"
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-green-500 text-sm"
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-green-500 text-base"
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-2">총 결제 금액 (원)</label>
+            <label className="text-base font-bold text-gray-400 block mb-2">총 결제 금액 (원)</label>
             <input
               type="number"
               placeholder="0"
@@ -231,13 +231,13 @@ export default function SettlementPage() {
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-2">입금받을 계좌번호</label>
+            <label className="text-base font-bold text-gray-400 block mb-2">입금받을 계좌번호</label>
             <input
               type="text"
               placeholder="예: 카카오뱅크 1234-56-789012"
               value={accountNumber}
               onChange={(e) => setAccountNumber(e.target.value)}
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-green-500 text-sm"
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-green-500 text-base"
             />
           </div>
         </div>
@@ -245,38 +245,38 @@ export default function SettlementPage() {
         {/* ✅ 멤버 선택 */}
         <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
           <div className="flex justify-between items-center mb-4">
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">
+            <label className="text-base font-bold text-gray-400 uppercase tracking-wide">
               참여 멤버 ({members.length}명)
             </label>
             <button
               onClick={() => setShowMemberPicker(true)}
-              className="text-xs font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-full border border-green-100"
+              className="text-base font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-full border border-green-100"
             >
               + 멤버 선택
             </button>
           </div>
 
           {members.length === 0 ? (
-            <p className="text-center text-gray-400 text-sm py-4">멤버를 추가해주세요</p>
+            <p className="text-center text-gray-400 text-base py-4">멤버를 추가해주세요</p>
           ) : (
             <div className="space-y-2">
               {members.map((member, index) => (
                 <div key={index} className="flex items-center gap-3 bg-gray-50 p-3 rounded-2xl">
                   <div className="flex-1">
-                    <p className="text-sm font-bold text-gray-800">
+                    <p className="text-base font-bold text-gray-800">
                       {member.nickname || member.name}
-                      {member.name === myName && <span className="ml-1 text-[10px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">나</span>}
+                      {member.name === myName && <span className="ml-1 text-[16px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">나</span>}
                     </p>
-                    {member.nickname && <p className="text-[10px] text-gray-400">{member.name}</p>}
+                    {member.nickname && <p className="text-[16px] text-gray-400">{member.name}</p>}
                   </div>
                   <div className="flex items-center gap-1">
                     <input
                       type="number"
                       value={member.amount || ''}
                       onChange={(e) => updateAmount(index, Number(e.target.value))}
-                      className="w-24 bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-sm font-black text-green-700 text-right focus:ring-2 focus:ring-green-500"
+                      className="w-24 bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-base font-black text-green-700 text-right focus:ring-2 focus:ring-green-500"
                     />
-                    <span className="text-gray-400 text-xs">원</span>
+                    <span className="text-gray-400 text-base">원</span>
                   </div>
                   {member.name !== myName && (
                     <button
@@ -293,7 +293,7 @@ export default function SettlementPage() {
               {/* 균등 분배 버튼 */}
               <button
                 onClick={() => setMembers(redistribute(members, totalAmount))}
-                className="w-full py-2 bg-gray-100 rounded-xl text-xs font-bold text-gray-500 mt-2"
+                className="w-full py-2 bg-gray-100 rounded-xl text-base font-bold text-gray-500 mt-2"
               >
                 🔄 균등 재분배
               </button>
@@ -302,7 +302,7 @@ export default function SettlementPage() {
 
           {/* 합계 확인 */}
           {totalAmount > 0 && (
-            <div className={`mt-3 p-3 rounded-xl text-[12px] font-bold text-center ${
+            <div className={`mt-3 p-3 rounded-xl text-[16px] font-bold text-center ${
               isBalanced ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'
             }`}>
               배분 합계: {totalAssigned.toLocaleString()}원 / 총액: {totalAmount.toLocaleString()}원
@@ -320,7 +320,7 @@ export default function SettlementPage() {
           <span className="text-2xl">💬</span> {sharing ? '처리 중...' : '카톡으로 정산 공유'}
         </button>
 
-        <p className="text-center text-[11px] text-gray-400">
+        <p className="text-center text-[17px] text-gray-400">
           공유 시 미정산 상태로 기록되며 마이페이지에 합산됩니다.
         </p>
       </div>
@@ -339,12 +339,12 @@ export default function SettlementPage() {
                 <h3 className="text-lg font-black">멤버 선택</h3>
                 <button
                   onClick={() => setShowMemberPicker(false)}
-                  className="text-sm font-bold text-green-600 bg-green-50 px-4 py-2 rounded-xl"
+                  className="text-base font-bold text-green-600 bg-green-50 px-4 py-2 rounded-xl"
                 >
                   완료
                 </button>
               </div>
-              <p className="text-[11px] text-gray-400 mt-1">선택한 멤버가 정산에 포함됩니다</p>
+              <p className="text-[17px] text-gray-400 mt-1">선택한 멤버가 정산에 포함됩니다</p>
             </div>
 
             <div
@@ -368,14 +368,14 @@ export default function SettlementPage() {
                       <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
                         isSelected ? 'bg-green-600 border-green-600' : 'border-gray-300'
                       }`}>
-                        {isSelected && <span className="text-white text-xs font-black">✓</span>}
+                        {isSelected && <span className="text-white text-base font-black">✓</span>}
                       </div>
                       <div className="flex-1">
-                        <p className="font-bold text-gray-800 text-sm">
+                        <p className="font-bold text-gray-800 text-base">
                           {appMember.nickname || appMember.name}
-                          {isMe && <span className="ml-1 text-[10px] text-green-600 bg-green-100 px-1.5 py-0.5 rounded-full">나</span>}
+                          {isMe && <span className="ml-1 text-[16px] text-green-600 bg-green-100 px-1.5 py-0.5 rounded-full">나</span>}
                         </p>
-                        {appMember.nickname && <p className="text-[10px] text-gray-400">{appMember.name}</p>}
+                        {appMember.nickname && <p className="text-[16px] text-gray-400">{appMember.name}</p>}
                       </div>
                     </div>
                   );

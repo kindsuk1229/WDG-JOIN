@@ -174,20 +174,20 @@ export default function SettlementHistoryPage() {
         <div className="flex justify-between items-center mb-3">
           <button onClick={() => router.push('/mypage')} className="p-2 text-gray-600 font-bold text-lg">〈</button>
           <h1 className="font-bold text-lg text-green-800">정산 내역</h1>
-          <button onClick={() => router.push('/settlement')} className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold">새 정산</button>
+          <button onClick={() => router.push('/settlement')} className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-base font-bold">새 정산</button>
         </div>
 
         {/* 탭 */}
         <div className="flex gap-2">
           <button
             onClick={() => setTab('receive')}
-            className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${tab === 'receive' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'}`}
+            className={`flex-1 py-2 rounded-xl text-base font-bold transition-all ${tab === 'receive' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'}`}
           >
             받아야 할 돈
           </button>
           <button
             onClick={() => setTab('send')}
-            className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${tab === 'send' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-500'}`}
+            className={`flex-1 py-2 rounded-xl text-base font-bold transition-all ${tab === 'send' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-500'}`}
           >
             내야 할 돈 {pendingBillsTotal > 0 && `(${pendingBillsTotal.toLocaleString()}원)`}
           </button>
@@ -209,16 +209,16 @@ export default function SettlementHistoryPage() {
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <h3 className="font-black text-lg text-gray-800">{item.memo}</h3>
-                    <p className="text-[10px] text-gray-400 mt-1">
+                    <p className="text-[16px] text-gray-400 mt-1">
                       {item.createdAt ? item.createdAt.toDate().toLocaleString() : '방금 전'}
                     </p>
-                    {item.accountNumber && <p className="text-[11px] text-gray-500 mt-1">💳 {item.accountNumber}</p>}
+                    {item.accountNumber && <p className="text-[17px] text-gray-500 mt-1">💳 {item.accountNumber}</p>}
                   </div>
-                  <button onClick={() => handleDelete(item.id)} className="text-gray-300 hover:text-red-500 text-xs font-bold p-1">삭제</button>
+                  <button onClick={() => handleDelete(item.id)} className="text-gray-300 hover:text-red-500 text-base font-bold p-1">삭제</button>
                 </div>
 
                 <div className="bg-gray-50 rounded-2xl p-4 mb-4 border border-gray-100">
-                  <p className="text-[11px] font-black text-gray-400 mb-3 uppercase tracking-wider">
+                  <p className="text-[17px] font-black text-gray-400 mb-3 uppercase tracking-wider">
                     입금 확인 ({(item.paidMembers || []).length}/{(item.members || []).filter(m => m.name !== myName).length})
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -227,7 +227,7 @@ export default function SettlementHistoryPage() {
                         const isPaid = (item.paidMembers || []).includes(m.name);
                         return (
                           <button key={i} onClick={() => togglePaid(item, m.name)}
-                            className={`px-3 py-2 rounded-xl text-[11px] font-black transition-all ${isPaid ? 'bg-green-600 text-white shadow-md' : 'bg-white text-gray-400 border border-gray-200'}`}>
+                            className={`px-3 py-2 rounded-xl text-[17px] font-black transition-all ${isPaid ? 'bg-green-600 text-white shadow-md' : 'bg-white text-gray-400 border border-gray-200'}`}>
                             {m.nickname || m.name}
                             <span className="ml-1 opacity-70">{m.amount.toLocaleString()}원</span>
                           </button>
@@ -236,7 +236,7 @@ export default function SettlementHistoryPage() {
                     ) : (
                       Array.from({ length: item.playerCount }).map((_, i) => (
                         <button key={i} onClick={() => togglePaid(item, `member_${i}`)}
-                          className={`px-3 py-2 rounded-xl text-[11px] font-black transition-all ${(item.paidMembers || []).includes(`member_${i}`) ? 'bg-green-600 text-white' : 'bg-white text-gray-400 border border-gray-200'}`}>
+                          className={`px-3 py-2 rounded-xl text-[17px] font-black transition-all ${(item.paidMembers || []).includes(`member_${i}`) ? 'bg-green-600 text-white' : 'bg-white text-gray-400 border border-gray-200'}`}>
                           {i === 0 ? '나(결제)' : `${i + 1}번 멤버`}
                         </button>
                       ))
@@ -246,13 +246,13 @@ export default function SettlementHistoryPage() {
 
                 <div className="flex justify-between items-end border-t border-dashed pt-4">
                   <div>
-                    <p className="text-[10px] text-gray-500 font-bold">받아야 할 금액</p>
+                    <p className="text-[16px] text-gray-500 font-bold">받아야 할 금액</p>
                     <p className="text-xl font-black text-green-700">{getReceivableAmount(item).toLocaleString()}원</p>
                   </div>
                   <div className="flex gap-1.5">
-                    <button onClick={() => reShare(item)} className="bg-yellow-50 text-yellow-700 px-3 py-2 rounded-xl text-[11px] font-black border border-yellow-100">재공유</button>
+                    <button onClick={() => reShare(item)} className="bg-yellow-50 text-yellow-700 px-3 py-2 rounded-xl text-[17px] font-black border border-yellow-100">재공유</button>
                     {item.status === 'pending' && (
-                      <button onClick={() => handleComplete(item.id)} disabled={!!processing} className={`px-3 py-2 rounded-xl text-[11px] font-black ${processing ? 'bg-gray-300 text-gray-400' : 'bg-gray-900 text-white'}`}>{processing === item.id ? '처리중' : '완료'}</button>
+                      <button onClick={() => handleComplete(item.id)} disabled={!!processing} className={`px-3 py-2 rounded-xl text-[17px] font-black ${processing ? 'bg-gray-300 text-gray-400' : 'bg-gray-900 text-white'}`}>{processing === item.id ? '처리중' : '완료'}</button>
                     )}
                   </div>
                 </div>
@@ -271,33 +271,33 @@ export default function SettlementHistoryPage() {
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <h3 className="font-black text-lg text-gray-800">{bill.memo}</h3>
-                    <p className="text-[10px] text-gray-400 mt-1">
+                    <p className="text-[16px] text-gray-400 mt-1">
                       {bill.createdAt ? bill.createdAt.toDate().toLocaleString() : '방금 전'}
                     </p>
                   </div>
-                  <span className={`text-[11px] px-2 py-1 rounded-lg font-bold ${bill.status === 'completed' ? 'bg-gray-100 text-gray-400' : 'bg-red-50 text-red-500'}`}>
+                  <span className={`text-[17px] px-2 py-1 rounded-lg font-bold ${bill.status === 'completed' ? 'bg-gray-100 text-gray-400' : 'bg-red-50 text-red-500'}`}>
                     {bill.status === 'completed' ? '완료' : '미납'}
                   </span>
                 </div>
 
                 <div className="bg-red-50 rounded-2xl p-4 mb-4 border border-red-100">
-                  <p className="text-[11px] text-red-400 font-bold mb-1">보내야 할 곳</p>
+                  <p className="text-[17px] text-red-400 font-bold mb-1">보내야 할 곳</p>
                   <p className="font-black text-gray-800">{bill.toNickname || bill.toName}</p>
                   {bill.accountNumber && (
-                    <p className="text-sm text-gray-600 mt-1 font-medium">💳 {bill.accountNumber}</p>
+                    <p className="text-base text-gray-600 mt-1 font-medium">💳 {bill.accountNumber}</p>
                   )}
                 </div>
 
                 <div className="flex justify-between items-center border-t border-dashed pt-4">
                   <div>
-                    <p className="text-[10px] text-gray-500 font-bold">내야 할 금액</p>
+                    <p className="text-[16px] text-gray-500 font-bold">내야 할 금액</p>
                     <p className="text-xl font-black text-red-500">{bill.amount.toLocaleString()}원</p>
                   </div>
                   {bill.status === 'pending' && (
                     <button
                       onClick={() => handleMyBillComplete(bill.id)}
                       disabled={!!processing}
-                      className={`px-4 py-2 rounded-xl text-sm font-black ${processing ? 'bg-gray-300 text-gray-400' : 'bg-green-600 text-white'}`}
+                      className={`px-4 py-2 rounded-xl text-base font-black ${processing ? 'bg-gray-300 text-gray-400' : 'bg-green-600 text-white'}`}
                     >
                       {processing === bill.id ? '처리중...' : '입금 완료'}
                     </button>

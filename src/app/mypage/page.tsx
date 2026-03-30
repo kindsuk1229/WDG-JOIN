@@ -130,7 +130,7 @@ export default function MyPage() {
               <p className="text-lg font-black text-gray-800">
                 {userNickname || userName}
               </p>
-              <p className="text-[12px] text-gray-400 mt-0.5 font-medium italic">
+              <p className="text-[16px] text-gray-400 mt-0.5 font-medium italic">
                 {userName === '김근석' ? '우동골 관리자' : '우동골 정회원'}
                 {userNickname && <span className="ml-1.5 not-italic opacity-70">({userName})</span>}
               </p>
@@ -146,8 +146,8 @@ export default function MyPage() {
             { label: '받아야 할 금액', value: loading ? '-' : `${stats.pendingAmount.toLocaleString()}원` },
           ].map((s, i) => (
             <div key={i} className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
-              <p className="text-[11px] text-gray-400 font-medium">{s.label}</p>
-              <p className={`text-[15px] font-bold mt-0.5 ${s.label === '받아야 할 금액' ? 'text-green-600' : 'text-gray-800'}`}>
+              <p className="text-[17px] text-gray-400 font-medium">{s.label}</p>
+              <p className={`text-[17px] font-bold mt-0.5 ${s.label === '받아야 할 금액' ? 'text-green-600' : 'text-gray-800'}`}>
                 {s.value}
               </p>
             </div>
@@ -167,13 +167,13 @@ export default function MyPage() {
               className="flex items-center gap-3 py-4 border-b border-gray-100 last:border-0 cursor-pointer active:bg-gray-50 px-2 transition-all"
             >
               <span className="text-lg w-7">{item.icon}</span>
-              <span className="flex-1 text-[15px] text-gray-700 font-medium">{item.label}</span>
+              <span className="flex-1 text-[17px] text-gray-700 font-medium">{item.label}</span>
               <span className="text-gray-300 text-lg font-light">〉</span>
             </div>
           ))}
         </div>
 
-        <p className="text-center text-[12px] text-gray-300 mt-12 font-light italic">우동골 v1.0.0</p>
+        <p className="text-center text-[16px] text-gray-300 mt-12 font-light italic">우동골 v1.0.0</p>
       </div>
 
       {/* 프로필 수정 바텀 시트 */}
@@ -195,11 +195,11 @@ export default function MyPage() {
             <div className="flex-1 overflow-y-auto px-8 pb-4" style={{ WebkitOverflowScrolling: 'touch' }}>
               <div className="space-y-6">
                 <div>
-                  <label className="text-[11px] font-black text-gray-400 uppercase tracking-wider">정산용 실명 (수정 불가)</label>
+                  <label className="text-[17px] font-black text-gray-400 uppercase tracking-wider">정산용 실명 (수정 불가)</label>
                   <input type="text" value={userName} disabled className="w-full mt-2 p-4 bg-gray-50 rounded-2xl border-none text-gray-400 font-bold" />
                 </div>
                 <div>
-                  <label className="text-[11px] font-black text-gray-400 uppercase tracking-wider">활동 닉네임 설정</label>
+                  <label className="text-[17px] font-black text-gray-400 uppercase tracking-wider">활동 닉네임 설정</label>
                   <input
                     type="text"
                     value={tempNickname}
@@ -207,7 +207,7 @@ export default function MyPage() {
                     placeholder="닉네임을 입력하세요"
                     className="w-full mt-2 p-4 bg-gray-100 rounded-2xl border-none font-bold text-gray-800 focus:ring-2 focus:ring-green-500"
                   />
-                  <p className="text-[10px] text-green-600 mt-3 font-medium bg-green-50 p-2 rounded-lg">
+                  <p className="text-[16px] text-green-600 mt-3 font-medium bg-green-50 p-2 rounded-lg">
                     💡 닉네임은 모든 기기에서 자동으로 동기화됩니다. 벙개 명단에는 닉네임이 우선 표시되며, 정산은 실명({userName}) 기준으로 처리됩니다.
                   </p>
                 </div>

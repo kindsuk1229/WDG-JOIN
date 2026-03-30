@@ -28,7 +28,7 @@ export default function BottomNav({ active }: BottomNavProps) {
             className={`flex flex-col items-center gap-1 flex-1 ${isActive ? 'text-green-600' : 'text-gray-400'}`}
           >
             <span className="text-2xl">{tab.icon}</span>
-            <span className="text-[10px] font-bold">{tab.label}</span>
+            <span className="text-[16px] font-bold">{tab.label}</span>
           </Link>
         );
       })}

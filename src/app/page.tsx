@@ -147,10 +147,10 @@ export default function Home() {
       <header className="p-4 bg-white flex justify-between items-center sticky top-0 z-10 shadow-sm">
         <h1 className="text-2xl font-black text-green-600 italic">WDG</h1>
         <div className="flex items-center gap-3">
-          <div className="px-3 py-1 bg-orange-100 rounded-full text-orange-600 font-bold text-xs">
+          <div className="px-3 py-1 bg-orange-100 rounded-full text-orange-600 font-bold text-base">
             {userName}님
           </div>
-          <button onClick={handleLogout} className="text-[11px] text-gray-400 underline decoration-gray-300">
+          <button onClick={handleLogout} className="text-[17px] text-gray-400 underline decoration-gray-300">
             로그아웃
           </button>
         </div>
@@ -171,7 +171,7 @@ export default function Home() {
             onClick={() => router.push('/settlement')}
             className="bg-green-600 p-5 rounded-3xl shadow-lg shadow-green-100 flex flex-col justify-between cursor-pointer active:scale-95 transition-all col-span-2"
           >
-            <p className="text-green-100 text-xs font-bold mb-1">라운딩 후 복잡한 계산은 그만!</p>
+            <p className="text-green-100 text-base font-bold mb-1">라운딩 후 복잡한 계산은 그만!</p>
             <div className="flex justify-between items-center">
               <p className="text-white text-xl font-black">💰 초간편 정산하기</p>
               <span className="text-white text-2xl">→</span>
@@ -184,7 +184,7 @@ export default function Home() {
           >
             <span className="text-2xl">👥</span>
             <p className="font-black text-gray-800">멤버</p>
-            <p className="text-[11px] text-gray-400">가입자 명단 보기</p>
+            <p className="text-[17px] text-gray-400">가입자 명단 보기</p>
           </div>
 
           <div
@@ -193,7 +193,7 @@ export default function Home() {
           >
             <span className="text-2xl">⛳</span>
             <p className="font-black text-gray-800">벙개 만들기</p>
-            <p className="text-[11px] text-gray-400">새 라운딩 개설</p>
+            <p className="text-[17px] text-gray-400">새 라운딩 개설</p>
           </div>
         </div>
 
@@ -203,7 +203,7 @@ export default function Home() {
             <h3 className="text-lg font-bold">현재 벙개 일정</h3>
             <button
               onClick={() => router.push('/meetups')}
-              className="text-green-600 text-sm font-bold"
+              className="text-green-600 text-base font-bold"
             >
               전체보기 →
             </button>
@@ -216,7 +216,7 @@ export default function Home() {
               </div>
             ) : meetups.length === 0 ? (
               <div className="bg-white p-10 rounded-3xl border border-dashed border-gray-200 text-center">
-                <p className="text-gray-400 text-sm">아직 예정된 라운딩이 없어요.<br />새로운 벙개를 만들어보세요!</p>
+                <p className="text-gray-400 text-base">아직 예정된 라운딩이 없어요.<br />새로운 벙개를 만들어보세요!</p>
               </div>
             ) : (
               meetups.map((item) => {
@@ -236,23 +236,23 @@ export default function Home() {
                         <div className="flex items-center gap-2 mb-1">
                           <p className="font-bold text-gray-800">{item.title}</p>
                           {item.meetupType === 'screen' && (
-                            <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md font-bold">스크린</span>
+                            <span className="text-[16px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md font-bold">스크린</span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-400">{item.golfCourse} | {formatDateWithDay(item.date)}</p>
+                        <p className="text-base text-gray-400">{item.golfCourse} | {formatDateWithDay(item.date)}</p>
                       </div>
-                      <span className={`text-[11px] px-2 py-1 rounded-lg font-bold flex-shrink-0 ${isFull ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'}`}>
+                      <span className={`text-[17px] px-2 py-1 rounded-lg font-bold flex-shrink-0 ${isFull ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'}`}>
                         {isFull ? '마감' : '모집중'}
                       </span>
                     </div>
                     {/* ✅ 그린피 표시 (필드 벙개만) */}
                     {item.meetupType !== 'screen' && item.greenFee > 0 && (
-                      <p className="text-[11px] text-green-600 font-bold mt-1">
+                      <p className="text-[17px] text-green-600 font-bold mt-1">
                         💰 그린피 {item.greenFee.toLocaleString()}원
                       </p>
                     )}
                     <div className="mt-3">
-                      <div className="flex justify-between text-[11px] text-gray-400 mb-1">
+                      <div className="flex justify-between text-[17px] text-gray-400 mb-1">
                         <span>참여 현황</span>
                         <span className="font-bold text-gray-600">{participants.length} / {maxPlayers}명</span>
                       </div>
@@ -280,7 +280,7 @@ export default function Home() {
             {isAdmin && !isEditingNotice && (
               <button
                 onClick={() => { setTempNotice(notice); setIsEditingNotice(true); }}
-                className="text-[11px] font-bold text-green-600 bg-green-50 px-2.5 py-1 rounded-full border border-green-100"
+                className="text-[17px] font-bold text-green-600 bg-green-50 px-2.5 py-1 rounded-full border border-green-100"
               >
                 ✏️ 수정
               </button>
@@ -292,17 +292,17 @@ export default function Home() {
                 value={tempNotice}
                 onChange={(e) => setTempNotice(e.target.value)}
                 rows={4}
-                className="w-full p-3 bg-gray-50 rounded-2xl text-sm text-gray-700 leading-relaxed border border-gray-200 focus:ring-2 focus:ring-green-500 focus:outline-none resize-none"
+                className="w-full p-3 bg-gray-50 rounded-2xl text-base text-gray-700 leading-relaxed border border-gray-200 focus:ring-2 focus:ring-green-500 focus:outline-none resize-none"
               />
               <div className="flex gap-2">
-                <button onClick={() => setIsEditingNotice(false)} className="flex-1 py-2.5 bg-gray-100 rounded-xl text-sm font-bold text-gray-500">취소</button>
-                <button onClick={handleSaveNotice} disabled={savingNotice} className="flex-1 py-2.5 bg-green-600 rounded-xl text-sm font-bold text-white">
+                <button onClick={() => setIsEditingNotice(false)} className="flex-1 py-2.5 bg-gray-100 rounded-xl text-base font-bold text-gray-500">취소</button>
+                <button onClick={handleSaveNotice} disabled={savingNotice} className="flex-1 py-2.5 bg-green-600 rounded-xl text-base font-bold text-white">
                   {savingNotice ? '저장 중...' : '저장하기'}
                 </button>
               </div>
             </div>
           ) : (
-            <p className="text-sm text-gray-500 leading-relaxed whitespace-pre-line">
+            <p className="text-base text-gray-500 leading-relaxed whitespace-pre-line">
               {notice || '공지사항이 없습니다.'}
             </p>
           )}
@@ -315,7 +315,7 @@ export default function Home() {
           <div className="w-full max-w-sm bg-white rounded-3xl overflow-hidden shadow-2xl">
             <div className="bg-green-600 px-6 py-5 flex justify-between items-start">
               <div>
-                <p className="text-[11px] text-green-200 font-bold mb-1">WDG 우동골</p>
+                <p className="text-[17px] text-green-200 font-bold mb-1">WDG 우동골</p>
                 <p className="text-lg font-black text-white leading-snug">앱으로 설치하면<br />더 편리해요!</p>
               </div>
               <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">⛳</div>
@@ -329,28 +329,28 @@ export default function Home() {
                 <div key={i} className="flex items-center gap-3">
                   <div className="w-9 h-9 bg-green-50 rounded-xl flex items-center justify-center text-base flex-shrink-0">{item.icon}</div>
                   <div>
-                    <p className="text-sm font-bold text-gray-800">{item.title}</p>
-                    <p className="text-[11px] text-gray-400">{item.desc}</p>
+                    <p className="text-base font-bold text-gray-800">{item.title}</p>
+                    <p className="text-[17px] text-gray-400">{item.desc}</p>
                   </div>
                 </div>
               ))}
             </div>
             <div className="px-6 py-4 border-b border-gray-100 space-y-2">
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">설치 방법</p>
+              <p className="text-[17px] font-bold text-gray-400 uppercase tracking-wide">설치 방법</p>
               <div className="bg-gray-50 rounded-2xl p-3">
-                <p className="text-[13px] font-bold text-gray-700 mb-1">iPhone (Safari)</p>
-                <p className="text-[12px] text-gray-500 leading-relaxed">① 하단 공유버튼(□↑) 탭<br />② 아래로 스크롤 → "홈 화면에 추가" 선택<br />③ 우측 상단 "추가" 탭</p>
+                <p className="text-[17px] font-bold text-gray-700 mb-1">iPhone (Safari)</p>
+                <p className="text-[16px] text-gray-500 leading-relaxed">① 하단 공유버튼(□↑) 탭<br />② 아래로 스크롤 → "홈 화면에 추가" 선택<br />③ 우측 상단 "추가" 탭</p>
               </div>
               <div className="bg-gray-50 rounded-2xl p-3">
-                <p className="text-[13px] font-bold text-gray-700 mb-1">Android (Chrome)</p>
-                <p className="text-[12px] text-gray-500 leading-relaxed">① 우측 상단 메뉴(⋮) 탭<br />② "홈 화면에 추가" 선택<br />③ "추가" 버튼 탭</p>
+                <p className="text-[17px] font-bold text-gray-700 mb-1">Android (Chrome)</p>
+                <p className="text-[16px] text-gray-500 leading-relaxed">① 우측 상단 메뉴(⋮) 탭<br />② "홈 화면에 추가" 선택<br />③ "추가" 버튼 탭</p>
               </div>
             </div>
             <div className="px-6 py-4 flex gap-2">
-              <button onClick={() => handleInstallGuideClose(false)} className="flex-1 py-3 bg-gray-100 rounded-2xl text-sm font-bold text-gray-500 active:scale-95 transition-all">
+              <button onClick={() => handleInstallGuideClose(false)} className="flex-1 py-3 bg-gray-100 rounded-2xl text-base font-bold text-gray-500 active:scale-95 transition-all">
                 다음에 하기
               </button>
-              <button onClick={() => handleInstallGuideClose(true)} className="flex-1 py-3 bg-green-600 rounded-2xl text-sm font-bold text-white active:scale-95 transition-all">
+              <button onClick={() => handleInstallGuideClose(true)} className="flex-1 py-3 bg-green-600 rounded-2xl text-base font-bold text-white active:scale-95 transition-all">
                 확인 완료
               </button>
             </div>

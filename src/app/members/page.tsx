@@ -90,7 +90,7 @@ export default function MembersPage() {
         <button onClick={() => router.back()} className="mr-4 text-xl font-bold text-gray-600">←</button>
         <h1 className="text-xl font-bold text-gray-800">멤버</h1>
         {!loading && (
-          <span className="ml-2 text-sm text-gray-400 font-medium">총 {members.length}명</span>
+          <span className="ml-2 text-base text-gray-400 font-medium">총 {members.length}명</span>
         )}
       </header>
 
@@ -112,17 +112,17 @@ export default function MembersPage() {
                       {member.nickname || member.name}
                     </p>
                     {member.nickname && (
-                      <p className="text-[11px] text-gray-400">({member.name})</p>
+                      <p className="text-[17px] text-gray-400">({member.name})</p>
                     )}
                     {member.isAdmin && (
-                      <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-black">관리자</span>
+                      <span className="text-[16px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-black">관리자</span>
                     )}
                   </div>
                   <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                    <span className="text-[11px] text-gray-400">
+                    <span className="text-[17px] text-gray-400">
                       🗓 가입 {formatDate(member.joinedAt)}
                     </span>
-                    <span className="text-[11px] text-gray-400">
+                    <span className="text-[17px] text-gray-400">
                       ⛳ 올해 벙개 {member.meetupCount}회
                     </span>
                   </div>
@@ -131,7 +131,7 @@ export default function MembersPage() {
 
               {/* 마지막 접속일 */}
               <div className="mt-3 pt-3 border-t border-gray-50 flex justify-end">
-                <p className="text-[10px] text-gray-300">
+                <p className="text-[16px] text-gray-300">
                   마지막 접속 {formatDate(member.lastLoginAt)}
                 </p>
               </div>

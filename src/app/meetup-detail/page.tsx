@@ -194,13 +194,13 @@ function MeetupDetailContent() {
           {(isAdmin || meetup?.creatorId === myName || isParticipant) && (
             <button
               onClick={() => router.push(`/create-meetup?id=${meetup?.id}`)}
-              className="text-green-600 text-sm font-bold px-3 py-1.5 bg-green-50 rounded-lg"
+              className="text-green-600 text-base font-bold px-3 py-1.5 bg-green-50 rounded-lg"
             >
               수정
             </button>
           )}
           {(isAdmin || meetup?.creatorId === myName) && (
-            <button onClick={handleDelete} className="text-red-500 text-sm font-bold px-3 py-1.5 bg-red-50 rounded-lg">
+            <button onClick={handleDelete} className="text-red-500 text-base font-bold px-3 py-1.5 bg-red-50 rounded-lg">
               삭제
             </button>
           )}
@@ -213,12 +213,12 @@ function MeetupDetailContent() {
           <div className="flex items-center gap-2 mb-2">
             <h2 className="text-2xl font-black text-gray-800">{meetup.title}</h2>
             {meetup.meetupType === 'screen' && (
-              <span className="text-[11px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">스크린</span>
+              <span className="text-[17px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">스크린</span>
             )}
           </div>
           <p className="text-green-600 font-bold mb-4">{meetup.golfCourse}</p>
 
-          <div className="space-y-2 text-sm text-gray-600 border-t pt-4">
+          <div className="space-y-2 text-base text-gray-600 border-t pt-4">
             <div className="flex items-center gap-2">
               <span>📅</span>
               <span>{meetup.date ? (() => {
@@ -261,12 +261,12 @@ function MeetupDetailContent() {
         {/* 조별 티타임 (필드) */}
         {meetup.meetupType !== 'screen' && meetup.cartTimes?.length > 0 && (
           <div className="bg-white p-5 rounded-3xl shadow-sm">
-            <h3 className="font-bold text-sm text-gray-500 mb-3">조별 티오프 시간</h3>
+            <h3 className="font-bold text-base text-gray-500 mb-3">조별 티오프 시간</h3>
             <div className="grid grid-cols-2 gap-2">
               {meetup.cartTimes.map((time: string, idx: number) => (
                 <div key={idx} className="flex justify-between items-center p-3 bg-green-50 rounded-2xl border border-green-100">
-                  <span className="text-[11px] font-black text-green-700">{idx + 1}조</span>
-                  <span className="text-sm font-black text-gray-800">{formatTime(time)}</span>
+                  <span className="text-[17px] font-black text-green-700">{idx + 1}조</span>
+                  <span className="text-base font-black text-gray-800">{formatTime(time)}</span>
                 </div>
               ))}
             </div>
@@ -277,11 +277,11 @@ function MeetupDetailContent() {
         <div className="bg-white p-6 rounded-3xl shadow-sm">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold">참여 멤버 ({participants.length}명)</h3>
-            <span className="text-gray-400 font-normal text-sm">최대 {maxPlayers}명</span>
+            <span className="text-gray-400 font-normal text-base">최대 {maxPlayers}명</span>
           </div>
 
           <div className="mb-3">
-            <div className="flex justify-between text-[11px] text-gray-400 mb-1">
+            <div className="flex justify-between text-[17px] text-gray-400 mb-1">
               <span>참여 현황</span>
               <span className="font-bold">{participants.length} / {maxPlayers}명</span>
             </div>
@@ -295,10 +295,10 @@ function MeetupDetailContent() {
 
           <div className="flex flex-wrap gap-2">
             {participants.length === 0 ? (
-              <p className="text-gray-400 text-sm py-2">가장 먼저 참여해보세요! ⛳</p>
+              <p className="text-gray-400 text-base py-2">가장 먼저 참여해보세요! ⛳</p>
             ) : (
               participants.map((p: any, idx: number) => (
-                <span key={idx} className={`px-4 py-2 rounded-full text-sm font-bold ${
+                <span key={idx} className={`px-4 py-2 rounded-full text-base font-bold ${
                   p.name === myName ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
                 }`}>
                   {p.nickname || p.name}
@@ -316,7 +316,7 @@ function MeetupDetailContent() {
             className="flex items-center justify-center gap-2 px-5 py-4 bg-[#FEE500] rounded-2xl font-bold text-[#191919] active:scale-95 transition-all"
           >
             <span className="text-lg">💬</span>
-            <span className="text-sm">카톡 공유</span>
+            <span className="text-base">카톡 공유</span>
           </button>
 
           {/* 참여/취소 버튼 */}

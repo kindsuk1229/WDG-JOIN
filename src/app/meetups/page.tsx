@@ -58,7 +58,7 @@ export default function MeetupsPage() {
             <button
               key={f.key}
               onClick={() => setFilter(f.key as any)}
-              className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+              className={`px-4 py-1.5 rounded-full text-base font-bold transition-all ${
                 filter === f.key
                   ? 'bg-green-600 text-white'
                   : 'bg-gray-100 text-gray-500'
@@ -75,7 +75,7 @@ export default function MeetupsPage() {
           <div className="text-center py-20 text-gray-400">벙개 목록을 불러오는 중...</div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-200">
-            <p className="text-gray-400 text-sm">등록된 벙개가 없어요.<br />새로운 벙개를 만들어보세요!</p>
+            <p className="text-gray-400 text-base">등록된 벙개가 없어요.<br />새로운 벙개를 만들어보세요!</p>
           </div>
         ) : (
           filtered.map((item) => {
@@ -94,7 +94,7 @@ export default function MeetupsPage() {
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-black text-gray-800">{item.title}</h3>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                    <span className={`text-[16px] px-2 py-0.5 rounded-full font-bold ${
                       item.meetupType === 'screen'
                         ? 'bg-blue-50 text-blue-600'
                         : 'bg-green-50 text-green-600'
@@ -102,14 +102,14 @@ export default function MeetupsPage() {
                       {item.meetupType === 'screen' ? '스크린' : '필드'}
                     </span>
                   </div>
-                  <span className={`text-[11px] px-2.5 py-1 rounded-lg font-bold flex-shrink-0 ${
+                  <span className={`text-[17px] px-2.5 py-1 rounded-lg font-bold flex-shrink-0 ${
                     isFull ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'
                   }`}>
                     {isFull ? '마감' : '모집중'}
                   </span>
                 </div>
 
-                <div className="space-y-1.5 text-sm text-gray-500 mb-3">
+                <div className="space-y-1.5 text-base text-gray-500 mb-3">
                   <p>📍 {item.golfCourse}</p>
                   <p>📅 {formatDate(item.date)}</p>
                   {item.meetupType === 'screen' ? (
@@ -121,7 +121,7 @@ export default function MeetupsPage() {
 
                 {/* 참여 현황 바 */}
                 <div>
-                  <div className="flex justify-between text-[11px] text-gray-400 mb-1">
+                  <div className="flex justify-between text-[17px] text-gray-400 mb-1">
                     <span>참여 현황</span>
                     <span className="font-bold">{participants.length} / {maxPlayers}명</span>
                   </div>

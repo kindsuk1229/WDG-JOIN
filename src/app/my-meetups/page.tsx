@@ -62,7 +62,7 @@ export default function MyMeetupsPage() {
         <div className="flex gap-2">
           <button
             onClick={() => setTab('created')}
-            className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${
+            className={`flex-1 py-2 rounded-xl text-base font-bold transition-all ${
               tab === 'created' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'
             }`}
           >
@@ -70,7 +70,7 @@ export default function MyMeetupsPage() {
           </button>
           <button
             onClick={() => setTab('joined')}
-            className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${
+            className={`flex-1 py-2 rounded-xl text-base font-bold transition-all ${
               tab === 'joined' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'
             }`}
           >
@@ -105,20 +105,20 @@ export default function MyMeetupsPage() {
                 <div className="flex items-center gap-2">
                   <h3 className="font-bold text-lg text-gray-800">{item.title || '제목 없음'}</h3>
                   {item.meetupType === 'screen' && (
-                    <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md font-bold">스크린</span>
+                    <span className="text-[16px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md font-bold">스크린</span>
                   )}
                 </div>
-                <span className="text-[11px] bg-green-100 text-green-700 px-2 py-1 rounded-lg font-bold flex-shrink-0">
+                <span className="text-[17px] bg-green-100 text-green-700 px-2 py-1 rounded-lg font-bold flex-shrink-0">
                   진행중
                 </span>
               </div>
-              <div className="flex items-center text-gray-500 text-sm gap-3">
+              <div className="flex items-center text-gray-500 text-base gap-3">
                 <span>📍 {item.golfCourse || '-'}</span>
                 <span className="text-gray-200">|</span>
                 <span>📅 {item.date || '날짜 미정'}</span>
               </div>
               <div className="mt-2 text-right">
-                <span className="text-blue-500 text-sm font-medium">
+                <span className="text-blue-500 text-base font-medium">
                   {tab === 'created' ? '상세 수정 〉' : '상세 보기 〉'}
                 </span>
               </div>

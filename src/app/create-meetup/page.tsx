@@ -32,7 +32,7 @@ function TimeInput({ value, onChange }: { value: string; onChange: (v: string) =
         onChange={(e) => {
           if (hourStr) onChange(buildTime(e.target.value === 'PM', parseInt(hourStr), parseInt(minStr) || 0));
         }}
-        className="bg-white border border-green-200 rounded-xl px-2 py-2 text-sm font-bold text-green-700 focus:ring-2 focus:ring-green-500"
+        className="bg-white border border-green-200 rounded-xl px-2 py-2 text-base font-bold text-green-700 focus:ring-2 focus:ring-green-500"
       >
         <option value="AM">오전</option>
         <option value="PM">오후</option>
@@ -49,7 +49,7 @@ function TimeInput({ value, onChange }: { value: string; onChange: (v: string) =
           const h = parseInt(v);
           if (v && h >= 1 && h <= 12) onChange(buildTime(isPM, h, parseInt(minStr) || 0));
         }}
-        className="w-12 bg-white border border-gray-200 rounded-xl px-2 py-2 text-sm font-bold text-gray-800 text-center focus:ring-2 focus:ring-green-500"
+        className="w-12 bg-white border border-gray-200 rounded-xl px-2 py-2 text-base font-bold text-gray-800 text-center focus:ring-2 focus:ring-green-500"
       />
       <span className="text-gray-400 font-bold">:</span>
       <input
@@ -64,7 +64,7 @@ function TimeInput({ value, onChange }: { value: string; onChange: (v: string) =
           const m = parseInt(v);
           if (hourStr && v.length === 2 && m >= 0 && m <= 59) onChange(buildTime(isPM, parseInt(hourStr), m));
         }}
-        className="w-12 bg-white border border-gray-200 rounded-xl px-2 py-2 text-sm font-bold text-gray-800 text-center focus:ring-2 focus:ring-green-500"
+        className="w-12 bg-white border border-gray-200 rounded-xl px-2 py-2 text-base font-bold text-gray-800 text-center focus:ring-2 focus:ring-green-500"
       />
     </div>
   );
@@ -236,7 +236,7 @@ function CreateMeetupContent() {
       <div className="flex flex-col items-center justify-center min-h-full p-10 text-center">
         <p className="text-4xl mb-4">🚫</p>
         <p className="font-black text-gray-800 mb-2">접근 권한이 없어요</p>
-        <p className="text-sm text-gray-400 mb-6">벙개 참여자, 등록자 또는 관리자만 수정할 수 있어요.</p>
+        <p className="text-base text-gray-400 mb-6">벙개 참여자, 등록자 또는 관리자만 수정할 수 있어요.</p>
         <button onClick={() => router.back()} className="px-6 py-3 bg-green-600 text-white rounded-2xl font-bold">돌아가기</button>
       </div>
     );
@@ -252,7 +252,7 @@ function CreateMeetupContent() {
           </h1>
         </div>
         {meetupId && canEdit && (
-          <button type="button" onClick={handleDelete} className="text-red-500 text-sm font-bold px-2 py-1 bg-red-50 rounded-lg">삭제</button>
+          <button type="button" onClick={handleDelete} className="text-red-500 text-base font-bold px-2 py-1 bg-red-50 rounded-lg">삭제</button>
         )}
       </header>
 
@@ -260,19 +260,19 @@ function CreateMeetupContent() {
 
         {!meetupId && (
           <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
-            <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">벙개 종류</label>
+            <label className="text-base font-bold text-gray-400 block mb-3 uppercase tracking-wide">벙개 종류</label>
             <div className="grid grid-cols-2 gap-3">
               <button type="button" onClick={() => setMeetupType('field')}
                 className={`p-4 rounded-2xl border-2 text-center transition-all ${meetupType === 'field' ? 'border-green-500 bg-green-50' : 'border-gray-100 bg-gray-50'}`}>
                 <p className="text-2xl mb-1">⛳</p>
-                <p className={`text-sm font-black ${meetupType === 'field' ? 'text-green-700' : 'text-gray-500'}`}>필드</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">카트 단위 모집</p>
+                <p className={`text-base font-black ${meetupType === 'field' ? 'text-green-700' : 'text-gray-500'}`}>필드</p>
+                <p className="text-[16px] text-gray-400 mt-0.5">카트 단위 모집</p>
               </button>
               <button type="button" onClick={() => setMeetupType('screen')}
                 className={`p-4 rounded-2xl border-2 text-center transition-all ${meetupType === 'screen' ? 'border-green-500 bg-green-50' : 'border-gray-100 bg-gray-50'}`}>
                 <p className="text-2xl mb-1">🖥️</p>
-                <p className={`text-sm font-black ${meetupType === 'screen' ? 'text-green-700' : 'text-gray-500'}`}>스크린</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">인원 단위 모집</p>
+                <p className={`text-base font-black ${meetupType === 'screen' ? 'text-green-700' : 'text-gray-500'}`}>스크린</p>
+                <p className="text-[16px] text-gray-400 mt-0.5">인원 단위 모집</p>
               </button>
             </div>
           </div>
@@ -280,26 +280,26 @@ function CreateMeetupContent() {
 
         <div className="bg-white p-6 rounded-3xl shadow-sm space-y-6 border border-gray-100">
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">벙개 제목</label>
+            <label className="text-base font-bold text-gray-400 block mb-2 uppercase tracking-wide">벙개 제목</label>
             <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)}
               placeholder="예: [WDG] 주말 정기 라운딩"
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all text-gray-900" />
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none text-base focus:ring-2 focus:ring-green-500 transition-all text-gray-900" />
           </div>
 
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">
+            <label className="text-base font-bold text-gray-400 block mb-2 uppercase tracking-wide">
               {meetupType === 'screen' ? '스크린 골프장 이름' : '골프장 이름'}
             </label>
             <input type="text" required value={golfCourse} onChange={(e) => setGolfCourse(e.target.value)}
               placeholder={meetupType === 'screen' ? '예: 골프존 강남점' : '예: 샤인데일 CC'}
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all text-gray-900" />
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none text-base focus:ring-2 focus:ring-green-500 transition-all text-gray-900" />
           </div>
 
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">날짜 선택</label>
+            <label className="text-base font-bold text-gray-400 block mb-2 uppercase tracking-wide">날짜 선택</label>
             <input type="date" required value={date} onChange={(e) => setDate(e.target.value)}
               min={new Date().toISOString().split('T')[0]}
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all text-gray-900" />
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none text-base focus:ring-2 focus:ring-green-500 transition-all text-gray-900" />
           </div>
 
           {/* 필드: 그린피 + 카트 수 + 티타임 */}
@@ -308,7 +308,7 @@ function CreateMeetupContent() {
 
               {/* ✅ 그린피 */}
               <div>
-                <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">그린피 (1인)</label>
+                <label className="text-base font-bold text-gray-400 block mb-2 uppercase tracking-wide">그린피 (1인)</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
@@ -316,12 +316,12 @@ function CreateMeetupContent() {
                     onChange={(e) => setGreenFee(Number(e.target.value))}
                     placeholder="예: 180000"
                     step="10000"
-                    className="flex-1 p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 text-gray-900"
+                    className="flex-1 p-4 bg-gray-50 rounded-2xl border-none text-base focus:ring-2 focus:ring-green-500 text-gray-900"
                   />
                   <span className="text-gray-400 font-bold pr-2">원</span>
                 </div>
                 {greenFee > 0 && (
-                  <p className="text-[11px] text-green-600 mt-1.5 font-bold">
+                  <p className="text-[17px] text-green-600 mt-1.5 font-bold">
                     💰 1인 {greenFee.toLocaleString()}원
                   </p>
                 )}
@@ -329,7 +329,7 @@ function CreateMeetupContent() {
 
               {/* 카트 수 */}
               <div>
-                <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">모집 규모 및 조별 티타임</label>
+                <label className="text-base font-bold text-gray-400 block mb-3 uppercase tracking-wide">모집 규모 및 조별 티타임</label>
                 <select value={cartCount} onChange={(e) => handleCartCountChange(Number(e.target.value))}
                   className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg mb-4 focus:ring-2 focus:ring-green-500 text-gray-900">
                   {[...Array(15)].map((_, i) => (
@@ -340,7 +340,7 @@ function CreateMeetupContent() {
                 <div className="grid grid-cols-1 gap-3">
                   {cartTimes.map((time, index) => (
                     <div key={index} className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
-                      <span className="text-[11px] font-black text-green-700 w-10 text-center flex-shrink-0">{index + 1}조</span>
+                      <span className="text-[17px] font-black text-green-700 w-10 text-center flex-shrink-0">{index + 1}조</span>
                       <TimeInput value={time} onChange={(v) => updateCartTime(index, v)} />
                     </div>
                   ))}
@@ -353,14 +353,14 @@ function CreateMeetupContent() {
           {meetupType === 'screen' && (
             <div className="border-t pt-6 space-y-4">
               <div>
-                <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">시작 시간</label>
+                <label className="text-base font-bold text-gray-400 block mb-2 uppercase tracking-wide">시작 시간</label>
                 <div className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
-                  <span className="text-[11px] font-black text-green-700 flex-shrink-0">시작</span>
+                  <span className="text-[17px] font-black text-green-700 flex-shrink-0">시작</span>
                   <TimeInput value={cartTimes[0] || '07:00'} onChange={(v) => setCartTimes([v])} />
                 </div>
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">
+                <label className="text-base font-bold text-gray-400 block mb-3 uppercase tracking-wide">
                   모집 인원 <span className="font-normal text-gray-400 normal-case">(최대 50명)</span>
                 </label>
                 <select value={playerCount} onChange={(e) => setPlayerCount(Number(e.target.value))}
@@ -370,7 +370,7 @@ function CreateMeetupContent() {
                   ))}
                 </select>
                 <div className="mt-3 bg-green-50 rounded-2xl p-3 border border-green-100">
-                  <p className="text-[12px] text-green-700 font-bold text-center">🖥️ 스크린 {playerCount}명 모집</p>
+                  <p className="text-[16px] text-green-700 font-bold text-center">🖥️ 스크린 {playerCount}명 모집</p>
                 </div>
               </div>
             </div>
