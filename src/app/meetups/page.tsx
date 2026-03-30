@@ -38,7 +38,7 @@ export default function MeetupsPage() {
     if (!dateStr) return '-';
     const d = new Date(dateStr + 'T00:00:00');
     const days = ['일', '월', '화', '수', '목', '금', '토'];
-    return `${d.getMonth() + 1}월 ${d.getDate()}일(${days[d.getDay()]})`;
+    return `${dateStr} (${days[d.getDay()]})`;
   };
 
   return (

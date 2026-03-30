@@ -131,6 +131,13 @@ export default function Home() {
     return <KakaoLoginButton />;
   }
 
+  const formatDateWithDay = (dateStr: string) => {
+    if (!dateStr) return dateStr;
+    const d = new Date(dateStr + 'T00:00:00');
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    return `${dateStr} (${days[d.getDay()]})`;
+  };
+
   return (
     <div className="bg-gray-50 text-gray-900">
       {/* Header */}
@@ -229,7 +236,7 @@ export default function Home() {
                             <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md font-bold">스크린</span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-400">{item.golfCourse} | {item.date}</p>
+                        <p className="text-xs text-gray-400">{item.golfCourse} | {formatDateWithDay(item.date)}</p>
                       </div>
                       <span className={`text-[11px] px-2 py-1 rounded-lg font-bold flex-shrink-0 ${isFull ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'}`}>
                         {isFull ? '마감' : '모집중'}

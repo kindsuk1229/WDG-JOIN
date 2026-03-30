@@ -146,9 +146,10 @@ function MeetupDetailContent() {
 
     const participantStr = `👤 현재 ${(meetup.participants || []).length}명 참여중`;
 
-    // ✅ 제목에 골프장 + 날짜 포함
-    const title = `⛳ [WDG] ${meetup.golfCourse} 벙개`;
+    // ✅ 제목은 벙개 제목으로
+    const title = `⛳ [WDG] ${meetup.title}`;
     const description = [
+      `📍 ${meetup.golfCourse}`,
       `📅 ${dateStr}${timeStr ? ` ${timeStr}` : ''}`,
       capacityStr,
       greenFeeStr,
@@ -215,7 +216,11 @@ function MeetupDetailContent() {
           <div className="space-y-2 text-sm text-gray-600 border-t pt-4">
             <div className="flex items-center gap-2">
               <span>📅</span>
-              <span>{meetup.date}</span>
+              <span>{meetup.date ? (() => {
+                const d = new Date(meetup.date + 'T00:00:00');
+                const days = ['일', '월', '화', '수', '목', '금', '토'];
+                return `${meetup.date} (${days[d.getDay()]})`;
+              })() : '-'}</span>
             </div>
             {meetup.meetupType === 'screen' ? (
               <>
