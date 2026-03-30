@@ -152,6 +152,32 @@ function CreateMeetupContent() {
     if (e) e.preventDefault();
     if (meetupId && !canEdit) { alert('수정 권한이 없습니다.'); return; }
 
+    // ✅ 오늘 날짜인 경우 현재 시간 이전 시간 체크
+    const today = new Date().toISOString().split('T')[0];
+    if (date === today && meetupType === 'field') {
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      for (const time of cartTimes) {
+        if (time) {
+          const [h, m] = time.split(':').map(Number);
+          const timeMinutes = h * 60 + m;
+          if (timeMinutes <= currentMinutes) {
+            alert('오늘 날짜는 현재 시간 이후로만 설정할 수 있어요!');
+            return;
+          }
+        }
+      }
+    }
+    if (date === today && meetupType === 'screen' && cartTimes[0]) {
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const [h, m] = cartTimes[0].split(':').map(Number);
+      if (h * 60 + m <= currentMinutes) {
+        alert('오늘 날짜는 현재 시간 이후로만 설정할 수 있어요!');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const meetupData: any = {
@@ -272,6 +298,7 @@ function CreateMeetupContent() {
           <div>
             <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">날짜 선택</label>
             <input type="date" required value={date} onChange={(e) => setDate(e.target.value)}
+              min={new Date().toISOString().split('T')[0]}
               className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 transition-all text-gray-900" />
           </div>
 
