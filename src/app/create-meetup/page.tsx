@@ -137,11 +137,13 @@ function CreateMeetupContent() {
         alert('⛳ 벙개가 수정되었습니다!');
       } else {
         // ✅ 등록자 ID를 실명으로 저장
+        const myNickname = (localStorage.getItem('user_nickname') || '').trim();
         const newDoc = await addDoc(collection(db, 'meetups'), {
           ...meetupData,
           creatorId: myName,
           createdAt: new Date().toISOString(),
           players: 1,
+          participants: [{ name: myName, nickname: myNickname }],
         });
 
         await sendNotificationToAll({

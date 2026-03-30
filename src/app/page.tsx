@@ -209,29 +209,47 @@ export default function Home() {
                 <p className="text-gray-400 text-sm">아직 예정된 라운딩이 없어요.<br />새로운 벙개를 만들어보세요!</p>
               </div>
             ) : (
-              meetups.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => router.push(`/meetup-detail?id=${item.id}`)}
-                  className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer active:bg-gray-50"
-                >
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-bold text-gray-800">{item.title}</p>
-                      {item.meetupType === 'screen' && (
-                        <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md font-bold">스크린</span>
-                      )}
+              meetups.map((item) => {
+                const participants = item.participants || [];
+                const maxPlayers = item.meetupType === 'screen'
+                  ? item.playerCount
+                  : (item.cartCount || 0) * 4;
+                const isFull = participants.length >= maxPlayers;
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => router.push(`/meetup-detail?id=${item.id}`)}
+                    className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 cursor-pointer active:bg-gray-50"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-bold text-gray-800">{item.title}</p>
+                          {item.meetupType === 'screen' && (
+                            <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md font-bold">스크린</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-400">{item.golfCourse} | {item.date}</p>
+                      </div>
+                      <span className={`text-[11px] px-2 py-1 rounded-lg font-bold flex-shrink-0 ${isFull ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'}`}>
+                        {isFull ? '마감' : '모집중'}
+                      </span>
                     </div>
-                    <p className="text-xs text-gray-400">{item.golfCourse} | {item.date}</p>
+                    <div className="mt-3">
+                      <div className="flex justify-between text-[11px] text-gray-400 mb-1">
+                        <span>참여 현황</span>
+                        <span className="font-bold text-gray-600">{participants.length} / {maxPlayers}명</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-1.5">
+                        <div
+                          className={`h-1.5 rounded-full transition-all ${isFull ? 'bg-red-400' : 'bg-green-500'}`}
+                          style={{ width: `${Math.min((participants.length / maxPlayers) * 100, 100)}%` }}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-green-600 font-bold text-sm">
-                      {item.meetupType === 'screen' ? `${item.playerCount}명` : `${item.cartCount}카트`}
-                    </p>
-                    <p className="text-[10px] text-gray-300 font-bold">참여하기</p>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
