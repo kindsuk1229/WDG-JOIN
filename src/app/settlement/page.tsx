@@ -26,6 +26,7 @@ export default function SettlementPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [myName, setMyName] = useState('');
   const [myNickname, setMyNickname] = useState('');
+  const [sharing, setSharing] = useState(false);
 
   // 앱 멤버 목록
   const [appMembers, setAppMembers] = useState<AppMember[]>([]);
@@ -100,10 +101,12 @@ export default function SettlementPage() {
   const isBalanced = totalAmount === 0 || totalAssigned === totalAmount;
 
   const handleKakaoShare = async () => {
+    if (sharing) return;
     if (totalAmount <= 0) return alert('금액을 입력해주세요!');
     if (members.length < 2) return alert('멤버를 1명 이상 추가해주세요!');
     if (!isBalanced) return alert(`금액 합계가 맞지 않아요!\n총액: ${totalAmount.toLocaleString()}원\n배분: ${totalAssigned.toLocaleString()}원`);
 
+    setSharing(true);
     if (accountNumber) localStorage.setItem('settlement_account', accountNumber);
 
     try {
@@ -179,6 +182,8 @@ export default function SettlementPage() {
     } catch (error) {
       console.error("정산 저장 에러:", error);
       alert('저장 중 오류가 발생했습니다.');
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -309,9 +314,10 @@ export default function SettlementPage() {
         {/* 카톡 공유 버튼 */}
         <button
           onClick={handleKakaoShare}
-          className="w-full bg-[#FEE500] text-[#191919] p-5 rounded-2xl font-black shadow-lg active:scale-95 transition-all text-lg flex items-center justify-center gap-3 border-b-4 border-yellow-600/30"
+          disabled={sharing}
+          className={`w-full p-5 rounded-2xl font-black shadow-lg active:scale-95 transition-all text-lg flex items-center justify-center gap-3 border-b-4 ${sharing ? 'bg-gray-300 text-gray-400 border-gray-400' : 'bg-[#FEE500] text-[#191919] border-yellow-600/30'}`}
         >
-          <span className="text-2xl">💬</span> 카톡으로 정산 공유
+          <span className="text-2xl">💬</span> {sharing ? '처리 중...' : '카톡으로 정산 공유'}
         </button>
 
         <p className="text-center text-[11px] text-gray-400">

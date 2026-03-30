@@ -48,6 +48,7 @@ export default function SettlementHistoryPage() {
   const [loading, setLoading] = useState(true);
   const [myName, setMyName] = useState('');
   const [myNickname, setMyNickname] = useState('');
+  const [processing, setProcessing] = useState<string | null>(null);
 
   useEffect(() => {
     const name = (localStorage.getItem('user_name') || '').trim();
@@ -116,16 +117,28 @@ export default function SettlementHistoryPage() {
   };
 
   const handleComplete = async (id: string) => {
+    if (processing) return;
     if (!confirm('완료 처리하시겠습니까?')) return;
-    await updateDoc(doc(db, "settlements", id), { status: 'completed' });
-    fetchAll(myName);
+    setProcessing(id);
+    try {
+      await updateDoc(doc(db, "settlements", id), { status: 'completed' });
+      fetchAll(myName);
+    } finally {
+      setProcessing(null);
+    }
   };
 
   // 내가 내야 할 돈 완료 처리
   const handleMyBillComplete = async (id: string) => {
+    if (processing) return;
     if (!confirm('입금 완료 처리하시겠습니까?')) return;
-    await updateDoc(doc(db, "settlement_members", id), { status: 'completed' });
-    fetchAll(myName);
+    setProcessing(id);
+    try {
+      await updateDoc(doc(db, "settlement_members", id), { status: 'completed' });
+      fetchAll(myName);
+    } finally {
+      setProcessing(null);
+    }
   };
 
   const reShare = (item: Settlement) => {
@@ -239,7 +252,7 @@ export default function SettlementHistoryPage() {
                   <div className="flex gap-1.5">
                     <button onClick={() => reShare(item)} className="bg-yellow-50 text-yellow-700 px-3 py-2 rounded-xl text-[11px] font-black border border-yellow-100">재공유</button>
                     {item.status === 'pending' && (
-                      <button onClick={() => handleComplete(item.id)} className="bg-gray-900 text-white px-3 py-2 rounded-xl text-[11px] font-black">완료</button>
+                      <button onClick={() => handleComplete(item.id)} disabled={!!processing} className={`px-3 py-2 rounded-xl text-[11px] font-black ${processing ? 'bg-gray-300 text-gray-400' : 'bg-gray-900 text-white'}`}>{processing === item.id ? '처리중' : '완료'}</button>
                     )}
                   </div>
                 </div>
@@ -283,9 +296,10 @@ export default function SettlementHistoryPage() {
                   {bill.status === 'pending' && (
                     <button
                       onClick={() => handleMyBillComplete(bill.id)}
-                      className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-black"
+                      disabled={!!processing}
+                      className={`px-4 py-2 rounded-xl text-sm font-black ${processing ? 'bg-gray-300 text-gray-400' : 'bg-green-600 text-white'}`}
                     >
-                      입금 완료
+                      {processing === bill.id ? '처리중...' : '입금 완료'}
                     </button>
                   )}
                 </div>
