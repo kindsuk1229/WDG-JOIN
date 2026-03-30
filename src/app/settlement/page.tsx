@@ -107,7 +107,8 @@ export default function SettlementPage() {
     if (accountNumber) localStorage.setItem('settlement_account', accountNumber);
 
     try {
-      await addDoc(collection(db, "settlements"), {
+      // 1. 마스터 정산 문서 저장
+      const masterDoc = await addDoc(collection(db, "settlements"), {
         userName: myName,
         totalAmount: Number(totalAmount),
         memo: memo || '모임 비용',
@@ -119,7 +120,42 @@ export default function SettlementPage() {
         createdAt: serverTimestamp()
       });
 
+      // ✅ 2. 멤버별 개별 문서 저장 (내가 내야 할 돈 추적용)
       const otherMembers = members.filter(m => m.name !== myName);
+      await Promise.all(
+        otherMembers.map(m =>
+          addDoc(collection(db, "settlement_members"), {
+            settlementId: masterDoc.id,
+            fromName: m.name,        // 내야 하는 사람
+            fromNickname: m.nickname,
+            toName: myName,          // 받는 사람
+            toNickname: myNickname,
+            amount: m.amount,
+            memo: memo || '모임 비용',
+            accountNumber,
+            status: 'pending',
+            createdAt: serverTimestamp()
+          })
+        )
+      );
+
+      // ✅ 3. 각 멤버에게 푸시 알림 전송
+      await Promise.all(
+        otherMembers.map(m =>
+          fetch('/api/send-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              toUserName: m.name,
+              title: '💰 정산 요청이 왔어요!',
+              body: `${myNickname || myName} → ${m.nickname || m.name}: ${m.amount.toLocaleString()}원${accountNumber ? ` (${accountNumber})` : ''}`,
+              url: '/settlement/my',
+            }),
+          })
+        )
+      );
+
+      // 4. 카카오 공유
       const memberLines = otherMembers
         .map(m => `• ${m.nickname || m.name}: ${m.amount.toLocaleString()}원`)
         .join('\n');
