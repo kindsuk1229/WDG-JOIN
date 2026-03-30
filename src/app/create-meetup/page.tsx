@@ -17,10 +17,13 @@ function TimeInput({ value, onChange, label }: { value: string; onChange: (v: st
   const hour12 = Math.floor(totalMinutes / 60) % 12 || 12;
   const minute = totalMinutes % 60;
 
-  const buildTime = (newIsPM: boolean, newHour: number, newMin: number) => {
-    let h = newHour % 12;
-    if (newIsPM) h += 12;
-    return `${String(h).padStart(2, '0')}:${String(newMin).padStart(2, '0')}`;
+  const [hourStr, setHourStr] = useState(value ? String(hour12) : '');
+  const [minStr, setMinStr] = useState(value ? String(minute).padStart(2, '0') : '');
+
+  const buildTime = (newIsPM: boolean, h: number, m: number) => {
+    let hour = h % 12;
+    if (newIsPM) hour += 12;
+    return `${String(hour).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
   };
 
   return (
@@ -28,7 +31,9 @@ function TimeInput({ value, onChange, label }: { value: string; onChange: (v: st
       {/* 오전/오후 */}
       <select
         value={isPM ? 'PM' : 'AM'}
-        onChange={(e) => onChange(buildTime(e.target.value === 'PM', hour12, minute))}
+        onChange={(e) => {
+          if (hourStr) onChange(buildTime(e.target.value === 'PM', parseInt(hourStr), parseInt(minStr) || 0));
+        }}
         className="bg-white border border-green-200 rounded-xl px-2 py-2 text-sm font-bold text-green-700 focus:ring-2 focus:ring-green-500"
       >
         <option value="AM">오전</option>
@@ -37,28 +42,38 @@ function TimeInput({ value, onChange, label }: { value: string; onChange: (v: st
 
       {/* 시 */}
       <input
-        type="number"
-        min={1}
-        max={12}
-        value={hour12}
+        type="text"
+        inputMode="numeric"
+        placeholder="시"
+        maxLength={2}
+        value={hourStr}
         onChange={(e) => {
-          const h = Math.min(12, Math.max(1, parseInt(e.target.value) || 1));
-          onChange(buildTime(isPM, h, minute));
+          const v = e.target.value.replace(/[^0-9]/g, '');
+          setHourStr(v);
+          const h = parseInt(v);
+          if (v && h >= 1 && h <= 12) {
+            onChange(buildTime(isPM, h, parseInt(minStr) || 0));
+          }
         }}
-        className="w-14 bg-white border border-gray-200 rounded-xl px-2 py-2 text-sm font-bold text-gray-800 text-center focus:ring-2 focus:ring-green-500"
+        className="w-12 bg-white border border-gray-200 rounded-xl px-2 py-2 text-sm font-bold text-gray-800 text-center focus:ring-2 focus:ring-green-500"
       />
       <span className="text-gray-400 font-bold">:</span>
       {/* 분 */}
       <input
-        type="number"
-        min={0}
-        max={59}
-        value={String(minute).padStart(2, '0')}
+        type="text"
+        inputMode="numeric"
+        placeholder="분"
+        maxLength={2}
+        value={minStr}
         onChange={(e) => {
-          const m = Math.min(59, Math.max(0, parseInt(e.target.value) || 0));
-          onChange(buildTime(isPM, hour12, m));
+          const v = e.target.value.replace(/[^0-9]/g, '');
+          setMinStr(v);
+          const m = parseInt(v);
+          if (hourStr && v.length === 2 && m >= 0 && m <= 59) {
+            onChange(buildTime(isPM, parseInt(hourStr), m));
+          }
         }}
-        className="w-14 bg-white border border-gray-200 rounded-xl px-2 py-2 text-sm font-bold text-gray-800 text-center focus:ring-2 focus:ring-green-500"
+        className="w-12 bg-white border border-gray-200 rounded-xl px-2 py-2 text-sm font-bold text-gray-800 text-center focus:ring-2 focus:ring-green-500"
       />
     </div>
   );
