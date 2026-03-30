@@ -259,14 +259,56 @@ function CreateMeetupContent() {
                 ))}
               </select>
               <div className="grid grid-cols-1 gap-3">
-                {cartTimes.map((time, index) => (
-                  <div key={index} className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
-                    <span className="text-[11px] font-black text-green-700 w-10 text-center">{index + 1}조</span>
-                    <input type="time" required value={time}
-                      onChange={(e) => updateCartTime(index, e.target.value)}
-                      className="bg-transparent border-none focus:ring-0 font-bold text-gray-800 flex-1 p-1" />
-                  </div>
-                ))}
+                {cartTimes.map((time, index) => {
+                  const ampm = time && parseInt(time.split(':')[0]) >= 12 ? 'PM' : 'AM';
+                  const hhmm = time ? time : '';
+                  return (
+                    <div key={index} className="flex items-center gap-2 bg-green-50/50 p-3 rounded-2xl border border-green-100">
+                      <span className="text-[11px] font-black text-green-700 w-10 text-center flex-shrink-0">{index + 1}조</span>
+                      <div className="flex items-center gap-2 flex-1">
+                        <select
+                          value={ampm}
+                          onChange={(e) => {
+                            const currentTime = cartTimes[index] || '07:00';
+                            const [h, m] = currentTime.split(':');
+                            let hour = parseInt(h);
+                            if (e.target.value === 'AM' && hour >= 12) hour -= 12;
+                            if (e.target.value === 'PM' && hour < 12) hour += 12;
+                            updateCartTime(index, `${String(hour).padStart(2,'0')}:${m || '00'}`);
+                          }}
+                          className="bg-white border border-green-200 rounded-xl px-2 py-1.5 text-sm font-bold text-green-700 focus:ring-2 focus:ring-green-500"
+                        >
+                          <option value="AM">오전</option>
+                          <option value="PM">오후</option>
+                        </select>
+                        <input
+                          type="text"
+                          required
+                          value={hhmm ? (() => {
+                            const [h, m] = hhmm.split(':');
+                            const hour = parseInt(h) % 12 || 12;
+                            return `${hour}:${m || '00'}`;
+                          })() : ''}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9:]/g, '');
+                            const parts = val.split(':');
+                            if (parts.length === 2) {
+                              let hour = parseInt(parts[0]) || 0;
+                              const min = parts[1].substring(0, 2);
+                              if (ampm === 'PM' && hour < 12) hour += 12;
+                              if (ampm === 'AM' && hour === 12) hour = 0;
+                              updateCartTime(index, `${String(hour).padStart(2,'0')}:${min.padStart(2,'0')}`);
+                            } else {
+                              updateCartTime(index, val);
+                            }
+                          }}
+                          placeholder="7:30"
+                          className="flex-1 bg-white border border-green-200 rounded-xl px-3 py-1.5 text-sm font-bold text-gray-800 focus:ring-2 focus:ring-green-500 w-20"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -276,11 +318,46 @@ function CreateMeetupContent() {
             <div className="border-t pt-6 space-y-4">
               <div>
                 <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">시작 시간</label>
-                <div className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
-                  <span className="text-[11px] font-black text-green-700">시작</span>
-                  <input type="time" required value={cartTimes[0] || ''}
-                    onChange={(e) => setCartTimes([e.target.value])}
-                    className="bg-transparent border-none focus:ring-0 font-bold text-gray-800 flex-1 p-1" />
+                <div className="flex items-center gap-2 bg-green-50/50 p-3 rounded-2xl border border-green-100">
+                  <span className="text-[11px] font-black text-green-700 flex-shrink-0">시작</span>
+                  <select
+                    value={cartTimes[0] && parseInt(cartTimes[0].split(':')[0]) >= 12 ? 'PM' : 'AM'}
+                    onChange={(e) => {
+                      const currentTime = cartTimes[0] || '07:00';
+                      const [h, m] = currentTime.split(':');
+                      let hour = parseInt(h);
+                      if (e.target.value === 'AM' && hour >= 12) hour -= 12;
+                      if (e.target.value === 'PM' && hour < 12) hour += 12;
+                      setCartTimes([`${String(hour).padStart(2,'0')}:${m || '00'}`]);
+                    }}
+                    className="bg-white border border-green-200 rounded-xl px-2 py-1.5 text-sm font-bold text-green-700 focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="AM">오전</option>
+                    <option value="PM">오후</option>
+                  </select>
+                  <input
+                    type="text"
+                    required
+                    value={cartTimes[0] ? (() => {
+                      const [h, m] = cartTimes[0].split(':');
+                      const hour = parseInt(h) % 12 || 12;
+                      return `${hour}:${m || '00'}`;
+                    })() : ''}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9:]/g, '');
+                      const parts = val.split(':');
+                      const ampm = cartTimes[0] && parseInt(cartTimes[0].split(':')[0]) >= 12 ? 'PM' : 'AM';
+                      if (parts.length === 2) {
+                        let hour = parseInt(parts[0]) || 0;
+                        const min = parts[1].substring(0, 2);
+                        if (ampm === 'PM' && hour < 12) hour += 12;
+                        if (ampm === 'AM' && hour === 12) hour = 0;
+                        setCartTimes([`${String(hour).padStart(2,'0')}:${min.padStart(2,'0')}`]);
+                      }
+                    }}
+                    placeholder="7:30"
+                    className="flex-1 bg-white border border-green-200 rounded-xl px-3 py-1.5 text-sm font-bold text-gray-800 focus:ring-2 focus:ring-green-500"
+                  />
                 </div>
               </div>
               <div>
