@@ -285,10 +285,10 @@ export default function SettlementPage() {
 
       {/* ✅ 멤버 선택 바텀시트 */}
       {showMemberPicker && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center" style={{ bottom: '64px' }}>
           <div
             className="w-full max-w-md bg-white rounded-t-[32px] flex flex-col"
-            style={{ maxHeight: '70vh' }}
+            style={{ maxHeight: 'calc(100vh - 128px)' }}
             onTouchMove={e => e.stopPropagation()}
           >
             <div className="px-6 pt-6 pb-4 shrink-0">
