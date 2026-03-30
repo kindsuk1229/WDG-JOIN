@@ -4,12 +4,17 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { shareToKakao } from '@/lib/kakao';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
 
 interface Member {
   name: string;
   nickname: string;
   amount: number;
+}
+
+interface AppMember {
+  name: string;
+  nickname: string;
 }
 
 export default function SettlementPage() {
@@ -18,87 +23,87 @@ export default function SettlementPage() {
   const [memo, setMemo] = useState('');
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const [accountNumber, setAccountNumber] = useState('');
-  const [members, setMembers] = useState<Member[]>([
-    { name: '', nickname: '', amount: 0 }
-  ]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [myName, setMyName] = useState('');
   const [myNickname, setMyNickname] = useState('');
+
+  // 앱 멤버 목록
+  const [appMembers, setAppMembers] = useState<AppMember[]>([]);
+  const [showMemberPicker, setShowMemberPicker] = useState(false);
 
   useEffect(() => {
     const name = (localStorage.getItem('user_name') || '').trim();
     const nickname = (localStorage.getItem('user_nickname') || '').trim();
     setMyName(name);
     setMyNickname(nickname);
-    // 저장된 계좌번호 불러오기
+
     const savedAccount = localStorage.getItem('settlement_account') || '';
     setAccountNumber(savedAccount);
+
+    // 본인 자동 추가
+    if (name) {
+      setMembers([{ name, nickname, amount: 0 }]);
+    }
+
+    // 앱 멤버 목록 불러오기
+    const fetchAppMembers = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'users'));
+        const list: AppMember[] = snap.docs.map(d => ({
+          name: d.data().name || d.id,
+          nickname: d.data().nickname || '',
+        }));
+        setAppMembers(list);
+      } catch (error) {
+        console.error('멤버 목록 로딩 실패:', error);
+      }
+    };
+    fetchAppMembers();
   }, []);
 
-  // 총액 변경 시 균등 분배
-  const handleTotalChange = (value: number) => {
-    setTotalAmount(value);
-    if (members.length > 0 && value > 0) {
-      const perPerson = Math.floor(value / members.length);
-      const remainder = value - perPerson * members.length;
-      setMembers(prev => prev.map((m, i) => ({
-        ...m,
-        amount: i === 0 ? perPerson + remainder : perPerson, // 첫번째에 나머지 추가
-      })));
-    }
-  };
-
-  // 인원 추가/삭제 시 균등 재분배
-  const redistributeAmounts = (newMembers: Member[]) => {
-    if (totalAmount <= 0 || newMembers.length === 0) return newMembers;
-    const perPerson = Math.floor(totalAmount / newMembers.length);
-    const remainder = totalAmount - perPerson * newMembers.length;
-    return newMembers.map((m, i) => ({
+  // 균등 분배
+  const redistribute = (list: Member[], total: number) => {
+    if (list.length === 0 || total <= 0) return list;
+    const perPerson = Math.floor(total / list.length);
+    const remainder = total - perPerson * list.length;
+    return list.map((m, i) => ({
       ...m,
       amount: i === 0 ? perPerson + remainder : perPerson,
     }));
   };
 
-  const addMember = () => {
-    const newMembers = redistributeAmounts([...members, { name: '', nickname: '', amount: 0 }]);
-    setMembers(newMembers);
+  const handleTotalChange = (value: number) => {
+    setTotalAmount(value);
+    setMembers(prev => redistribute(prev, value));
   };
 
-  const removeMember = (index: number) => {
-    if (members.length <= 1) return;
-    const newMembers = redistributeAmounts(members.filter((_, i) => i !== index));
-    setMembers(newMembers);
+  // 멤버 선택/해제
+  const toggleAppMember = (appMember: AppMember) => {
+    const exists = members.some(m => m.name === appMember.name);
+    let newMembers: Member[];
+    if (exists) {
+      if (appMember.name === myName) return; // 본인은 제거 불가
+      newMembers = members.filter(m => m.name !== appMember.name);
+    } else {
+      newMembers = [...members, { name: appMember.name, nickname: appMember.nickname, amount: 0 }];
+    }
+    setMembers(redistribute(newMembers, totalAmount));
   };
 
-  const updateMember = (index: number, field: keyof Member, value: string | number) => {
-    setMembers(prev => prev.map((m, i) => i === index ? { ...m, [field]: value } : m));
-  };
-
-  // 금액 수동 수정 시 나머지 자동 조정
   const updateAmount = (index: number, value: number) => {
     const newMembers = [...members];
     newMembers[index] = { ...newMembers[index], amount: value };
-
-    // 수정된 금액들의 합
-    const fixedTotal = newMembers.reduce((sum, m) => sum + m.amount, 0);
-    const diff = totalAmount - fixedTotal;
-
-    // 차이가 있으면 첫 번째 멤버에 반영
-    if (diff !== 0 && index !== 0) {
-      newMembers[0] = { ...newMembers[0], amount: newMembers[0].amount + diff };
-    }
-
     setMembers(newMembers);
   };
 
   const totalAssigned = members.reduce((sum, m) => sum + m.amount, 0);
-  const isBalanced = totalAssigned === totalAmount;
+  const isBalanced = totalAmount === 0 || totalAssigned === totalAmount;
 
   const handleKakaoShare = async () => {
     if (totalAmount <= 0) return alert('금액을 입력해주세요!');
-    if (members.some(m => !m.name.trim())) return alert('모든 멤버 이름을 입력해주세요!');
+    if (members.length < 2) return alert('멤버를 1명 이상 추가해주세요!');
     if (!isBalanced) return alert(`금액 합계가 맞지 않아요!\n총액: ${totalAmount.toLocaleString()}원\n배분: ${totalAssigned.toLocaleString()}원`);
 
-    // 계좌번호 저장
     if (accountNumber) localStorage.setItem('settlement_account', accountNumber);
 
     try {
@@ -108,20 +113,19 @@ export default function SettlementPage() {
         memo: memo || '모임 비용',
         playerCount: members.length,
         perPerson: Math.floor(totalAmount / members.length),
-        members: members,
+        members,
         accountNumber,
         status: 'pending',
         createdAt: serverTimestamp()
       });
 
-      // 카카오 공유 메시지 생성
-      const memberLines = members
-        .filter(m => m.name !== myName) // 본인 제외
+      const otherMembers = members.filter(m => m.name !== myName);
+      const memberLines = otherMembers
         .map(m => `• ${m.nickname || m.name}: ${m.amount.toLocaleString()}원`)
         .join('\n');
-
-      const myMember = members.find(m => m.name === myName);
-      const accountLine = accountNumber ? `\n💳 계좌: ${accountNumber} (${myNickname || myName})` : '';
+      const accountLine = accountNumber
+        ? `\n💳 계좌: ${accountNumber} (${myNickname || myName})`
+        : '';
 
       const title = '⛳ WDG 라운딩 정산 요청';
       const description = [
@@ -172,10 +176,9 @@ export default function SettlementPage() {
               placeholder="예: 그늘집 및 저녁 식사"
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-green-500 font-medium text-sm"
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-green-500 text-sm"
             />
           </div>
-
           <div>
             <label className="text-xs font-bold text-gray-400 block mb-2">총 결제 금액 (원)</label>
             <input
@@ -186,7 +189,6 @@ export default function SettlementPage() {
               className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-green-500 text-xl font-black"
             />
           </div>
-
           <div>
             <label className="text-xs font-bold text-gray-400 block mb-2">입금받을 계좌번호</label>
             <input
@@ -194,83 +196,78 @@ export default function SettlementPage() {
               placeholder="예: 카카오뱅크 1234-56-789012"
               value={accountNumber}
               onChange={(e) => setAccountNumber(e.target.value)}
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-green-500 text-sm font-medium"
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-green-500 text-sm"
             />
           </div>
         </div>
 
-        {/* 멤버별 금액 */}
+        {/* ✅ 멤버 선택 */}
         <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
           <div className="flex justify-between items-center mb-4">
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">멤버별 금액</label>
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">
+              참여 멤버 ({members.length}명)
+            </label>
             <button
-              onClick={addMember}
+              onClick={() => setShowMemberPicker(true)}
               className="text-xs font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-full border border-green-100"
             >
-              + 멤버 추가
+              + 멤버 선택
             </button>
           </div>
 
-          <div className="space-y-3">
-            {members.map((member, index) => (
-              <div key={index} className="bg-gray-50 rounded-2xl p-3 space-y-2">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    placeholder="이름"
-                    value={member.name}
-                    onChange={(e) => updateMember(index, 'name', e.target.value)}
-                    className="flex-1 bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-green-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="닉네임(선택)"
-                    value={member.nickname}
-                    onChange={(e) => updateMember(index, 'nickname', e.target.value)}
-                    className="flex-1 bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-green-500"
-                  />
-                  {members.length > 1 && (
-                    <button
-                      onClick={() => removeMember(index)}
-                      className="text-gray-300 hover:text-red-400 text-xl font-bold px-1"
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 relative">
+          {members.length === 0 ? (
+            <p className="text-center text-gray-400 text-sm py-4">멤버를 추가해주세요</p>
+          ) : (
+            <div className="space-y-2">
+              {members.map((member, index) => (
+                <div key={index} className="flex items-center gap-3 bg-gray-50 p-3 rounded-2xl">
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-gray-800">
+                      {member.nickname || member.name}
+                      {member.name === myName && <span className="ml-1 text-[10px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">나</span>}
+                    </p>
+                    {member.nickname && <p className="text-[10px] text-gray-400">{member.name}</p>}
+                  </div>
+                  <div className="flex items-center gap-1">
                     <input
                       type="number"
                       value={member.amount || ''}
                       onChange={(e) => updateAmount(index, Number(e.target.value))}
-                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-black text-green-700 focus:ring-2 focus:ring-green-500"
+                      className="w-24 bg-white border border-gray-200 rounded-xl px-2 py-1.5 text-sm font-black text-green-700 text-right focus:ring-2 focus:ring-green-500"
                     />
+                    <span className="text-gray-400 text-xs">원</span>
                   </div>
-                  <span className="text-gray-400 text-sm font-bold">원</span>
-                  <button
-                    onClick={() => {
-                      // 균등 재분배
-                      const newMembers = redistributeAmounts(members);
-                      setMembers(newMembers);
-                    }}
-                    className="text-[10px] text-gray-400 bg-gray-100 px-2 py-1.5 rounded-lg font-bold whitespace-nowrap"
-                  >
-                    균등
-                  </button>
+                  {member.name !== myName && (
+                    <button
+                      onClick={() => {
+                        const newMembers = redistribute(members.filter(m => m.name !== member.name), totalAmount);
+                        setMembers(newMembers);
+                      }}
+                      className="text-gray-300 hover:text-red-400 text-lg font-bold"
+                    >×</button>
+                  )}
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+
+              {/* 균등 분배 버튼 */}
+              <button
+                onClick={() => setMembers(redistribute(members, totalAmount))}
+                className="w-full py-2 bg-gray-100 rounded-xl text-xs font-bold text-gray-500 mt-2"
+              >
+                🔄 균등 재분배
+              </button>
+            </div>
+          )}
 
           {/* 합계 확인 */}
-          <div className={`mt-3 p-3 rounded-xl text-[12px] font-bold text-center ${
-            isBalanced ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'
-          }`}>
-            배분 합계: {totalAssigned.toLocaleString()}원 / 총액: {totalAmount.toLocaleString()}원
-            {!isBalanced && ` (${(totalAmount - totalAssigned) > 0 ? '+' : ''}${(totalAmount - totalAssigned).toLocaleString()}원)`}
-          </div>
+          {totalAmount > 0 && (
+            <div className={`mt-3 p-3 rounded-xl text-[12px] font-bold text-center ${
+              isBalanced ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'
+            }`}>
+              배분 합계: {totalAssigned.toLocaleString()}원 / 총액: {totalAmount.toLocaleString()}원
+              {!isBalanced && ` (${(totalAmount - totalAssigned) > 0 ? '+' : ''}${(totalAmount - totalAssigned).toLocaleString()}원)`}
+            </div>
+          )}
         </div>
 
         {/* 카톡 공유 버튼 */}
@@ -285,6 +282,60 @@ export default function SettlementPage() {
           공유 시 미정산 상태로 기록되며 마이페이지에 합산됩니다.
         </p>
       </div>
+
+      {/* ✅ 멤버 선택 바텀시트 */}
+      {showMemberPicker && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center">
+          <div className="w-full max-w-md bg-white rounded-t-[32px] flex flex-col" style={{ maxHeight: '70vh' }}>
+            <div className="px-6 pt-6 pb-4 shrink-0">
+              <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-4" />
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-black">멤버 선택</h3>
+                <button
+                  onClick={() => setShowMemberPicker(false)}
+                  className="text-sm font-bold text-green-600 bg-green-50 px-4 py-2 rounded-xl"
+                >
+                  완료
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1">선택한 멤버가 정산에 포함됩니다</p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 pb-8">
+              <div className="space-y-2">
+                {appMembers.map((appMember, i) => {
+                  const isSelected = members.some(m => m.name === appMember.name);
+                  const isMe = appMember.name === myName;
+                  return (
+                    <div
+                      key={i}
+                      onClick={() => !isMe && toggleAppMember(appMember)}
+                      className={`flex items-center gap-3 p-4 rounded-2xl border transition-all ${
+                        isSelected
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-gray-50 border-gray-100'
+                      } ${isMe ? 'cursor-default' : 'cursor-pointer active:scale-[0.98]'}`}
+                    >
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                        isSelected ? 'bg-green-600 border-green-600' : 'border-gray-300'
+                      }`}>
+                        {isSelected && <span className="text-white text-xs font-black">✓</span>}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-bold text-gray-800 text-sm">
+                          {appMember.nickname || appMember.name}
+                          {isMe && <span className="ml-1 text-[10px] text-green-600 bg-green-100 px-1.5 py-0.5 rounded-full">나</span>}
+                        </p>
+                        {appMember.nickname && <p className="text-[10px] text-gray-400">{appMember.name}</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
