@@ -31,10 +31,14 @@ export default function MembersPage() {
         // 관리자 목록
         const adminNames = new Set(adminsSnap.docs.map(d => d.id));
 
-        // 벙개별 참여자 카운트
+        // ✅ 벙개별 참여자 카운트 (올해 기준)
+        const currentYear = new Date().getFullYear().toString();
         const meetupCountMap: Record<string, number> = {};
         meetupsSnap.forEach((d) => {
-          const participants = d.data().participants || [];
+          const data = d.data();
+          // 올해 벙개만 카운트
+          if (!data.date || !data.date.startsWith(currentYear)) return;
+          const participants = data.participants || [];
           participants.forEach((p: any) => {
             const name = p.name || '';
             meetupCountMap[name] = (meetupCountMap[name] || 0) + 1;
@@ -117,7 +121,7 @@ export default function MembersPage() {
                       🗓 가입 {formatDate(member.joinedAt)}
                     </span>
                     <span className="text-[11px] text-gray-400">
-                      ⛳ 벙개 {member.meetupCount}회
+                      ⛳ 올해 벙개 {member.meetupCount}회
                     </span>
                   </div>
                 </div>
