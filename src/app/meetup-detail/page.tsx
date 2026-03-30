@@ -71,10 +71,40 @@ function MeetupDetailContent() {
       if (isJoined) {
         const updatedParticipants = meetup.participants.filter((p: any) => p.name !== myName);
         await updateDoc(meetupRef, { participants: updatedParticipants });
+
+        // ✅ 참여 취소 시 등록자에게 알림
+        if (meetup.creatorId && meetup.creatorId !== myName) {
+          const displayName = myNickname || myName;
+          await fetch('/api/send-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              toUserName: meetup.creatorId,
+              title: '⛳ 참여 취소 알림',
+              body: `${displayName}님이 "${meetup.title}" 참여를 취소했어요.`,
+              url: `/meetup-detail?id=${meetupId}`,
+            }),
+          });
+        }
         alert('참여가 취소되었습니다. ⛳');
       } else {
         const updatedParticipants = [...(meetup.participants || []), { name: myName, nickname: myNickname }];
         await updateDoc(meetupRef, { participants: updatedParticipants });
+
+        // ✅ 참여 신청 시 등록자에게 알림
+        if (meetup.creatorId && meetup.creatorId !== myName) {
+          const displayName = myNickname || myName;
+          await fetch('/api/send-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              toUserName: meetup.creatorId,
+              title: '⛳ 새 참여자 알림',
+              body: `${displayName}님이 "${meetup.title}"에 참여했어요!`,
+              url: `/meetup-detail?id=${meetupId}`,
+            }),
+          });
+        }
         alert('참여 신청이 완료되었습니다! ⛳');
       }
       window.location.reload();
