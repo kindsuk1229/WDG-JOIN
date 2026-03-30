@@ -235,6 +235,12 @@ export default function Home() {
                         {isFull ? '마감' : '모집중'}
                       </span>
                     </div>
+                    {/* ✅ 그린피 표시 (필드 벙개만) */}
+                    {item.meetupType !== 'screen' && item.greenFee > 0 && (
+                      <p className="text-[11px] text-green-600 font-bold mt-1">
+                        💰 그린피 {item.greenFee.toLocaleString()}원
+                      </p>
+                    )}
                     <div className="mt-3">
                       <div className="flex justify-between text-[11px] text-gray-400 mb-1">
                         <span>참여 현황</span>
