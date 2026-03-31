@@ -53,9 +53,11 @@ export async function GET(req: NextRequest) {
       const [h, m] = timeStr.split(':').map(Number);
       const meetupDateTime = new Date(`${data.date}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
 
-      // 시작시간 + 2시간 이후인지 체크
-      const twoHoursAfter = new Date(meetupDateTime.getTime() + 2 * 60 * 60 * 1000);
-      if (now < twoHoursAfter) continue;
+      // closed(마감)는 12시간, open(미달)은 2시간 기준
+      const hoursAfter = data.status === 'closed'
+        ? new Date(meetupDateTime.getTime() + 12 * 60 * 60 * 1000)
+        : new Date(meetupDateTime.getTime() + 2 * 60 * 60 * 1000);
+      if (now < hoursAfter) continue;
 
       // 정원 확인
       const participants = data.participants || [];
@@ -64,8 +66,8 @@ export async function GET(req: NextRequest) {
         : (data.cartCount || 0) * 4;
       const isFull = participants.length >= maxPlayers;
 
-      if (isFull) {
-        // 정원 찼으면 completed
+      if (isFull || data.status === 'closed') {
+        // 정원 찼거나 마감된 벙개 → completed
         await docSnap.ref.update({ status: 'completed' });
         completedCount++;
       } else {
