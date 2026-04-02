@@ -390,6 +390,27 @@ function MeetupDetailContent() {
             {buttonStyle.text}
           </button>
         </div>
+
+        {/* ✅ 관리자/등록자만 수동 마감 버튼 표시 */}
+        {(isAdmin || meetup?.creatorId === myName) && meetup?.status !== 'closed' && meetup?.status !== 'completed' && meetup?.status !== 'cancelled' && (
+          <button
+            onClick={async () => {
+              if (!window.confirm('벙개를 마감 처리하시겠습니까?')) return;
+              try {
+                const { doc, updateDoc } = await import('firebase/firestore');
+                const { db } = await import('@/lib/firebase');
+                await updateDoc(doc(db, 'meetups', meetupId!), { status: 'closed' });
+                alert('벙개가 마감 처리되었습니다! ⛳');
+                window.location.reload();
+              } catch (error) {
+                alert('처리 중 오류가 발생했습니다.');
+              }
+            }}
+            className="w-full py-3.5 rounded-2xl font-bold text-sm bg-gray-800 text-white active:scale-95 transition-all"
+          >
+            🔒 벙개 수동 마감하기
+          </button>
+        )}
       </div>
     </div>
   );
