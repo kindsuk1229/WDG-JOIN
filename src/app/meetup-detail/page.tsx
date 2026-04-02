@@ -191,7 +191,7 @@ function MeetupDetailContent() {
   const handleManualClose = async () => {
     if (!window.confirm('벙개를 마감 처리하시겠습니까?\n정원 미달이어도 진행하는 경우 사용하세요.')) return;
     try {
-      await updateDoc(doc(db, 'meetups', meetupId!), { status: 'closed' });
+      await updateDoc(doc(db, 'meetups', meetupId!), { status: 'manually_closed' });
       alert('벙개가 마감 처리되었습니다! ⛳');
       window.location.reload();
     } catch (error) {
@@ -403,7 +403,7 @@ function MeetupDetailContent() {
         </div>
 
         {/* ✅ 관리자/등록자만 수동 마감 버튼 표시 */}
-        {(isAdmin || meetup?.creatorId === myName) && meetup?.status !== 'closed' && meetup?.status !== 'completed' && meetup?.status !== 'cancelled' && (
+        {(isAdmin || meetup?.creatorId === myName) && meetup?.status !== 'closed' && meetup?.status !== 'manually_closed' && meetup?.status !== 'completed' && meetup?.status !== 'cancelled' && (
           <button
             onClick={handleManualClose}
             className="w-full py-3.5 rounded-2xl font-bold text-sm bg-gray-800 text-white active:scale-95 transition-all"

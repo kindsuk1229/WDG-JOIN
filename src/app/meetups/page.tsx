@@ -29,7 +29,7 @@ export default function MeetupsPage() {
 
   const filtered = meetups.filter(m => {
     // ✅ cancelled, completed 제외
-    if (m.status === 'cancelled' || m.status === 'completed') return false;
+    if (m.status === 'cancelled' || m.status === 'completed' || m.status === 'closed' || m.status === 'manually_closed') return false;
     if (filter === 'all') return true;
     if (filter === 'field') return m.meetupType !== 'screen';
     if (filter === 'screen') return m.meetupType === 'screen';

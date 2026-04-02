@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
 
       // 이미 처리된 것 제외
       if (data.status === 'completed' || data.status === 'cancelled') continue;
+      // manually_closed 도 처리 대상
 
       // 날짜 + 시작 시간 파싱
       if (!data.date) continue;
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
       const [h, m] = timeStr.split(':').map(Number);
       const meetupDateTime = new Date(`${data.date}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
 
-      // closed(마감)는 12시간, open(미달)은 2시간 기준
+      // closed(마감)는 12시간, manually_closed/open(미달)은 2시간 기준
       const hoursAfter = data.status === 'closed'
         ? new Date(meetupDateTime.getTime() + 12 * 60 * 60 * 1000)
         : new Date(meetupDateTime.getTime() + 2 * 60 * 60 * 1000);
@@ -66,7 +67,7 @@ export async function GET(req: NextRequest) {
         : (data.cartCount || 0) * 4;
       const isFull = participants.length >= maxPlayers;
 
-      if (isFull || data.status === 'closed') {
+      if (isFull || data.status === 'closed' || data.status === 'manually_closed') {
         // 정원 찼거나 마감된 벙개 → completed
         await docSnap.ref.update({ status: 'completed' });
         completedCount++;

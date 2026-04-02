@@ -83,7 +83,7 @@ export default function Home() {
         // ✅ cancelled, completed 제외
         const data = querySnapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter((m: any) => m.status !== 'cancelled' && m.status !== 'completed');
+          .filter((m: any) => m.status !== 'cancelled' && m.status !== 'completed' && m.status !== 'closed' && m.status !== 'manually_closed');
         setMeetups(data);
       } catch (error) {
         console.error("데이터 로딩 실패:", error);
