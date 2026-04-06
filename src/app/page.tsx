@@ -78,12 +78,22 @@ export default function Home() {
 
     const fetchMeetups = async () => {
       try {
-        const q = query(collection(db, "meetups"), orderBy("createdAt", "desc"), limit(3));
+        // ✅ 더 많이 가져와서 필터링 후 3개만 표시
+        const q = query(collection(db, "meetups"), orderBy("createdAt", "desc"), limit(20));
         const querySnapshot = await getDocs(q);
-        // ✅ cancelled, completed 제외
         const data = querySnapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter((m: any) => m.status !== 'cancelled' && m.status !== 'completed' && m.status !== 'closed' && m.status !== 'manually_closed');
+          .filter((m: any) => {
+            if (m.status === 'cancelled' || m.status === 'completed' || m.status === 'manually_closed') return false;
+            // closed(마감)는 시작시간 이후에 안 보이게
+            if (m.status === 'closed') {
+              const timeStr = m.cartTimes?.[0] || '00:00';
+              const meetupDateTime = new Date(`${m.date}T${timeStr}:00`);
+              return new Date() < meetupDateTime;
+            }
+            return true;
+          })
+          .slice(0, 3);
         setMeetups(data);
       } catch (error) {
         console.error("데이터 로딩 실패:", error);

@@ -29,7 +29,13 @@ export default function MeetupsPage() {
 
   const filtered = meetups.filter(m => {
     // ✅ cancelled, completed 제외
-    if (m.status === 'cancelled' || m.status === 'completed' || m.status === 'closed' || m.status === 'manually_closed') return false;
+    if (m.status === 'cancelled' || m.status === 'completed' || m.status === 'manually_closed') return false;
+    // closed(마감)는 시작시간 이후에 안 보이게
+    if (m.status === 'closed') {
+      const timeStr = m.cartTimes?.[0] || '00:00';
+      const meetupDateTime = new Date(`${m.date}T${timeStr}:00`);
+      return new Date() < meetupDateTime;
+    }
     if (filter === 'all') return true;
     if (filter === 'field') return m.meetupType !== 'screen';
     if (filter === 'screen') return m.meetupType === 'screen';
