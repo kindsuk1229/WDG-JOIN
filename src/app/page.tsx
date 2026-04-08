@@ -19,7 +19,7 @@ export default function Home() {
   const [isEditingNotice, setIsEditingNotice] = useState(false);
   const [tempNotice, setTempNotice] = useState('');
   const [savingNotice, setSavingNotice] = useState(false);
-  const [showInstallGuide, setShowInstallGuide] = useState(false);
+
 
   useEffect(() => {
     const status = localStorage.getItem('isLoggedIn');
@@ -64,11 +64,7 @@ export default function Home() {
       };
       syncUserFromFirebase();
 
-      const installGuideShown = localStorage.getItem('installGuideShown');
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-      if (!installGuideShown && !isStandalone) {
-        setTimeout(() => setShowInstallGuide(true), 1000);
-      }
+
     }
     setCheckingAuth(false);
 
@@ -108,9 +104,7 @@ export default function Home() {
 
   const handleLogout = () => {
     if (window.confirm('로그아웃 하시겠습니까?')) {
-      const installGuideShown = localStorage.getItem('installGuideShown');
       localStorage.clear();
-      if (installGuideShown) localStorage.setItem('installGuideShown', installGuideShown);
       window.location.reload();
     }
   };
@@ -131,10 +125,7 @@ export default function Home() {
     }
   };
 
-  const handleInstallGuideClose = (confirmed: boolean) => {
-    setShowInstallGuide(false);
-    if (confirmed) localStorage.setItem('installGuideShown', 'true');
-  };
+
 
   if (checkingAuth) {
     return <div className="flex items-center justify-center min-h-screen">로딩 중...</div>;
@@ -319,54 +310,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* PWA 설치 안내 팝업 */}
-      {showInstallGuide && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center px-5">
-          <div className="w-full max-w-sm bg-white rounded-3xl overflow-hidden shadow-2xl">
-            <div className="bg-green-600 px-6 py-5 flex justify-between items-start">
-              <div>
-                <p className="text-[17px] text-green-200 font-bold mb-1">WDG 우동골</p>
-                <p className="text-lg font-black text-white leading-snug">앱으로 설치하면<br />더 편리해요!</p>
-              </div>
-              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">⛳</div>
-            </div>
-            <div className="px-6 py-5 border-b border-gray-100 space-y-4">
-              {[
-                { icon: '🔔', title: '푸시 알림 수신', desc: '벙개 & 정산 알림을 바로 받아요' },
-                { icon: '⚡', title: '빠른 실행', desc: '홈 화면에서 바로 접속' },
-                { icon: '📶', title: '오프라인 지원', desc: '인터넷 없어도 기본 기능 사용' },
-              ].map((item, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-green-50 rounded-xl flex items-center justify-center text-base flex-shrink-0">{item.icon}</div>
-                  <div>
-                    <p className="text-base font-bold text-gray-800">{item.title}</p>
-                    <p className="text-[17px] text-gray-400">{item.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="px-6 py-4 border-b border-gray-100 space-y-2">
-              <p className="text-[17px] font-bold text-gray-400 uppercase tracking-wide">설치 방법</p>
-              <div className="bg-gray-50 rounded-2xl p-3">
-                <p className="text-[17px] font-bold text-gray-700 mb-1">iPhone (Safari)</p>
-                <p className="text-[16px] text-gray-500 leading-relaxed">① 하단 공유버튼(□↑) 탭<br />② 아래로 스크롤 → "홈 화면에 추가" 선택<br />③ 우측 상단 "추가" 탭</p>
-              </div>
-              <div className="bg-gray-50 rounded-2xl p-3">
-                <p className="text-[17px] font-bold text-gray-700 mb-1">Android (Chrome)</p>
-                <p className="text-[16px] text-gray-500 leading-relaxed">① 우측 상단 메뉴(⋮) 탭<br />② "홈 화면에 추가" 선택<br />③ "추가" 버튼 탭</p>
-              </div>
-            </div>
-            <div className="px-6 py-4 flex gap-2">
-              <button onClick={() => handleInstallGuideClose(false)} className="flex-1 py-3 bg-gray-100 rounded-2xl text-base font-bold text-gray-500 active:scale-95 transition-all">
-                다음에 하기
-              </button>
-              <button onClick={() => handleInstallGuideClose(true)} className="flex-1 py-3 bg-green-600 rounded-2xl text-base font-bold text-white active:scale-95 transition-all">
-                확인 완료
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
