@@ -21,13 +21,37 @@ export default function MyMeetupsPage() {
         const snap = await getDocs(collection(db, "meetups"));
         const allMeetups = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
 
+        const now = new Date();
+
+        // 시간이 지나지 않은 벙개 필터 함수
+        const isActive = (m: any) => {
+          // completed, cancelled는 제외
+          if (m.status === 'completed' || m.status === 'cancelled') return false;
+          // manually_closed는 제외
+          if (m.status === 'manually_closed') return false;
+          // closed는 시작시간 이전까지만
+          if (m.status === 'closed') {
+            const timeStr = m.cartTimes?.[0] || '00:00';
+            const meetupDateTime = new Date(`${m.date}T${timeStr}:00`);
+            return now < meetupDateTime;
+          }
+          // open 상태는 날짜+시간 기준으로 필터
+          if (m.date) {
+            const timeStr = m.cartTimes?.[0] || '23:59';
+            const meetupDateTime = new Date(`${m.date}T${timeStr}:00`);
+            return now < meetupDateTime;
+          }
+          return true;
+        };
+
         // 내가 만든 벙개 (creatorId === 실명)
-        const created = allMeetups.filter(m => m.creatorId === myName);
+        const created = allMeetups.filter(m => m.creatorId === myName && isActive(m));
 
         // 내가 참여한 벙개 (participants 배열에 내 실명 있는 것)
         const joined = allMeetups.filter(m =>
           m.participants?.some((p: any) => p.name === myName) &&
-          m.creatorId !== myName // 내가 만든 건 제외
+          m.creatorId !== myName &&
+          isActive(m)
         );
 
         // 날짜 최신순 정렬
