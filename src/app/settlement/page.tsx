@@ -31,6 +31,8 @@ export default function SettlementPage() {
   // 앱 멤버 목록
   const [appMembers, setAppMembers] = useState<AppMember[]>([]);
   const [showMemberPicker, setShowMemberPicker] = useState(false);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [memberSearch, setMemberSearch] = useState('');
 
   useEffect(() => {
     const name = (localStorage.getItem('user_name') || '').trim();
@@ -335,16 +337,22 @@ export default function SettlementPage() {
           >
             <div className="px-6 pt-6 pb-4 shrink-0">
               <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-4" />
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center mb-3">
                 <h3 className="text-lg font-black">멤버 선택</h3>
                 <button
-                  onClick={() => setShowMemberPicker(false)}
+                  onClick={() => { setShowMemberPicker(false); setMemberSearch(''); }}
                   className="text-base font-bold text-green-600 bg-green-50 px-4 py-2 rounded-xl"
                 >
                   완료
                 </button>
               </div>
-              <p className="text-[17px] text-gray-400 mt-1">선택한 멤버가 정산에 포함됩니다</p>
+              <input
+                type="text"
+                placeholder="이름 또는 닉네임 검색"
+                value={memberSearch}
+                onChange={(e) => setMemberSearch(e.target.value)}
+                className="w-full p-3 bg-gray-100 rounded-xl text-base focus:ring-2 focus:ring-green-500 focus:outline-none"
+              />
             </div>
 
             <div
@@ -352,7 +360,7 @@ export default function SettlementPage() {
               style={{ WebkitOverflowScrolling: 'touch', overflowY: 'auto' }}
             >
               <div className="space-y-2">
-                {appMembers.map((appMember, i) => {
+                {appMembers.filter(m => !memberSearch || m.name.includes(memberSearch) || m.nickname.includes(memberSearch)).map((appMember, i) => {
                   const isSelected = members.some(m => m.name === appMember.name);
                   const isMe = appMember.name === myName;
                   return (
