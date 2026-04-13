@@ -17,7 +17,8 @@ export default function MyPage() {
   const [stats, setStats] = useState({
     totalCount: 0,
     monthlyCount: 0,
-    pendingAmount: 0
+    pendingAmount: 0,
+    owingAmount: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -64,7 +65,20 @@ export default function MyPage() {
           pendingTotal += (totalAmount - perPerson);
         });
 
-        setStats({ totalCount: total, monthlyCount: monthly, pendingAmount: pendingTotal });
+        // ✅ 내가 내야 할 금액 (settlement_members)
+        const owingSnap = await getDocs(
+          query(
+            collection(db, "settlement_members"),
+            where("fromName", "==", savedName),
+            where("status", "==", "pending")
+          )
+        );
+        let owingTotal = 0;
+        owingSnap.forEach((doc) => {
+          owingTotal += doc.data().amount || 0;
+        });
+
+        setStats({ totalCount: total, monthlyCount: monthly, pendingAmount: pendingTotal, owingAmount: owingTotal });
       } catch (error) {
         console.error("데이터 로딩 실패:", error);
       } finally {
@@ -139,15 +153,16 @@ export default function MyPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-2 mb-6">
+        <div className="grid grid-cols-2 gap-2 mb-6">
           {[
-            { label: '참여 벙개', value: loading ? '-' : `${stats.totalCount}회` },
-            { label: '이번 달', value: loading ? '-' : `${stats.monthlyCount}회` },
-            { label: '받아야 할 금액', value: loading ? '-' : `${stats.pendingAmount.toLocaleString()}원` },
+            { label: '참여 벙개', value: loading ? '-' : `${stats.totalCount}회`, color: 'text-gray-800' },
+            { label: '이번 달', value: loading ? '-' : `${stats.monthlyCount}회`, color: 'text-gray-800' },
+            { label: '받아야 할 금액', value: loading ? '-' : `${stats.pendingAmount.toLocaleString()}원`, color: 'text-green-600' },
+            { label: '보내야 할 금액', value: loading ? '-' : `${stats.owingAmount.toLocaleString()}원`, color: 'text-red-500' },
           ].map((s, i) => (
             <div key={i} className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
-              <p className="text-[17px] text-gray-400 font-medium">{s.label}</p>
-              <p className={`text-[17px] font-bold mt-0.5 ${s.label === '받아야 할 금액' ? 'text-green-600' : 'text-gray-800'}`}>
+              <p className="text-[15px] text-gray-400 font-medium">{s.label}</p>
+              <p className={`text-[17px] font-bold mt-0.5 ${s.color}`}>
                 {s.value}
               </p>
             </div>
