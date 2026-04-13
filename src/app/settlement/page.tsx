@@ -32,7 +32,6 @@ export default function SettlementPage() {
   const [appMembers, setAppMembers] = useState<AppMember[]>([]);
   const [showMemberPicker, setShowMemberPicker] = useState(false);
   const [memberSearch, setMemberSearch] = useState('');
-  const [memberSearch, setMemberSearch] = useState('');
 
   useEffect(() => {
     const name = (localStorage.getItem('user_name') || '').trim();
