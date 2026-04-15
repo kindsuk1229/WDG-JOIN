@@ -358,11 +358,44 @@ function MeetupDetailContent() {
               <p className="text-gray-400 text-base py-2">가장 먼저 참여해보세요! ⛳</p>
             ) : (
               participants.map((p: any, idx: number) => (
-                <span key={idx} className={`px-4 py-2 rounded-full text-base font-bold ${
+                <div key={idx} className={`flex items-center gap-1 px-4 py-2 rounded-full text-base font-bold ${
                   p.name === myName ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
                 }`}>
-                  {p.nickname || p.name}
-                </span>
+                  <span>{p.nickname || p.name}</span>
+                  {/* ✅ 등록자/관리자만 강제 취소 가능 (본인 제외) */}
+                  {(isAdmin || meetup?.creatorId === myName) && p.name !== myName && (
+                    <button
+                      onClick={async () => {
+                        if (!window.confirm(`${p.nickname || p.name}님의 참여를 취소하시겠습니까?`)) return;
+                        try {
+                          const updatedParticipants = participants.filter((_: any, i: number) => i !== idx);
+                          const maxPlayers = meetup.meetupType === 'screen'
+                            ? meetup.playerCount
+                            : (meetup.cartCount || 0) * 4;
+                          await updateDoc(doc(db, 'meetups', meetupId!), {
+                            participants: updatedParticipants,
+                            status: updatedParticipants.length >= maxPlayers ? 'closed' : 'open',
+                          });
+                          // 취소된 멤버에게 알림
+                          await fetch('/api/send-notification', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              toUserName: p.name,
+                              title: '⛳ 참여 취소 안내',
+                              body: `"${meetup.title}" 참여가 취소되었습니다.`,
+                              url: `/meetup-detail?id=${meetupId}`,
+                            }),
+                          });
+                          window.location.reload();
+                        } catch (error) {
+                          alert('처리 중 오류가 발생했습니다.');
+                        }
+                      }}
+                      className="ml-1 text-gray-400 hover:text-red-400 font-black text-base"
+                    >×</button>
+                  )}
+                </div>
               ))
             )}
           </div>
@@ -401,6 +434,16 @@ function MeetupDetailContent() {
             {buttonStyle.text}
           </button>
         </div>
+
+        {/* ✅ 필드 벙개만 성적표 버튼 표시 */}
+        {meetup?.meetupType !== 'screen' && (
+          <button
+            onClick={() => router.push(`/scorecard?meetupId=${meetupId}`)}
+            className="w-full py-3.5 rounded-2xl font-bold text-sm bg-blue-600 text-white active:scale-95 transition-all"
+          >
+            📊 성적표 입력/보기
+          </button>
+        )}
 
         {/* ✅ 관리자/등록자만 수동 마감 버튼 표시 */}
         {(isAdmin || meetup?.creatorId === myName) && meetup?.status !== 'closed' && meetup?.status !== 'manually_closed' && meetup?.status !== 'completed' && meetup?.status !== 'cancelled' && (
