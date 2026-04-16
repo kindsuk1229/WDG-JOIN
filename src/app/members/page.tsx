@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, deleteDoc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, getDoc, setDoc } from 'firebase/firestore';
 import { Avatar } from '@/components/UI';
+
+const OWNER_NAME = '김근석'; // 오너 이름 (매니저 지정 권한자)
 
 interface Member {
   name: string;
@@ -12,6 +14,8 @@ interface Member {
   joinedAt: string;
   lastLoginAt: string;
   isAdmin: boolean;
+  isOwner: boolean;
+  role: string; // 'owner' | 'manager' | ''
   meetupCount: number;
 }
 
@@ -20,8 +24,10 @@ export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
   const [myName, setMyName] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [toggling, setToggling] = useState<string | null>(null);
 
   const fetchMembers = async (myNameStr: string) => {
     try {
@@ -29,7 +35,11 @@ export default function MembersPage() {
       const adminsSnap = await getDocs(collection(db, 'admins'));
       const meetupsSnap = await getDocs(collection(db, 'meetups'));
 
-      const adminNames = new Set(adminsSnap.docs.map(d => d.id));
+      // admins 컬렉션에서 role 정보 가져오기
+      const adminMap: Record<string, string> = {};
+      adminsSnap.docs.forEach(d => {
+        adminMap[d.id] = d.data().role || 'manager';
+      });
 
       const currentYear = new Date().getFullYear().toString();
       const meetupCountMap: Record<string, number> = {};
@@ -46,17 +56,23 @@ export default function MembersPage() {
 
       const memberList: Member[] = usersSnap.docs.map((d) => {
         const data = d.data();
+        const name = data.name || d.id;
+        const role = name === OWNER_NAME ? 'owner' : (adminMap[name] || '');
         return {
-          name: data.name || d.id,
+          name,
           nickname: data.nickname || '',
           joinedAt: data.joinedAt || '',
           lastLoginAt: data.lastLoginAt || '',
-          isAdmin: adminNames.has(d.id),
-          meetupCount: meetupCountMap[data.name] || 0,
+          isAdmin: !!adminMap[name] || name === OWNER_NAME,
+          isOwner: name === OWNER_NAME,
+          role,
+          meetupCount: meetupCountMap[name] || 0,
         };
       });
 
       memberList.sort((a, b) => {
+        if (a.isOwner && !b.isOwner) return -1;
+        if (!a.isOwner && b.isOwner) return 1;
         if (a.isAdmin && !b.isAdmin) return -1;
         if (!a.isAdmin && b.isAdmin) return 1;
         return new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime();
@@ -73,11 +89,12 @@ export default function MembersPage() {
   useEffect(() => {
     const name = (localStorage.getItem('user_name') || '').trim();
     setMyName(name);
+    setIsOwner(name === OWNER_NAME);
 
     const checkAdmin = async () => {
       try {
         const adminDoc = await getDoc(doc(db, 'admins', name));
-        setIsAdmin(adminDoc.exists());
+        setIsAdmin(adminDoc.exists() || name === OWNER_NAME);
       } catch (error) {
         console.error('관리자 확인 실패:', error);
       }
@@ -90,9 +107,7 @@ export default function MembersPage() {
     if (!window.confirm(`${member.nickname || member.name}님을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
     setDeleting(member.name);
     try {
-      // users 컬렉션에서 삭제
       await deleteDoc(doc(db, 'users', member.name));
-      // fcm_tokens 에서도 삭제
       await deleteDoc(doc(db, 'fcm_tokens', member.name));
       alert(`${member.nickname || member.name}님이 삭제되었습니다.`);
       fetchMembers(myName);
@@ -103,10 +118,46 @@ export default function MembersPage() {
     }
   };
 
+  // ✅ 매니저 지정/해제 (오너만 가능)
+  const handleToggleManager = async (member: Member) => {
+    if (!isOwner) return;
+    const isManager = member.role === 'manager';
+    const action = isManager ? '해제' : '지정';
+    if (!window.confirm(`${member.nickname || member.name}님을 매니저 ${action}하시겠습니까?`)) return;
+
+    setToggling(member.name);
+    try {
+      if (isManager) {
+        // 매니저 해제
+        await deleteDoc(doc(db, 'admins', member.name));
+        alert(`${member.nickname || member.name}님의 매니저 권한이 해제되었습니다.`);
+      } else {
+        // 매니저 지정
+        await setDoc(doc(db, 'admins', member.name), {
+          role: 'manager',
+          assignedAt: new Date().toISOString(),
+          assignedBy: myName,
+        });
+        alert(`${member.nickname || member.name}님이 매니저로 지정되었습니다!`);
+      }
+      fetchMembers(myName);
+    } catch (error) {
+      alert('처리 중 오류가 발생했습니다.');
+    } finally {
+      setToggling(null);
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '-';
     const d = new Date(dateStr);
     return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  const getRoleBadge = (member: Member) => {
+    if (member.isOwner) return { label: '오너', className: 'bg-yellow-100 text-yellow-700' };
+    if (member.role === 'manager') return { label: '매니저', className: 'bg-blue-100 text-blue-700' };
+    return null;
   };
 
   return (
@@ -127,55 +178,73 @@ export default function MembersPage() {
             <p className="text-gray-400">아직 가입한 멤버가 없어요.</p>
           </div>
         ) : (
-          members.map((member, i) => (
-            <div key={i} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-              <div className="flex items-center gap-4">
-                <Avatar name={member.name} size={48} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-black text-gray-800">
-                      {member.nickname || member.name}
-                    </p>
-                    {member.nickname && (
-                      <p className="text-sm text-gray-400">({member.name})</p>
-                    )}
-                    {member.isAdmin && (
-                      <span className="text-sm bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-black">관리자</span>
-                    )}
+          members.map((member, i) => {
+            const badge = getRoleBadge(member);
+            return (
+              <div key={i} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                <div className="flex items-center gap-4">
+                  <Avatar name={member.name} size={48} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-black text-gray-800">
+                        {member.nickname || member.name}
+                      </p>
+                      {member.nickname && (
+                        <p className="text-sm text-gray-400">({member.name})</p>
+                      )}
+                      {badge && (
+                        <span className={`text-sm px-2 py-0.5 rounded-full font-black ${badge.className}`}>
+                          {badge.label}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                      <span className="text-sm text-gray-400">🗓 가입 {formatDate(member.joinedAt)}</span>
+                      <span className="text-sm text-gray-400">⛳ 올해 벙개 {member.meetupCount}회</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                    <span className="text-sm text-gray-400">
-                      🗓 가입 {formatDate(member.joinedAt)}
-                    </span>
-                    <span className="text-sm text-gray-400">
-                      ⛳ 올해 벙개 {member.meetupCount}회
-                    </span>
+
+                  <div className="flex flex-col gap-1.5">
+                    {/* ✅ 오너만 매니저 지정/해제 가능 (본인 및 오너 제외) */}
+                    {isOwner && !member.isOwner && (
+                      <button
+                        onClick={() => handleToggleManager(member)}
+                        disabled={toggling === member.name}
+                        className={`text-sm font-bold px-3 py-1.5 rounded-lg ${
+                          toggling === member.name
+                            ? 'bg-gray-100 text-gray-400'
+                            : member.role === 'manager'
+                            ? 'bg-blue-50 text-blue-500'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {toggling === member.name ? '처리중' : member.role === 'manager' ? '매니저 해제' : '매니저 지정'}
+                      </button>
+                    )}
+
+                    {/* ✅ 매니저/오너만 삭제 가능 (본인 및 다른 관리자 제외) */}
+                    {isAdmin && member.name !== myName && !member.isAdmin && (
+                      <button
+                        onClick={() => handleDelete(member)}
+                        disabled={deleting === member.name}
+                        className={`text-sm font-bold px-3 py-1.5 rounded-lg ${
+                          deleting === member.name
+                            ? 'bg-gray-100 text-gray-400'
+                            : 'bg-red-50 text-red-500'
+                        }`}
+                      >
+                        {deleting === member.name ? '삭제중' : '삭제'}
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                {/* ✅ 관리자만 삭제 버튼 표시 (본인 및 다른 관리자 제외) */}
-                {isAdmin && member.name !== myName && !member.isAdmin && (
-                  <button
-                    onClick={() => handleDelete(member)}
-                    disabled={deleting === member.name}
-                    className={`text-sm font-bold px-3 py-1.5 rounded-lg flex-shrink-0 ${
-                      deleting === member.name
-                        ? 'bg-gray-100 text-gray-400'
-                        : 'bg-red-50 text-red-500'
-                    }`}
-                  >
-                    {deleting === member.name ? '삭제중' : '삭제'}
-                  </button>
-                )}
+                <div className="mt-3 pt-3 border-t border-gray-50 flex justify-end">
+                  <p className="text-sm text-gray-300">마지막 접속 {formatDate(member.lastLoginAt)}</p>
+                </div>
               </div>
-
-              <div className="mt-3 pt-3 border-t border-gray-50 flex justify-end">
-                <p className="text-sm text-gray-300">
-                  마지막 접속 {formatDate(member.lastLoginAt)}
-                </p>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
