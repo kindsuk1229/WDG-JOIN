@@ -38,12 +38,14 @@ export default function MeetupsPage() {
       // closed(마감)는 시작시간 + 12시간 후 안 보이게
       if (m.status === 'closed') {
         const hideAfter = new Date(meetupDateTime.getTime() + 12 * 60 * 60 * 1000);
-        return now < hideAfter;
+        if (now >= hideAfter) return false;
+      } else {
+        // open은 시작시간 + 2시간 후 안 보이게
+        const hideAfter = new Date(meetupDateTime.getTime() + 2 * 60 * 60 * 1000);
+        if (now >= hideAfter) return false;
       }
-      // open은 시작시간 + 2시간 후 안 보이게
-      const hideAfter = new Date(meetupDateTime.getTime() + 2 * 60 * 60 * 1000);
-      return now < hideAfter;
     }
+    // ✅ 필드/스크린 필터
     if (filter === 'all') return true;
     if (filter === 'field') return m.meetupType !== 'screen';
     if (filter === 'screen') return m.meetupType === 'screen';
