@@ -15,10 +15,13 @@ interface Member {
   lastLoginAt: string;
   isAdmin: boolean;
   isOwner: boolean;
-  role: string; // 'owner' | 'manager' | ''
+  role: string;
   meetupCount: number;
-  seasonScore: number;   // 2달 시즌 점수
-  yearlyScore: number;   // 연간 점수
+  seasonScore: number;
+  yearlyScore: number;
+  avgScore: number;
+  bestScore: number;
+  rounds: number;
 }
 
 export default function MembersPage() {
@@ -91,6 +94,9 @@ export default function MembersPage() {
           meetupCount: meetupCountMap[name] || 0,
           seasonScore: seasonScoreMap[name] || 0,
           yearlyScore: yearlyScoreMap[name] || 0,
+          avgScore: 0,
+          bestScore: 0,
+          rounds: 0,
         };
       });
 
@@ -102,6 +108,29 @@ export default function MembersPage() {
         // 시즌 점수 높은 순
         if (b.seasonScore !== a.seasonScore) return b.seasonScore - a.seasonScore;
         return new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime();
+      });
+
+      // ✅ 성적 통계 불러오기
+      const scoreSnap = await getDocs(collection(db, 'scorecards'));
+      const scoreStatsMap: Record<string, { scores: number[] }> = {};
+      scoreSnap.docs.forEach(d => {
+        const data = d.data();
+        const players = data.players || [];
+        players.forEach((p: any) => {
+          const total = (p.scores || []).reduce((a: number, b: number) => a + b, 0);
+          if (total === 0) return;
+          if (!scoreStatsMap[p.name]) scoreStatsMap[p.name] = { scores: [] };
+          scoreStatsMap[p.name].scores.push(total);
+        });
+      });
+
+      memberList.forEach(m => {
+        const stats = scoreStatsMap[m.name];
+        if (stats && stats.scores.length > 0) {
+          m.rounds = stats.scores.length;
+          m.avgScore = Math.round(stats.scores.reduce((a, b) => a + b, 0) / stats.scores.length);
+          m.bestScore = Math.min(...stats.scores);
+        }
       });
 
       setMembers(memberList);
@@ -229,6 +258,13 @@ export default function MembersPage() {
                       <span className="text-sm font-bold text-blue-500">시즌 {member.seasonScore}점</span>
                       <span className="text-sm font-bold text-green-600">연간 {member.yearlyScore}점</span>
                     </div>
+                    {member.rounds > 0 && (
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <span className="text-sm text-gray-400">🏌️ {member.rounds}라운드</span>
+                        <span className="text-sm font-bold text-purple-500">평균 {member.avgScore}타</span>
+                        <span className="text-sm font-bold text-orange-500">베스트 {member.bestScore}타</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-col gap-1.5">
