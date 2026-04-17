@@ -46,8 +46,9 @@ export default function MyPage() {
           const data = doc.data();
           const isJoined = data.participants?.some((p: any) => p.name === savedName);
           if (isJoined) {
-            total++;
-            if (data.date && data.date.includes(currentMonth)) monthly++;
+            // 전체 참여 카운트 (completed만)
+            if (data.status === 'completed') total++;
+            if (data.date && data.date.includes(currentMonth) && data.status === 'completed') monthly++;
           }
         });
 
@@ -94,7 +95,8 @@ export default function MyPage() {
         meetupSnap.forEach((d) => {
           const data = d.data();
           if (!data.date || !data.date.startsWith(scoreYear)) return;
-          if (data.status === 'cancelled') return;
+          // ✅ completed 상태만 점수 카운트
+          if (data.status !== 'completed') return;
           const isJoined = data.participants?.some((p: any) => p.name === savedName);
           if (!isJoined) return;
           if (data.meetupType === 'etc' || data.isEtc) return; // 기타벙 점수 제외

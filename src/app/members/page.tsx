@@ -58,7 +58,8 @@ export default function MembersPage() {
       meetupsSnap.forEach((d) => {
         const data = d.data();
         if (!data.date || !data.date.startsWith(currentYear)) return;
-        if (data.status === 'cancelled') return;
+        // ✅ completed 상태만 카운트
+        if (data.status !== 'completed') return;
         if (data.meetupType === 'etc' || data.isEtc) return; // 기타벙 점수 제외
         const isField = data.meetupType === 'field';
         const point = isField ? 2 : 1;
