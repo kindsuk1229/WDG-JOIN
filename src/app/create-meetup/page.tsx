@@ -383,7 +383,8 @@ function CreateMeetupContent() {
               </div>
             </div>
           )}
-        {/* 기타벙 설정 */}
+
+          {/* 기타벙 설정 */}
           {meetupType === 'etc' && (
             <div className="bg-white p-6 rounded-3xl shadow-sm space-y-5 border border-gray-100">
               <div>
