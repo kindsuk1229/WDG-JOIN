@@ -70,7 +70,7 @@ function MeetupDetailContent() {
 
     const participants = meetup.participants || [];
     const waitlist = meetup.waitlist || [];
-    const maxPlayers = meetup.meetupType === 'screen'
+    const maxPlayers = meetup.meetupType === 'screen' || meetup.meetupType === 'etc'
       ? meetup.playerCount
       : (meetup.cartCount || 0) * 4;
 
@@ -236,7 +236,7 @@ function MeetupDetailContent() {
   const isJoined = participants.some((p: any) => p.name === myName);
   const isWaiting = waitlist.some((p: any) => p.name === myName);
   const isParticipant = isJoined;
-  const maxPlayers = meetup.meetupType === 'screen' ? meetup.playerCount : (meetup.cartCount || 0) * 4;
+  const maxPlayers = (meetup.meetupType === 'screen' || meetup.meetupType === 'etc') ? meetup.playerCount : (meetup.cartCount || 0) * 4;
   const isFull = participants.length >= maxPlayers;
 
   const formatTime = (timeStr: string) => {
@@ -373,7 +373,7 @@ function MeetupDetailContent() {
                         if (!window.confirm(`${p.nickname || p.name}님의 참여를 취소하시겠습니까?`)) return;
                         try {
                           const updatedParticipants = participants.filter((_: any, i: number) => i !== idx);
-                          const maxPlayers = meetup.meetupType === 'screen'
+                          const maxPlayers = meetup.meetupType === 'screen' || meetup.meetupType === 'etc'
                             ? meetup.playerCount
                             : (meetup.cartCount || 0) * 4;
                           await updateDoc(doc(db, 'meetups', meetupId!), {
