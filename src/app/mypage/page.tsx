@@ -19,6 +19,8 @@ export default function MyPage() {
     monthlyCount: 0,
     pendingAmount: 0,
     owingAmount: 0,
+    seasonScore: 0,
+    yearlyScore: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -78,7 +80,31 @@ export default function MyPage() {
           owingTotal += doc.data().amount || 0;
         });
 
-        setStats({ totalCount: total, monthlyCount: monthly, pendingAmount: pendingTotal, owingAmount: owingTotal });
+        // ✅ 시즌/연간 점수 계산
+        const nowDate = new Date();
+        const currentYear = nowDate.getFullYear().toString();
+        const currentMonth = nowDate.getMonth() + 1;
+        const seasonStartMonth = Math.floor((currentMonth - 1) / 2) * 2 + 1;
+        const seasonStart = `${currentYear}-${String(seasonStartMonth).padStart(2, '0')}`;
+        const seasonEnd = `${currentYear}-${String(seasonStartMonth + 1).padStart(2, '0')}`;
+
+        let seasonScore = 0;
+        let yearlyScore = 0;
+
+        meetupSnap.forEach((d) => {
+          const data = d.data();
+          if (!data.date || !data.date.startsWith(currentYear)) return;
+          if (data.status === 'cancelled') return;
+          const isJoined = data.participants?.some((p: any) => p.name === savedName);
+          if (!isJoined) return;
+          const point = data.meetupType !== 'screen' ? 2 : 1;
+          yearlyScore += point;
+          if (data.date >= seasonStart && data.date <= `${seasonEnd}-31`) {
+            seasonScore += point;
+          }
+        });
+
+        setStats({ totalCount: total, monthlyCount: monthly, pendingAmount: pendingTotal, owingAmount: owingTotal, seasonScore, yearlyScore });
       } catch (error) {
         console.error("데이터 로딩 실패:", error);
       } finally {
@@ -157,6 +183,8 @@ export default function MyPage() {
           {[
             { label: '참여 벙개', value: loading ? '-' : `${stats.totalCount}회`, color: 'text-gray-800' },
             { label: '이번 달', value: loading ? '-' : `${stats.monthlyCount}회`, color: 'text-gray-800' },
+            { label: '시즌 점수', value: loading ? '-' : `${stats.seasonScore}점`, color: 'text-blue-500' },
+            { label: '연간 점수', value: loading ? '-' : `${stats.yearlyScore}점`, color: 'text-green-600' },
             { label: '받아야 할 금액', value: loading ? '-' : `${stats.pendingAmount.toLocaleString()}원`, color: 'text-green-600' },
             { label: '보내야 할 금액', value: loading ? '-' : `${stats.owingAmount.toLocaleString()}원`, color: 'text-red-500' },
           ].map((s, i) => (

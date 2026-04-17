@@ -17,6 +17,8 @@ interface Member {
   isOwner: boolean;
   role: string; // 'owner' | 'manager' | ''
   meetupCount: number;
+  seasonScore: number;   // 2달 시즌 점수
+  yearlyScore: number;   // 연간 점수
 }
 
 export default function MembersPage() {
@@ -42,15 +44,33 @@ export default function MembersPage() {
       });
 
       const currentYear = new Date().getFullYear().toString();
+      const now = new Date();
+      const currentMonth = now.getMonth() + 1; // 1~12
+      // 2달 시즌 계산 (1~2월, 3~4월, 5~6월, 7~8월, 9~10월, 11~12월)
+      const seasonStartMonth = Math.floor((currentMonth - 1) / 2) * 2 + 1;
+      const seasonStart = `${currentYear}-${String(seasonStartMonth).padStart(2, '0')}`;
+      const seasonEnd = `${currentYear}-${String(seasonStartMonth + 1).padStart(2, '0')}`;
+
       const meetupCountMap: Record<string, number> = {};
+      const seasonScoreMap: Record<string, number> = {};
+      const yearlyScoreMap: Record<string, number> = {};
+
       meetupsSnap.forEach((d) => {
         const data = d.data();
         if (!data.date || !data.date.startsWith(currentYear)) return;
         if (data.status === 'cancelled') return;
+        const isField = data.meetupType !== 'screen';
+        const point = isField ? 2 : 1;
+        const isInSeason = data.date >= seasonStart && data.date <= `${seasonEnd}-31`;
+
         const participants = data.participants || [];
         participants.forEach((p: any) => {
           const name = p.name || '';
           meetupCountMap[name] = (meetupCountMap[name] || 0) + 1;
+          yearlyScoreMap[name] = (yearlyScoreMap[name] || 0) + point;
+          if (isInSeason) {
+            seasonScoreMap[name] = (seasonScoreMap[name] || 0) + point;
+          }
         });
       });
 
@@ -67,6 +87,8 @@ export default function MembersPage() {
           isOwner: name === OWNER_NAME,
           role,
           meetupCount: meetupCountMap[name] || 0,
+          seasonScore: seasonScoreMap[name] || 0,
+          yearlyScore: yearlyScoreMap[name] || 0,
         };
       });
 
@@ -75,6 +97,8 @@ export default function MembersPage() {
         if (!a.isOwner && b.isOwner) return 1;
         if (a.isAdmin && !b.isAdmin) return -1;
         if (!a.isAdmin && b.isAdmin) return 1;
+        // 시즌 점수 높은 순
+        if (b.seasonScore !== a.seasonScore) return b.seasonScore - a.seasonScore;
         return new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime();
       });
 
@@ -198,9 +222,10 @@ export default function MembersPage() {
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                      <span className="text-sm text-gray-400">🗓 가입 {formatDate(member.joinedAt)}</span>
-                      <span className="text-sm text-gray-400">⛳ 올해 벙개 {member.meetupCount}회</span>
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <span className="text-sm text-gray-400">⛳ {member.meetupCount}회</span>
+                      <span className="text-sm font-bold text-blue-500">시즌 {member.seasonScore}점</span>
+                      <span className="text-sm font-bold text-green-600">연간 {member.yearlyScore}점</span>
                     </div>
                   </div>
 
