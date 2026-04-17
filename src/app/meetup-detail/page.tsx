@@ -241,6 +241,7 @@ function MeetupDetailContent() {
 
   const formatTime = (timeStr: string) => {
     if (!timeStr) return '';
+    if (timeStr === 'TBD') return '시간 미정';
     const [h, m] = timeStr.split(':').map(Number);
     const isPM = h >= 12;
     const hour12 = h % 12 || 12;

@@ -322,7 +322,20 @@ function CreateMeetupContent() {
                   {cartTimes.map((time, index) => (
                     <div key={index} className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
                       <span className="text-[11px] font-black text-green-700 w-10 text-center flex-shrink-0">{index + 1}조</span>
-                      <TimeInput value={time} onChange={(v) => updateCartTime(index, v)} />
+                      {time === 'TBD' ? (
+                        <span className="flex-1 text-sm font-bold text-orange-500">시간 미정</span>
+                      ) : (
+                        <TimeInput value={time} onChange={(v) => updateCartTime(index, v)} />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => updateCartTime(index, time === 'TBD' ? '07:00' : 'TBD')}
+                        className={`text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0 ${
+                          time === 'TBD' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-400'
+                        }`}
+                      >
+                        {time === 'TBD' ? '시간입력' : '미정'}
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -337,7 +350,20 @@ function CreateMeetupContent() {
                 <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">시작 시간</label>
                 <div className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
                   <span className="text-[11px] font-black text-green-700 flex-shrink-0">시작</span>
-                  <TimeInput value={cartTimes[0] || '07:00'} onChange={(v) => setCartTimes([v])} />
+                  {cartTimes[0] === 'TBD' ? (
+                    <span className="flex-1 text-sm font-bold text-orange-500">시간 미정</span>
+                  ) : (
+                    <TimeInput value={cartTimes[0] || '07:00'} onChange={(v) => setCartTimes([v])} />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setCartTimes([cartTimes[0] === 'TBD' ? '07:00' : 'TBD'])}
+                    className={`text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0 ${
+                      cartTimes[0] === 'TBD' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-400'
+                    }`}
+                  >
+                    {cartTimes[0] === 'TBD' ? '시간입력' : '미정'}
+                  </button>
                 </div>
               </div>
               <div>
@@ -372,7 +398,20 @@ function CreateMeetupContent() {
                 <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">시작 시간</label>
                 <div className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
                   <span className="text-[11px] font-black text-green-700 flex-shrink-0">시작</span>
-                  <TimeInput value={cartTimes[0] || '19:00'} onChange={(v) => setCartTimes([v])} />
+                  {cartTimes[0] === 'TBD' ? (
+                    <span className="flex-1 text-sm font-bold text-orange-500">시간 미정</span>
+                  ) : (
+                    <TimeInput value={cartTimes[0] || '19:00'} onChange={(v) => setCartTimes([v])} />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setCartTimes([cartTimes[0] === 'TBD' ? '19:00' : 'TBD'])}
+                    className={`text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0 ${
+                      cartTimes[0] === 'TBD' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-400'
+                    }`}
+                  >
+                    {cartTimes[0] === 'TBD' ? '시간입력' : '미정'}
+                  </button>
                 </div>
               </div>
               <div>
