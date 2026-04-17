@@ -96,7 +96,7 @@ export default function MeetupsPage() {
         ) : (
           filtered.map((item) => {
             const participants = item.participants || [];
-            const maxPlayers = item.meetupType === 'screen'
+            const maxPlayers = (item.meetupType === 'screen' || item.meetupType === 'etc')
               ? item.playerCount
               : (item.cartCount || 0) * 4;
             const isFull = participants.length >= maxPlayers;
@@ -130,7 +130,7 @@ export default function MeetupsPage() {
                 <div className="space-y-1.5 text-base text-gray-500 mb-3">
                   <p>📍 {item.golfCourse}</p>
                   <p>📅 {formatDate(item.date)}</p>
-                  {item.meetupType === 'screen' ? (
+                  {item.meetupType === 'screen' || item.meetupType === 'etc' ? (
                     <p>👥 {item.playerCount}명 모집</p>
                   ) : (
                     <p>🛒 {item.cartCount}카트 ({item.cartCount * 4}명 정원)</p>

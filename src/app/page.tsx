@@ -229,7 +229,7 @@ export default function Home() {
             ) : (
               meetups.map((item) => {
                 const participants = item.participants || [];
-                const maxPlayers = item.meetupType === 'screen'
+                const maxPlayers = (item.meetupType === 'screen' || item.meetupType === 'etc')
                   ? item.playerCount
                   : (item.cartCount || 0) * 4;
                 const isFull = participants.length >= maxPlayers;

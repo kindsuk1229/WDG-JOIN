@@ -440,7 +440,7 @@ function MeetupDetailContent() {
         </div>
 
         {/* ✅ 필드 벙개만 성적표 버튼 표시 */}
-        {meetup?.meetupType !== 'screen' && (
+        {meetup?.meetupType === 'field' && (
           <button
             onClick={() => router.push(`/scorecard?meetupId=${meetupId}`)}
             className="w-full py-3.5 rounded-2xl font-bold text-sm bg-blue-600 text-white active:scale-95 transition-all"
