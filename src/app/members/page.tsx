@@ -59,7 +59,8 @@ export default function MembersPage() {
         const data = d.data();
         if (!data.date || !data.date.startsWith(currentYear)) return;
         if (data.status === 'cancelled') return;
-        const isField = data.meetupType !== 'screen';
+        if (data.meetupType === 'etc' || data.isEtc) return; // 기타벙 점수 제외
+        const isField = data.meetupType === 'field';
         const point = isField ? 2 : 1;
         const isInSeason = data.date >= seasonStart && data.date <= `${seasonEnd}-31`;
 

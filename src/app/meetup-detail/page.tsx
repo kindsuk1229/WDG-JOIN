@@ -287,6 +287,9 @@ function MeetupDetailContent() {
             {meetup.meetupType === 'screen' && (
               <span className="text-[13px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">스크린</span>
             )}
+            {meetup.meetupType === 'etc' && (
+              <span className="text-[13px] bg-yellow-50 text-yellow-600 px-2 py-0.5 rounded-full font-bold">{meetup.etcType || '기타'}</span>
+            )}
             {isFull && (
               <span className="text-[13px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold">마감</span>
             )}

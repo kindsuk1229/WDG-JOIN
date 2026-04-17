@@ -82,22 +82,23 @@ export default function MyPage() {
 
         // ✅ 시즌/연간 점수 계산
         const nowDate = new Date();
-        const currentYear = nowDate.getFullYear().toString();
-        const currentMonth = nowDate.getMonth() + 1;
-        const seasonStartMonth = Math.floor((currentMonth - 1) / 2) * 2 + 1;
-        const seasonStart = `${currentYear}-${String(seasonStartMonth).padStart(2, '0')}`;
-        const seasonEnd = `${currentYear}-${String(seasonStartMonth + 1).padStart(2, '0')}`;
+        const scoreYear = nowDate.getFullYear().toString();
+        const scoreMonth = nowDate.getMonth() + 1;
+        const seasonStartMonth = Math.floor((scoreMonth - 1) / 2) * 2 + 1;
+        const seasonStart = `${scoreYear}-${String(seasonStartMonth).padStart(2, '0')}`;
+        const seasonEnd = `${scoreYear}-${String(seasonStartMonth + 1).padStart(2, '0')}`;
 
         let seasonScore = 0;
         let yearlyScore = 0;
 
         meetupSnap.forEach((d) => {
           const data = d.data();
-          if (!data.date || !data.date.startsWith(currentYear)) return;
+          if (!data.date || !data.date.startsWith(scoreYear)) return;
           if (data.status === 'cancelled') return;
           const isJoined = data.participants?.some((p: any) => p.name === savedName);
           if (!isJoined) return;
-          const point = data.meetupType !== 'screen' ? 2 : 1;
+          if (data.meetupType === 'etc' || data.isEtc) return; // 기타벙 점수 제외
+          const point = data.meetupType === 'field' ? 2 : 1;
           yearlyScore += point;
           if (data.date >= seasonStart && data.date <= `${seasonEnd}-31`) {
             seasonScore += point;

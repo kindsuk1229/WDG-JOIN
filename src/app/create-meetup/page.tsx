@@ -75,7 +75,8 @@ function CreateMeetupContent() {
   const searchParams = useSearchParams();
   const meetupId = searchParams.get('id');
 
-  const [meetupType, setMeetupType] = useState<'field' | 'screen'>('field');
+  const [meetupType, setMeetupType] = useState<'field' | 'screen' | 'etc'>('field');
+  const [etcType, setEtcType] = useState('술벙');
   const [title, setTitle] = useState('');
   const [golfCourse, setGolfCourse] = useState('');
   const [date, setDate] = useState('');
@@ -194,6 +195,13 @@ function CreateMeetupContent() {
         meetupData.cartTimes = cartTimes;
         meetupData.greenFee = greenFee;
         meetupData.maxPlayers = cartCount * 4;
+      } else if (meetupType === 'etc') {
+        meetupData.etcType = etcType;
+        meetupData.playerCount = playerCount;
+        meetupData.cartTimes = cartTimes;
+        meetupData.cartCount = 0;
+        meetupData.maxPlayers = playerCount;
+        meetupData.isEtc = true;
       } else {
         meetupData.playerCount = playerCount;
         meetupData.cartTimes = cartTimes;
@@ -215,7 +223,7 @@ function CreateMeetupContent() {
         });
 
         await sendNotificationToAll({
-          title: `⛳ 새로운 ${meetupType === 'screen' ? '스크린' : '필드'} 벙개가 열렸어요!`,
+          title: `⛳ 새로운 ${meetupType === 'screen' ? '스크린' : meetupType === 'etc' ? '기타' : '필드'} 벙개가 열렸어요!`,
           body: `${golfCourse} | ${date} | ${meetupType === 'field' ? `${cartCount}카트` : `${playerCount}명`}`,
           url: `/meetup-detail?id=${newDoc.id}`,
           excludeUserName: myName,
@@ -261,7 +269,7 @@ function CreateMeetupContent() {
         {!meetupId && (
           <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
             <label className="text-base font-bold text-gray-400 block mb-3 uppercase tracking-wide">벙개 종류</label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <button type="button" onClick={() => setMeetupType('field')}
                 className={`p-4 rounded-2xl border-2 text-center transition-all ${meetupType === 'field' ? 'border-green-500 bg-green-50' : 'border-gray-100 bg-gray-50'}`}>
                 <p className="text-2xl mb-1">⛳</p>
@@ -375,7 +383,51 @@ function CreateMeetupContent() {
               </div>
             </div>
           )}
-        </div>
+        {/* 기타벙 설정 */}
+          {meetupType === 'etc' && (
+            <div className="bg-white p-6 rounded-3xl shadow-sm space-y-5 border border-gray-100">
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">벙개 종류</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {['술벙', '밥벙', '모임벙', '여행벙', '운동벙', '기타'].map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setEtcType(type)}
+                      className={`py-2.5 rounded-xl text-sm font-bold transition-all ${
+                        etcType === type ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">시작 시간</label>
+                <div className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
+                  <span className="text-[11px] font-black text-green-700 flex-shrink-0">시작</span>
+                  <TimeInput value={cartTimes[0] || '19:00'} onChange={(v) => setCartTimes([v])} />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">
+                  모집 인원 <span className="font-normal text-gray-400 normal-case">(최대 50명)</span>
+                </label>
+                <select value={playerCount} onChange={(e) => setPlayerCount(Number(e.target.value))}
+                  className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg focus:ring-2 focus:ring-green-500 text-gray-900">
+                  {[...Array(50)].map((_, i) => (
+                    <option key={i+1} value={i+1}>{i+1}명</option>
+                  ))}
+                </select>
+                <div className="mt-3 bg-yellow-50 rounded-2xl p-3 border border-yellow-100">
+                  <p className="text-[12px] text-yellow-700 font-bold text-center">🎉 기타벙은 점수에 포함되지 않아요</p>
+                </div>
+              </div>
+            </div>
+          )}
 
         <button type="submit" disabled={loading}
           className={`w-full p-4 rounded-2xl font-black text-lg text-white transition-all active:scale-95 ${

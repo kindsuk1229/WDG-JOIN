@@ -113,9 +113,11 @@ export default function MeetupsPage() {
                     <span className={`text-[16px] px-2 py-0.5 rounded-full font-bold ${
                       item.meetupType === 'screen'
                         ? 'bg-blue-50 text-blue-600'
+                        : item.meetupType === 'etc'
+                        ? 'bg-yellow-50 text-yellow-600'
                         : 'bg-green-50 text-green-600'
                     }`}>
-                      {item.meetupType === 'screen' ? '스크린' : '필드'}
+                      {item.meetupType === 'screen' ? '스크린' : item.meetupType === 'etc' ? (item.etcType || '기타') : '필드'}
                     </span>
                   </div>
                   <span className={`text-[17px] px-2.5 py-1 rounded-lg font-bold flex-shrink-0 ${
