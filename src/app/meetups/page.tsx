@@ -29,18 +29,17 @@ export default function MeetupsPage() {
 
   const filtered = meetups.filter(m => {
     // ✅ cancelled, completed 제외
-    if (m.status === 'cancelled' || m.status === 'completed' || m.status === 'manually_closed') return false;
-    // 날짜+시간 기준 실시간 필터링
+    // cancelled, completed 즉시 안 보임
+    if (m.status === 'cancelled' || m.status === 'completed') return false;
     if (m.date) {
       const timeStr = (m.cartTimes?.[0] === 'TBD' || !m.cartTimes?.[0]) ? '23:59' : m.cartTimes[0];
       const meetupDateTime = new Date(`${m.date}T${timeStr}:00`);
       const now = new Date();
-      // closed(마감)는 시작시간 + 12시간 후 안 보이게
-      if (m.status === 'closed') {
-        const hideAfter = new Date(meetupDateTime.getTime() + 12 * 60 * 60 * 1000);
-        if (now >= hideAfter) return false;
+      // closed, manually_closed: 시작시간 전까지 보임
+      if (m.status === 'closed' || m.status === 'manually_closed') {
+        if (now >= meetupDateTime) return false;
       } else {
-        // open은 시작시간 + 2시간 후 안 보이게
+        // open: 시작시간 + 2시간 전까지 보임
         const hideAfter = new Date(meetupDateTime.getTime() + 2 * 60 * 60 * 1000);
         if (now >= hideAfter) return false;
       }

@@ -46,33 +46,38 @@ export async function GET(req: NextRequest) {
 
       // 이미 처리된 것 제외
       if (data.status === 'completed' || data.status === 'cancelled') continue;
-      // manually_closed 도 처리 대상
 
       // 날짜 + 시작 시간 파싱
       if (!data.date) continue;
-      const timeStr = data.cartTimes?.[0] || '00:00';
+      const rawTime = data.cartTimes?.[0];
+      const timeStr = (!rawTime || rawTime === 'TBD') ? '23:59' : rawTime;
       const [h, m] = timeStr.split(':').map(Number);
       const meetupDateTime = new Date(`${data.date}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
 
-      // closed(마감)는 12시간, manually_closed/open(미달)은 2시간 기준
-      const hoursAfter = data.status === 'closed'
-        ? new Date(meetupDateTime.getTime() + 12 * 60 * 60 * 1000)
-        : new Date(meetupDateTime.getTime() + 2 * 60 * 60 * 1000);
-      if (now < hoursAfter) continue;
+      // ✅ closed, manually_closed: 시작시간 지나면 completed
+      if (data.status === 'closed' || data.status === 'manually_closed') {
+        if (now >= meetupDateTime) {
+          await docSnap.ref.update({ status: 'completed' });
+          completedCount++;
+        }
+        continue;
+      }
+
+      // ✅ open: 시작시간 + 2시간 지나면 처리
+      const twoHoursAfter = new Date(meetupDateTime.getTime() + 2 * 60 * 60 * 1000);
+      if (now < twoHoursAfter) continue;
 
       // 정원 확인
       const participants = data.participants || [];
-      const maxPlayers = data.meetupType === 'screen'
+      const maxPlayers = (data.meetupType === 'screen' || data.meetupType === 'etc')
         ? data.playerCount
         : (data.cartCount || 0) * 4;
       const isFull = participants.length >= maxPlayers;
 
-      if (isFull || data.status === 'closed' || data.status === 'manually_closed') {
-        // 정원 찼거나 마감된 벙개 → completed
+      if (isFull) {
         await docSnap.ref.update({ status: 'completed' });
         completedCount++;
       } else {
-        // 정원 안 찼으면 cancelled
         await docSnap.ref.update({ status: 'cancelled' });
         cancelledCount++;
       }
