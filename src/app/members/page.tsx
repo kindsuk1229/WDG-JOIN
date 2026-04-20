@@ -61,8 +61,14 @@ export default function MembersPage() {
       meetupsSnap.forEach((d) => {
         const data = d.data();
         if (!data.date || !data.date.startsWith(currentYear)) return;
-        // ✅ completed 상태만 카운트
-        if (data.status !== 'completed') return;
+        // ✅ completed 또는 날짜가 지난 closed/manually_closed만 카운트
+        const now = new Date();
+        if (data.status === 'cancelled' || data.status === 'open') return;
+        if (data.status === 'closed' || data.status === 'manually_closed') {
+          const timeStr = (data.cartTimes?.[0] === 'TBD' || !data.cartTimes?.[0]) ? '23:59' : data.cartTimes[0];
+          const meetupDateTime = new Date(`${data.date}T${timeStr}:00`);
+          if (now < meetupDateTime) return;
+        }
         if (data.meetupType === 'etc' || data.isEtc) return; // 기타벙 점수 제외
         const isField = data.meetupType === 'field';
         const point = isField ? 2 : 1;

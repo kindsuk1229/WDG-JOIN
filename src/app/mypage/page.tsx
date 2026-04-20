@@ -46,9 +46,15 @@ export default function MyPage() {
           const data = doc.data();
           const isJoined = data.participants?.some((p: any) => p.name === savedName);
           if (isJoined) {
-            // 전체 참여 카운트 (completed만)
-            if (data.status === 'completed') total++;
-            if (data.date && data.date.includes(currentMonth) && data.status === 'completed') monthly++;
+            // ✅ completed 또는 날짜가 지난 closed/manually_closed만 카운트
+            const nowCheck = new Date();
+            const timeStrCheck = (data.cartTimes?.[0] === 'TBD' || !data.cartTimes?.[0]) ? '23:59' : data.cartTimes[0];
+            const meetupDTCheck = new Date(`${data.date}T${timeStrCheck}:00`);
+            const isPastCheck = nowCheck >= meetupDTCheck;
+            const isCountable = data.status === 'completed' ||
+              ((data.status === 'closed' || data.status === 'manually_closed') && isPastCheck);
+            if (isCountable) total++;
+            if (data.date && data.date.includes(currentMonth) && isCountable) monthly++;
           }
         });
 
@@ -95,8 +101,14 @@ export default function MyPage() {
         meetupSnap.forEach((d) => {
           const data = d.data();
           if (!data.date || !data.date.startsWith(scoreYear)) return;
-          // ✅ completed 상태만 점수 카운트
-          if (data.status !== 'completed') return;
+          // ✅ completed 또는 날짜가 지난 closed/manually_closed만 점수 카운트
+          const nowScore = new Date();
+          if (data.status === 'cancelled' || data.status === 'open') return;
+          if (data.status === 'closed' || data.status === 'manually_closed') {
+            const timeStrS = (data.cartTimes?.[0] === 'TBD' || !data.cartTimes?.[0]) ? '23:59' : data.cartTimes[0];
+            const meetupDTS = new Date(`${data.date}T${timeStrS}:00`);
+            if (nowScore < meetupDTS) return;
+          }
           const isJoined = data.participants?.some((p: any) => p.name === savedName);
           if (!isJoined) return;
           if (data.meetupType === 'etc' || data.isEtc) return; // 기타벙 점수 제외
