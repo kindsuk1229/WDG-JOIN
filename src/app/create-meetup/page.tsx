@@ -77,6 +77,7 @@ function CreateMeetupContent() {
 
   const [meetupType, setMeetupType] = useState<'field' | 'screen' | 'etc' | 'overnight'>('field');
   const [endDate, setEndDate] = useState('');
+  const [description, setDescription] = useState('');
   const [etcType, setEtcType] = useState('술벙');
   const [title, setTitle] = useState('');
   const [golfCourse, setGolfCourse] = useState('');
@@ -184,6 +185,7 @@ function CreateMeetupContent() {
         if (meetupType === 'overnight') {
           meetupData.endDate = endDate;
           meetupData.isOvernight = true;
+          meetupData.description = description;
         }
       } else if (meetupType === 'etc') {
         meetupData.etcType = etcType;
@@ -406,13 +408,14 @@ function CreateMeetupContent() {
                 <p className="text-sm text-yellow-700 font-bold text-center">🌙 1박2일 벙개 - 4점 부여</p>
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">그린피 (1인)</label>
+                <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">패키지 금액 (1인)</label>
                 <div className="flex items-center gap-2">
                   <input type="number" value={greenFee || ''} onChange={(e) => setGreenFee(Number(e.target.value))}
-                    placeholder="예: 180000" step="10000"
+                    placeholder="예: 350000" step="10000"
                     className="flex-1 p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 text-gray-900" />
                   <span className="text-gray-400 font-bold pr-2">원</span>
                 </div>
+                {greenFee > 0 && <p className="text-[11px] text-green-600 mt-1.5 font-bold">💰 1인 {greenFee.toLocaleString()}원</p>}
               </div>
               <div>
                 <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">카트 수 및 티타임</label>
@@ -438,6 +441,16 @@ function CreateMeetupContent() {
                     </div>
                   ))}
                 </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">상세 내용 (선택)</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="예: 숙박 포함, 조식/중식/석식 제공, 라운딩 2회"
+                  rows={3}
+                  className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 text-gray-900 resize-none"
+                />
               </div>
             </div>
           )}

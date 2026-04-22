@@ -291,6 +291,9 @@ function MeetupDetailContent() {
             {meetup.meetupType === 'etc' && (
               <span className="text-[13px] bg-yellow-50 text-yellow-600 px-2 py-0.5 rounded-full font-bold">{meetup.etcType || '기타'}</span>
             )}
+            {meetup.meetupType === 'overnight' && (
+              <span className="text-[13px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-bold">🌙 1박2일</span>
+            )}
             {isFull && (
               <span className="text-[13px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold">마감</span>
             )}
@@ -317,7 +320,24 @@ function MeetupDetailContent() {
               <>
                 <div className="flex items-center gap-2"><span>🛒</span><span>{meetup.cartCount}카트 ({meetup.cartCount * 4}명 정원)</span></div>
                 {meetup.greenFee > 0 && (
-                  <div className="flex items-center gap-2"><span>💰</span><span className="font-bold text-green-600">그린피 {meetup.greenFee.toLocaleString()}원 (1인)</span></div>
+                  <div className="flex items-center gap-2">
+                    <span>💰</span>
+                    <span className="font-bold text-green-600">
+                      {meetup.isOvernight ? '패키지' : '그린피'} {meetup.greenFee.toLocaleString()}원 (1인)
+                    </span>
+                  </div>
+                )}
+                {meetup.isOvernight && meetup.endDate && (
+                  <div className="flex items-center gap-2">
+                    <span>📅</span>
+                    <span>~ {meetup.endDate} (종료)</span>
+                  </div>
+                )}
+                {meetup.description && (
+                  <div className="flex items-start gap-2 mt-1">
+                    <span>📋</span>
+                    <span className="text-gray-600 text-sm leading-relaxed">{meetup.description}</span>
+                  </div>
                 )}
               </>
             )}
