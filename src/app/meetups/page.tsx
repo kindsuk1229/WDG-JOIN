@@ -14,7 +14,7 @@ export default function MeetupsPage() {
   useEffect(() => {
     const fetchMeetups = async () => {
       try {
-        const q = query(collection(db, 'meetups'), orderBy('date', 'desc'));
+        const q = query(collection(db, 'meetups'), orderBy('date', 'asc'));
         const snap = await getDocs(q);
         const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setMeetups(data);
