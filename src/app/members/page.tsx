@@ -70,8 +70,7 @@ export default function MembersPage() {
           if (now < meetupDateTime) return;
         }
         if (data.meetupType === 'etc' || data.isEtc) return; // 기타벙 점수 제외
-        const isField = data.meetupType === 'field';
-        const point = isField ? 2 : 1;
+        const point = data.meetupType === 'overnight' || data.isOvernight ? 4 : data.meetupType === 'field' ? 2 : 1;
         const isInSeason = data.date >= seasonStart && data.date <= `${seasonEnd}-31`;
 
         const participants = data.participants || [];

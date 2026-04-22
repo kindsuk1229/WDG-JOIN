@@ -112,7 +112,7 @@ export default function MyPage() {
           const isJoined = data.participants?.some((p: any) => p.name === savedName);
           if (!isJoined) return;
           if (data.meetupType === 'etc' || data.isEtc) return; // 기타벙 점수 제외
-          const point = data.meetupType === 'field' ? 2 : 1;
+          const point = data.meetupType === 'overnight' || data.isOvernight ? 4 : data.meetupType === 'field' ? 2 : 1;
           yearlyScore += point;
           if (data.date >= seasonStart && data.date <= `${seasonEnd}-31`) {
             seasonScore += point;

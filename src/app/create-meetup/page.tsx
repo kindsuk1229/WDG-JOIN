@@ -75,7 +75,8 @@ function CreateMeetupContent() {
   const searchParams = useSearchParams();
   const meetupId = searchParams.get('id');
 
-  const [meetupType, setMeetupType] = useState<'field' | 'screen' | 'etc'>('field');
+  const [meetupType, setMeetupType] = useState<'field' | 'screen' | 'etc' | 'overnight'>('field');
+  const [endDate, setEndDate] = useState('');
   const [etcType, setEtcType] = useState('술벙');
   const [title, setTitle] = useState('');
   const [golfCourse, setGolfCourse] = useState('');
@@ -175,11 +176,15 @@ function CreateMeetupContent() {
         updatedAt: new Date().toISOString(),
       };
 
-      if (meetupType === 'field') {
+      if (meetupType === 'field' || meetupType === 'overnight') {
         meetupData.cartCount = cartCount;
         meetupData.cartTimes = cartTimes;
         meetupData.greenFee = greenFee;
         meetupData.maxPlayers = cartCount * 4;
+        if (meetupType === 'overnight') {
+          meetupData.endDate = endDate;
+          meetupData.isOvernight = true;
+        }
       } else if (meetupType === 'etc') {
         meetupData.etcType = etcType;
         meetupData.playerCount = playerCount;
@@ -207,7 +212,7 @@ function CreateMeetupContent() {
           participants: [{ name: myName, nickname: myNickname }],
         });
 
-        const typeLabel = meetupType === 'screen' ? '스크린' : meetupType === 'etc' ? etcType : '필드';
+        const typeLabel = meetupType === 'screen' ? '스크린' : meetupType === 'etc' ? etcType : meetupType === 'overnight' ? '1박2일' : '필드';
         await sendNotificationToAll({
           title: `⛳ 새로운 ${typeLabel} 벙개가 열렸어요!`,
           body: `${golfCourse} | ${date}`,
@@ -253,7 +258,7 @@ function CreateMeetupContent() {
         {!meetupId && (
           <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
             <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">벙개 종류</label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-2">
               <button type="button" onClick={() => setMeetupType('field')}
                 className={`p-4 rounded-2xl border-2 text-center transition-all ${meetupType === 'field' ? 'border-green-500 bg-green-50' : 'border-gray-100 bg-gray-50'}`}>
                 <p className="text-2xl mb-1">⛳</p>
@@ -268,6 +273,11 @@ function CreateMeetupContent() {
                 className={`p-4 rounded-2xl border-2 text-center transition-all ${meetupType === 'etc' ? 'border-green-500 bg-green-50' : 'border-gray-100 bg-gray-50'}`}>
                 <p className="text-2xl mb-1">🎉</p>
                 <p className={`text-sm font-black ${meetupType === 'etc' ? 'text-green-700' : 'text-gray-500'}`}>기타벙</p>
+              </button>
+              <button type="button" onClick={() => setMeetupType('overnight')}
+                className={`p-4 rounded-2xl border-2 text-center transition-all ${meetupType === 'overnight' ? 'border-green-500 bg-green-50' : 'border-gray-100 bg-gray-50'}`}>
+                <p className="text-2xl mb-1">🌙</p>
+                <p className={`text-sm font-black ${meetupType === 'overnight' ? 'text-green-700' : 'text-gray-500'}`}>1박2일</p>
               </button>
             </div>
           </div>
@@ -291,11 +301,22 @@ function CreateMeetupContent() {
           </div>
 
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">날짜 선택</label>
+            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">
+              {meetupType === 'overnight' ? '시작 날짜' : '날짜 선택'}
+            </label>
             <input type="date" required value={date} onChange={(e) => setDate(e.target.value)}
               min={new Date().toISOString().split('T')[0]}
               className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 text-gray-900" />
           </div>
+
+          {meetupType === 'overnight' && (
+            <div>
+              <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">종료 날짜</label>
+              <input type="date" required={meetupType === 'overnight'} value={endDate} onChange={(e) => setEndDate(e.target.value)}
+                min={date || new Date().toISOString().split('T')[0]}
+                className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 text-gray-900" />
+            </div>
+          )}
 
           {/* 필드: 그린피 + 카트 수 + 티타임 */}
           {meetupType === 'field' && (
@@ -374,6 +395,49 @@ function CreateMeetupContent() {
                     <option key={i+1} value={i+1}>{i+1}명</option>
                   ))}
                 </select>
+              </div>
+            </div>
+          )}
+
+          {/* 1박2일: 필드와 동일 설정 */}
+          {meetupType === 'overnight' && (
+            <div className="border-t pt-6 space-y-5">
+              <div className="bg-yellow-50 rounded-2xl p-3 border border-yellow-100">
+                <p className="text-sm text-yellow-700 font-bold text-center">🌙 1박2일 벙개 - 4점 부여</p>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">그린피 (1인)</label>
+                <div className="flex items-center gap-2">
+                  <input type="number" value={greenFee || ''} onChange={(e) => setGreenFee(Number(e.target.value))}
+                    placeholder="예: 180000" step="10000"
+                    className="flex-1 p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 text-gray-900" />
+                  <span className="text-gray-400 font-bold pr-2">원</span>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">카트 수 및 티타임</label>
+                <select value={cartCount} onChange={(e) => handleCartCountChange(Number(e.target.value))}
+                  className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg mb-4 focus:ring-2 focus:ring-green-500 text-gray-900">
+                  {[...Array(15)].map((_, i) => (
+                    <option key={i+1} value={i+1}>{i+1}카트 ({(i+1)*4}명)</option>
+                  ))}
+                </select>
+                <div className="grid grid-cols-1 gap-3">
+                  {cartTimes.map((time, index) => (
+                    <div key={index} className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
+                      <span className="text-[11px] font-black text-green-700 w-10 text-center flex-shrink-0">{index + 1}조</span>
+                      {time === 'TBD' ? (
+                        <span className="flex-1 text-sm font-bold text-orange-500">시간 미정</span>
+                      ) : (
+                        <TimeInput value={time} onChange={(v) => updateCartTime(index, v)} />
+                      )}
+                      <button type="button" onClick={() => updateCartTime(index, time === 'TBD' ? '07:00' : 'TBD')}
+                        className={`text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0 ${time === 'TBD' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-400'}`}>
+                        {time === 'TBD' ? '시간입력' : '미정'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}

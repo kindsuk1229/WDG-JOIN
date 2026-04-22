@@ -97,7 +97,7 @@ export default function MeetupsPage() {
             const participants = item.participants || [];
             const maxPlayers = (item.meetupType === 'screen' || item.meetupType === 'etc')
               ? item.playerCount
-              : (item.cartCount || 0) * 4;
+              : (item.cartCount || 0) * 4; // field & overnight 모두 cartCount 기준
             const isFull = participants.length >= maxPlayers;
 
             return (
@@ -114,9 +114,11 @@ export default function MeetupsPage() {
                         ? 'bg-blue-50 text-blue-600'
                         : item.meetupType === 'etc'
                         ? 'bg-yellow-50 text-yellow-600'
+                        : item.meetupType === 'overnight'
+                        ? 'bg-purple-50 text-purple-600'
                         : 'bg-green-50 text-green-600'
                     }`}>
-                      {item.meetupType === 'screen' ? '스크린' : item.meetupType === 'etc' ? (item.etcType || '기타') : '필드'}
+                      {item.meetupType === 'screen' ? '스크린' : item.meetupType === 'etc' ? (item.etcType || '기타') : item.meetupType === 'overnight' ? '1박2일' : '필드'}
                     </span>
                   </div>
                   <span className={`text-[17px] px-2.5 py-1 rounded-lg font-bold flex-shrink-0 ${
