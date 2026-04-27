@@ -18,6 +18,15 @@ export default function MeetupsPage() {
         const snap = await getDocs(q);
         const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setMeetups(data);
+
+        // ✅ 저장된 스크롤 위치 복원
+        const savedScroll = sessionStorage.getItem('meetups_scroll');
+        if (savedScroll) {
+          setTimeout(() => {
+            window.scrollTo(0, parseInt(savedScroll));
+            sessionStorage.removeItem('meetups_scroll');
+          }, 100);
+        }
       } catch (error) {
         console.error('벙개 목록 로딩 실패:', error);
       } finally {
@@ -103,7 +112,10 @@ export default function MeetupsPage() {
             return (
               <div
                 key={item.id}
-                onClick={() => router.push(`/meetup-detail?id=${item.id}`)}
+                onClick={() => {
+                sessionStorage.setItem('meetups_scroll', String(window.scrollY));
+                router.push(`/meetup-detail?id=${item.id}`);
+              }}
                 className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 cursor-pointer active:bg-gray-50 transition-all"
               >
                 <div className="flex justify-between items-start mb-3">
