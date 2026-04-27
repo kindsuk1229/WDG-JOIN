@@ -17,6 +17,9 @@ function MeetupDetailContent() {
   const [myNickname, setMyNickname] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [showGuestInput, setShowGuestInput] = useState(false);
+  const [guestName, setGuestName] = useState('');
+  const [guestNickname, setGuestNickname] = useState('');
 
   useEffect(() => {
     if (typeof initKakao === 'function') initKakao();
@@ -188,6 +191,28 @@ function MeetupDetailContent() {
     }
   };
 
+  const handleAddGuest = async () => {
+    if (!guestName.trim()) return alert('게스트 이름을 입력해주세요!');
+    try {
+      const updatedParticipants = [...participants, {
+        name: guestName.trim(),
+        nickname: guestNickname.trim() || guestName.trim(),
+        isGuest: true,
+      }];
+      const newIsFull = updatedParticipants.length >= maxPlayers;
+      await updateDoc(doc(db, 'meetups', meetupId!), {
+        participants: updatedParticipants,
+        ...(newIsFull ? { status: 'closed' } : {}),
+      });
+      setGuestName('');
+      setGuestNickname('');
+      setShowGuestInput(false);
+      window.location.reload();
+    } catch (error) {
+      alert('게스트 추가 중 오류가 발생했습니다.');
+    }
+  };
+
   const handleManualClose = async () => {
     if (!window.confirm('벙개를 마감 처리하시겠습니까?\n정원 미달이어도 진행하는 경우 사용하세요.')) return;
     try {
@@ -254,6 +279,7 @@ function MeetupDetailContent() {
   const getButtonStyle = () => {
     if (joining) return { text: '처리 중...', className: 'bg-gray-300 text-gray-400' };
     if (isJoined) return { text: '참여 취소하기', className: 'bg-gray-200 text-gray-600' };
+    if (meetup?.status === 'manually_closed' && !isJoined) return { text: '마감된 벙개입니다', className: 'bg-gray-200 text-gray-400' };
     if (isWaiting) return { text: `대기 취소 (${myWaitPosition}번)`, className: 'bg-orange-100 text-orange-600' };
     if (isFull) return { text: '대기 신청하기', className: 'bg-orange-500 text-white shadow-lg shadow-orange-200' };
     return { text: '나도 갈래요! ⛳', className: 'bg-green-600 text-white shadow-lg shadow-green-200' };
@@ -294,7 +320,7 @@ function MeetupDetailContent() {
             {meetup.meetupType === 'overnight' && (
               <span className="text-[13px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-bold">🌙 1박2일</span>
             )}
-            {isFull && (
+            {(isFull || meetup?.status === 'manually_closed') && (
               <span className="text-[13px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold">마감</span>
             )}
           </div>
@@ -424,6 +450,55 @@ function MeetupDetailContent() {
             )}
           </div>
         </div>
+
+        {/* ✅ 게스트 초빙 (등록자/관리자만) */}
+        {(isAdmin || meetup?.creatorId === myName) && (
+          <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
+            <div className="flex justify-between items-center mb-3">
+              <p className="font-bold text-base text-gray-700">게스트 초빙</p>
+              <button
+                onClick={() => setShowGuestInput(!showGuestInput)}
+                className="text-sm font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-full border border-green-100"
+              >
+                {showGuestInput ? '취소' : '+ 게스트 추가'}
+              </button>
+            </div>
+            {showGuestInput && (
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  placeholder="이름 (필수)"
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  className="w-full p-3 bg-gray-50 rounded-xl text-sm border-none focus:ring-2 focus:ring-green-500"
+                />
+                <input
+                  type="text"
+                  placeholder="닉네임 (선택)"
+                  value={guestNickname}
+                  onChange={(e) => setGuestNickname(e.target.value)}
+                  className="w-full p-3 bg-gray-50 rounded-xl text-sm border-none focus:ring-2 focus:ring-green-500"
+                />
+                <button
+                  onClick={handleAddGuest}
+                  className="w-full py-3 bg-green-600 text-white rounded-xl text-sm font-bold"
+                >
+                  게스트 추가하기
+                </button>
+              </div>
+            )}
+            {/* 게스트 목록 */}
+            {participants.filter((p: any) => p.isGuest).length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {participants.filter((p: any) => p.isGuest).map((p: any, i: number) => (
+                  <span key={i} className="px-3 py-1.5 bg-purple-50 text-purple-600 rounded-full text-sm font-bold">
+                    👤 {p.nickname || p.name}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ✅ 대기자 목록 */}
         {waitlist.length > 0 && (
