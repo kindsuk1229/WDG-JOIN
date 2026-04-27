@@ -33,6 +33,8 @@ export default function MembersPage() {
   const [myName, setMyName] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [editingNickname, setEditingNickname] = useState<string | null>(null);
+  const [tempNickname, setTempNickname] = useState('');
 
   const fetchMembers = async (myNameStr: string) => {
     try {
@@ -179,6 +181,25 @@ export default function MembersPage() {
   };
 
   // ✅ 매니저 지정/해제 (오너만 가능)
+  // ✅ 닉네임 수정 (오너/매니저만)
+  const handleEditNickname = async (member: Member) => {
+    if (!tempNickname.trim()) return alert('닉네임을 입력해주세요!');
+    try {
+      const { doc, setDoc, getDoc } = await import('firebase/firestore');
+      const userRef = doc(db, 'users', member.name);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        await setDoc(userRef, { ...userSnap.data(), nickname: tempNickname.trim(), updatedAt: new Date().toISOString() });
+      }
+      alert(`${member.name}님의 닉네임이 변경되었습니다!`);
+      setEditingNickname(null);
+      setTempNickname('');
+      fetchMembers(myName);
+    } catch (error) {
+      alert('닉네임 수정 중 오류가 발생했습니다.');
+    }
+  };
+
   const handleToggleManager = async (member: Member) => {
     if (!isOwner) return;
     const isManager = member.role === 'manager';
@@ -273,6 +294,19 @@ export default function MembersPage() {
                   </div>
 
                   <div className="flex flex-col gap-1.5">
+                    {/* ✅ 오너/매니저 닉네임 수정 버튼 */}
+                    {isAdmin && member.name !== myName && (
+                      <button
+                        onClick={() => {
+                          setEditingNickname(member.name);
+                          setTempNickname(member.nickname || '');
+                        }}
+                        className="text-sm font-bold px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600"
+                      >
+                        닉네임 수정
+                      </button>
+                    )}
+
                     {/* ✅ 오너만 매니저 지정/해제 가능 (본인 및 오너 제외) */}
                     {isOwner && !member.isOwner && (
                       <button
@@ -315,6 +349,43 @@ export default function MembersPage() {
           })
         )}
       </div>
+    </div>
+
+      {/* ✅ 닉네임 수정 모달 */}
+      {editingNickname && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center">
+          <div className="w-full max-w-md bg-white rounded-t-[32px] p-6 space-y-4">
+            <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-2" />
+            <h3 className="text-lg font-black text-gray-800">닉네임 수정</h3>
+            <p className="text-sm text-gray-400">{editingNickname}님의 닉네임을 변경합니다</p>
+            <input
+              type="text"
+              value={tempNickname}
+              onChange={(e) => setTempNickname(e.target.value)}
+              placeholder="새 닉네임 입력"
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500"
+              autoFocus
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setEditingNickname(null); setTempNickname(''); }}
+                className="flex-1 py-3 bg-gray-100 rounded-2xl font-bold text-gray-500"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => {
+                  const member = members.find(m => m.name === editingNickname);
+                  if (member) handleEditNickname(member);
+                }}
+                className="flex-1 py-3 bg-green-600 text-white rounded-2xl font-bold"
+              >
+                저장
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
