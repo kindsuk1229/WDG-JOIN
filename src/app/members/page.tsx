@@ -6,7 +6,7 @@ import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, deleteDoc, getDoc, setDoc } from 'firebase/firestore';
 import { Avatar } from '@/components/UI';
 
-const OWNER_NAME = '김근석'; // 오너 이름 (매니저 지정 권한자)
+const OWNER_NAME = '김근석';
 
 interface Member {
   name: string;
@@ -42,7 +42,6 @@ export default function MembersPage() {
       const adminsSnap = await getDocs(collection(db, 'admins'));
       const meetupsSnap = await getDocs(collection(db, 'meetups'));
 
-      // admins 컬렉션에서 role 정보 가져오기
       const adminMap: Record<string, string> = {};
       adminsSnap.docs.forEach(d => {
         adminMap[d.id] = d.data().role || 'manager';
@@ -50,8 +49,7 @@ export default function MembersPage() {
 
       const currentYear = new Date().getFullYear().toString();
       const now = new Date();
-      const currentMonth = now.getMonth() + 1; // 1~12
-      // 2달 시즌 계산 (1~2월, 3~4월, 5~6월, 7~8월, 9~10월, 11~12월)
+      const currentMonth = now.getMonth() + 1;
       const seasonStartMonth = Math.floor((currentMonth - 1) / 2) * 2 + 1;
       const seasonStart = `${currentYear}-${String(seasonStartMonth).padStart(2, '0')}`;
       const seasonEnd = `${currentYear}-${String(seasonStartMonth + 1).padStart(2, '0')}`;
@@ -63,15 +61,16 @@ export default function MembersPage() {
       meetupsSnap.forEach((d) => {
         const data = d.data();
         if (!data.date || !data.date.startsWith(currentYear)) return;
-        // ✅ completed 또는 날짜가 지난 closed/manually_closed만 카운트
-        const now = new Date();
+
+        // completed 또는 날짜가 지난 closed/manually_closed만 카운트
         if (data.status === 'cancelled' || data.status === 'open') return;
         if (data.status === 'closed' || data.status === 'manually_closed') {
           const timeStr = (data.cartTimes?.[0] === 'TBD' || !data.cartTimes?.[0]) ? '23:59' : data.cartTimes[0];
           const meetupDateTime = new Date(`${data.date}T${timeStr}:00`);
           if (now < meetupDateTime) return;
         }
-        if (data.meetupType === 'etc' || data.isEtc) return; // 기타벙 점수 제외
+
+        if (data.meetupType === 'etc' || data.isEtc) return;
         const point = data.meetupType === 'overnight' || data.isOvernight ? 4 : data.meetupType === 'field' ? 2 : 1;
         const isInSeason = data.date >= seasonStart && data.date <= `${seasonEnd}-31`;
 
@@ -86,38 +85,7 @@ export default function MembersPage() {
         });
       });
 
-      const memberList: Member[] = usersSnap.docs.map((d) => {
-        const data = d.data();
-        const name = data.name || d.id;
-        const role = name === OWNER_NAME ? 'owner' : (adminMap[name] || '');
-        return {
-          name,
-          nickname: data.nickname || '',
-          joinedAt: data.joinedAt || '',
-          lastLoginAt: data.lastLoginAt || '',
-          isAdmin: !!adminMap[name] || name === OWNER_NAME,
-          isOwner: name === OWNER_NAME,
-          role,
-          meetupCount: meetupCountMap[name] || 0,
-          seasonScore: seasonScoreMap[name] || 0,
-          yearlyScore: yearlyScoreMap[name] || 0,
-          avgScore: 0,
-          bestScore: 0,
-          rounds: 0,
-        };
-      });
-
-      memberList.sort((a, b) => {
-        if (a.isOwner && !b.isOwner) return -1;
-        if (!a.isOwner && b.isOwner) return 1;
-        if (a.isAdmin && !b.isAdmin) return -1;
-        if (!a.isAdmin && b.isAdmin) return 1;
-        // 시즌 점수 높은 순
-        if (b.seasonScore !== a.seasonScore) return b.seasonScore - a.seasonScore;
-        return new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime();
-      });
-
-      // ✅ 성적 통계 불러오기
+      // 성적 통계
       const scoreSnap = await getDocs(collection(db, 'scorecards'));
       const scoreStatsMap: Record<string, { scores: number[] }> = {};
       scoreSnap.docs.forEach(d => {
@@ -131,13 +99,35 @@ export default function MembersPage() {
         });
       });
 
-      memberList.forEach(m => {
-        const stats = scoreStatsMap[m.name];
-        if (stats && stats.scores.length > 0) {
-          m.rounds = stats.scores.length;
-          m.avgScore = Math.round(stats.scores.reduce((a, b) => a + b, 0) / stats.scores.length);
-          m.bestScore = Math.min(...stats.scores);
-        }
+      const memberList: Member[] = usersSnap.docs.map((d) => {
+        const data = d.data();
+        const name = data.name || d.id;
+        const role = name === OWNER_NAME ? 'owner' : (adminMap[name] || '');
+        const stats = scoreStatsMap[name];
+        return {
+          name,
+          nickname: data.nickname || '',
+          joinedAt: data.joinedAt || '',
+          lastLoginAt: data.lastLoginAt || '',
+          isAdmin: !!adminMap[name] || name === OWNER_NAME,
+          isOwner: name === OWNER_NAME,
+          role,
+          meetupCount: meetupCountMap[name] || 0,
+          seasonScore: seasonScoreMap[name] || 0,
+          yearlyScore: yearlyScoreMap[name] || 0,
+          avgScore: stats ? Math.round(stats.scores.reduce((a, b) => a + b, 0) / stats.scores.length) : 0,
+          bestScore: stats ? Math.min(...stats.scores) : 0,
+          rounds: stats ? stats.scores.length : 0,
+        };
+      });
+
+      memberList.sort((a, b) => {
+        if (a.isOwner && !b.isOwner) return -1;
+        if (!a.isOwner && b.isOwner) return 1;
+        if (a.isAdmin && !b.isAdmin) return -1;
+        if (!a.isAdmin && b.isAdmin) return 1;
+        if (b.seasonScore !== a.seasonScore) return b.seasonScore - a.seasonScore;
+        return new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime();
       });
 
       setMembers(memberList);
@@ -166,7 +156,7 @@ export default function MembersPage() {
   }, []);
 
   const handleDelete = async (member: Member) => {
-    if (!window.confirm(`${member.nickname || member.name}님을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+    if (!window.confirm(`${member.nickname || member.name}님을 삭제하시겠습니까?`)) return;
     setDeleting(member.name);
     try {
       await deleteDoc(doc(db, 'users', member.name));
@@ -180,52 +170,43 @@ export default function MembersPage() {
     }
   };
 
-  // ✅ 매니저 지정/해제 (오너만 가능)
-  // ✅ 닉네임 수정 (오너/매니저만)
-  const handleEditNickname = async (member: Member) => {
-    if (!tempNickname.trim()) return alert('닉네임을 입력해주세요!');
-    try {
-      const { doc, setDoc, getDoc } = await import('firebase/firestore');
-      const userRef = doc(db, 'users', member.name);
-      const userSnap = await getDoc(userRef);
-      if (userSnap.exists()) {
-        await setDoc(userRef, { ...userSnap.data(), nickname: tempNickname.trim(), updatedAt: new Date().toISOString() });
-      }
-      alert(`${member.name}님의 닉네임이 변경되었습니다!`);
-      setEditingNickname(null);
-      setTempNickname('');
-      fetchMembers(myName);
-    } catch (error) {
-      alert('닉네임 수정 중 오류가 발생했습니다.');
-    }
-  };
-
   const handleToggleManager = async (member: Member) => {
     if (!isOwner) return;
     const isManager = member.role === 'manager';
-    const action = isManager ? '해제' : '지정';
-    if (!window.confirm(`${member.nickname || member.name}님을 매니저 ${action}하시겠습니까?`)) return;
-
+    if (!window.confirm(`${member.nickname || member.name}님을 매니저 ${isManager ? '해제' : '지정'}하시겠습니까?`)) return;
     setToggling(member.name);
     try {
       if (isManager) {
-        // 매니저 해제
         await deleteDoc(doc(db, 'admins', member.name));
-        alert(`${member.nickname || member.name}님의 매니저 권한이 해제되었습니다.`);
       } else {
-        // 매니저 지정
         await setDoc(doc(db, 'admins', member.name), {
           role: 'manager',
           assignedAt: new Date().toISOString(),
           assignedBy: myName,
         });
-        alert(`${member.nickname || member.name}님이 매니저로 지정되었습니다!`);
       }
       fetchMembers(myName);
     } catch (error) {
       alert('처리 중 오류가 발생했습니다.');
     } finally {
       setToggling(null);
+    }
+  };
+
+  const handleEditNickname = async (member: Member) => {
+    if (!tempNickname.trim()) return alert('닉네임을 입력해주세요!');
+    try {
+      const userRef = doc(db, 'users', member.name);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        await setDoc(userRef, { ...userSnap.data(), nickname: tempNickname.trim(), updatedAt: new Date().toISOString() });
+      }
+      alert(`닉네임이 변경되었습니다!`);
+      setEditingNickname(null);
+      setTempNickname('');
+      fetchMembers(myName);
+    } catch (error) {
+      alert('닉네임 수정 중 오류가 발생했습니다.');
     }
   };
 
@@ -267,12 +248,8 @@ export default function MembersPage() {
                   <Avatar name={member.name} size={48} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-black text-gray-800">
-                        {member.nickname || member.name}
-                      </p>
-                      {member.nickname && (
-                        <p className="text-sm text-gray-400">({member.name})</p>
-                      )}
+                      <p className="font-black text-gray-800">{member.nickname || member.name}</p>
+                      {member.nickname && <p className="text-sm text-gray-400">({member.name})</p>}
                       {badge && (
                         <span className={`text-sm px-2 py-0.5 rounded-full font-black ${badge.className}`}>
                           {badge.label}
@@ -294,45 +271,37 @@ export default function MembersPage() {
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    {/* ✅ 오너/매니저 닉네임 수정 버튼 */}
+                    {/* 닉네임 수정 (오너/매니저만) */}
                     {isAdmin && member.name !== myName && (
                       <button
-                        onClick={() => {
-                          setEditingNickname(member.name);
-                          setTempNickname(member.nickname || '');
-                        }}
+                        onClick={() => { setEditingNickname(member.name); setTempNickname(member.nickname || ''); }}
                         className="text-sm font-bold px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600"
                       >
                         닉네임 수정
                       </button>
                     )}
 
-                    {/* ✅ 오너만 매니저 지정/해제 가능 (본인 및 오너 제외) */}
+                    {/* 매니저 지정/해제 (오너만) */}
                     {isOwner && !member.isOwner && (
                       <button
                         onClick={() => handleToggleManager(member)}
                         disabled={toggling === member.name}
                         className={`text-sm font-bold px-3 py-1.5 rounded-lg ${
-                          toggling === member.name
-                            ? 'bg-gray-100 text-gray-400'
-                            : member.role === 'manager'
-                            ? 'bg-blue-50 text-blue-500'
-                            : 'bg-gray-100 text-gray-600'
+                          toggling === member.name ? 'bg-gray-100 text-gray-400' :
+                          member.role === 'manager' ? 'bg-blue-50 text-blue-500' : 'bg-gray-100 text-gray-600'
                         }`}
                       >
                         {toggling === member.name ? '처리중' : member.role === 'manager' ? '매니저 해제' : '매니저 지정'}
                       </button>
                     )}
 
-                    {/* ✅ 매니저/오너만 삭제 가능 (본인 및 다른 관리자 제외) */}
+                    {/* 삭제 (오너/매니저만, 본인/관리자 제외) */}
                     {isAdmin && member.name !== myName && !member.isAdmin && (
                       <button
                         onClick={() => handleDelete(member)}
                         disabled={deleting === member.name}
                         className={`text-sm font-bold px-3 py-1.5 rounded-lg ${
-                          deleting === member.name
-                            ? 'bg-gray-100 text-gray-400'
-                            : 'bg-red-50 text-red-500'
+                          deleting === member.name ? 'bg-gray-100 text-gray-400' : 'bg-red-50 text-red-500'
                         }`}
                       >
                         {deleting === member.name ? '삭제중' : '삭제'}
@@ -349,9 +318,8 @@ export default function MembersPage() {
           })
         )}
       </div>
-    </div>
 
-      {/* ✅ 닉네임 수정 모달 */}
+      {/* 닉네임 수정 모달 */}
       {editingNickname && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center">
           <div className="w-full max-w-md bg-white rounded-t-[32px] p-6 space-y-4">
