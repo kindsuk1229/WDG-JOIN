@@ -321,7 +321,7 @@ export default function MembersPage() {
 
       {/* 닉네임 수정 모달 */}
       {editingNickname && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center" style={{ paddingBottom: '64px' }}>
           <div className="w-full max-w-md bg-white rounded-t-[32px] p-6 space-y-4">
             <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-2" />
             <h3 className="text-lg font-black text-gray-800">닉네임 수정</h3>
