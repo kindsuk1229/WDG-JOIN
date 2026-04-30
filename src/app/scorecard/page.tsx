@@ -298,14 +298,16 @@ function ScorecardContent() {
               {currentPlayers.map((player, idx) => (
                 <div key={idx} className="flex items-center justify-between px-4 py-3">
                   <span className="font-bold text-gray-700">{player.nickname || player.name}</span>
-                  <div className="flex items-center gap-3">
-                    <button onClick={() => updateTotalOverride(idx, (player.totalOverride || 0) - 1)}
-                      className="w-9 h-9 rounded-full bg-gray-100 font-black text-gray-600 text-lg flex items-center justify-center">−</button>
-                    <span className="text-xl font-black text-gray-800 w-12 text-center">
-                      {player.totalOverride || '-'}
-                    </span>
-                    <button onClick={() => updateTotalOverride(idx, (player.totalOverride || 0) + 1)}
-                      className="w-9 h-9 rounded-full bg-gray-100 font-black text-gray-600 text-lg flex items-center justify-center">+</button>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={player.totalOverride || ''}
+                      onChange={(e) => updateTotalOverride(idx, Number(e.target.value))}
+                      placeholder="총타수"
+                      className="w-20 text-center text-xl font-black text-gray-800 bg-gray-50 border-none rounded-xl p-2 focus:ring-2 focus:ring-green-500"
+                    />
+                    <span className="text-gray-400 text-sm">타</span>
                   </div>
                 </div>
               ))}
