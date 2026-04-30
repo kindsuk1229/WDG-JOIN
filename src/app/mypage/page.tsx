@@ -166,6 +166,7 @@ export default function MyPage() {
 
   const menus = [
     { label: '내 벙개 내역', icon: '📋', href: '/my-meetups' },
+    { label: '필드 벙개 히스토리', icon: '🏌️', href: '/meetup-history' },
     { label: '내 성적 히스토리', icon: '⛳', href: '/my-scores' },
     { label: '성적 랭킹', icon: '🏆', href: '/score-ranking' },
     { label: '정산 내역', icon: '💰', href: '/settlement/history' },
