@@ -371,17 +371,46 @@ function MeetupDetailContent() {
         </div>
 
         {/* 조별 티타임 */}
-        {meetup.meetupType !== 'screen' && meetup.cartTimes?.length > 0 && (
+        {meetup.meetupType !== 'screen' && meetup.meetupType !== 'etc' && meetup.cartTimes?.length > 0 && (
           <div className="bg-white p-5 rounded-3xl shadow-sm">
-            <h3 className="font-bold text-base text-gray-500 mb-3">조별 티오프 시간</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {meetup.cartTimes.map((time: string, idx: number) => (
-                <div key={idx} className="flex justify-between items-center p-3 bg-green-50 rounded-2xl border border-green-100">
-                  <span className="text-[13px] font-black text-green-700">{idx + 1}조</span>
-                  <span className="text-base font-black text-gray-800">{formatTime(time)}</span>
+            {meetup.meetupType === 'overnight' ? (
+              <>
+                <h3 className="font-bold text-base text-gray-500 mb-3">1일차 티오프 시간</h3>
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  {meetup.cartTimes.slice(0, meetup.cartCount).map((time: string, idx: number) => (
+                    <div key={idx} className="flex justify-between items-center p-3 bg-green-50 rounded-2xl border border-green-100">
+                      <span className="text-[13px] font-black text-green-700">{idx + 1}조</span>
+                      <span className="text-base font-black text-gray-800">{formatTime(time)}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+                {meetup.cartTimes.length > meetup.cartCount && (
+                  <>
+                    <h3 className="font-bold text-base text-gray-500 mb-3">2일차 티오프 시간</h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      {meetup.cartTimes.slice(meetup.cartCount).map((time: string, idx: number) => (
+                        <div key={idx} className="flex justify-between items-center p-3 bg-purple-50 rounded-2xl border border-purple-100">
+                          <span className="text-[13px] font-black text-purple-700">{idx + 1}조</span>
+                          <span className="text-base font-black text-gray-800">{formatTime(time)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <h3 className="font-bold text-base text-gray-500 mb-3">조별 티오프 시간</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {meetup.cartTimes.map((time: string, idx: number) => (
+                    <div key={idx} className="flex justify-between items-center p-3 bg-green-50 rounded-2xl border border-green-100">
+                      <span className="text-[13px] font-black text-green-700">{idx + 1}조</span>
+                      <span className="text-base font-black text-gray-800">{formatTime(time)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -534,8 +563,8 @@ function MeetupDetailContent() {
           </button>
         </div>
 
-        {/* ✅ 필드 벙개만 성적표 버튼 표시 */}
-        {meetup?.meetupType === 'field' && (
+        {/* ✅ 필드/1박2일 벙개만 성적표 버튼 표시 */}
+        {(meetup?.meetupType === 'field' || meetup?.meetupType === 'overnight') && (
           <button
             onClick={() => router.push(`/scorecard?meetupId=${meetupId}`)}
             className="w-full py-3.5 rounded-2xl font-bold text-sm bg-blue-600 text-white active:scale-95 transition-all"

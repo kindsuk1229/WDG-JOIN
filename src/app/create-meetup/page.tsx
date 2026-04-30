@@ -418,28 +418,71 @@ function CreateMeetupContent() {
                 {greenFee > 0 && <p className="text-[11px] text-green-600 mt-1.5 font-bold">💰 1인 {greenFee.toLocaleString()}원</p>}
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">카트 수 및 티타임</label>
+                <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">카트 수</label>
                 <select value={cartCount} onChange={(e) => handleCartCountChange(Number(e.target.value))}
                   className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg mb-4 focus:ring-2 focus:ring-green-500 text-gray-900">
                   {[...Array(15)].map((_, i) => (
                     <option key={i+1} value={i+1}>{i+1}카트 ({(i+1)*4}명)</option>
                   ))}
                 </select>
+              </div>
+
+              {/* 1일차 티타임 */}
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">1일차 티오프 시간</label>
                 <div className="grid grid-cols-1 gap-3">
-                  {cartTimes.map((time, index) => (
-                    <div key={index} className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
-                      <span className="text-[11px] font-black text-green-700 w-10 text-center flex-shrink-0">{index + 1}조</span>
-                      {time === 'TBD' ? (
-                        <span className="flex-1 text-sm font-bold text-orange-500">시간 미정</span>
-                      ) : (
-                        <TimeInput value={time} onChange={(v) => updateCartTime(index, v)} />
-                      )}
-                      <button type="button" onClick={() => updateCartTime(index, time === 'TBD' ? '07:00' : 'TBD')}
-                        className={`text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0 ${time === 'TBD' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-400'}`}>
-                        {time === 'TBD' ? '시간입력' : '미정'}
-                      </button>
-                    </div>
-                  ))}
+                  {Array.from({ length: cartCount }).map((_, index) => {
+                    const time = cartTimes[index] || '07:00';
+                    return (
+                      <div key={index} className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
+                        <span className="text-[11px] font-black text-green-700 w-10 text-center flex-shrink-0">{index + 1}조</span>
+                        {time === 'TBD' ? (
+                          <span className="flex-1 text-sm font-bold text-orange-500">시간 미정</span>
+                        ) : (
+                          <TimeInput value={time} onChange={(v) => updateCartTime(index, v)} />
+                        )}
+                        <button type="button" onClick={() => updateCartTime(index, time === 'TBD' ? '07:00' : 'TBD')}
+                          className={`text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0 ${time === 'TBD' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-400'}`}>
+                          {time === 'TBD' ? '시간입력' : '미정'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 2일차 티타임 */}
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">2일차 티오프 시간</label>
+                <div className="grid grid-cols-1 gap-3">
+                  {Array.from({ length: cartCount }).map((_, index) => {
+                    const timeIndex = cartCount + index;
+                    const time = cartTimes[timeIndex] || '07:00';
+                    return (
+                      <div key={index} className="flex items-center gap-3 bg-purple-50/50 p-3 rounded-2xl border border-purple-100">
+                        <span className="text-[11px] font-black text-purple-700 w-10 text-center flex-shrink-0">{index + 1}조</span>
+                        {time === 'TBD' ? (
+                          <span className="flex-1 text-sm font-bold text-orange-500">시간 미정</span>
+                        ) : (
+                          <TimeInput value={time} onChange={(v) => {
+                            const newTimes = [...cartTimes];
+                            while (newTimes.length <= timeIndex) newTimes.push('07:00');
+                            newTimes[timeIndex] = v;
+                            setCartTimes(newTimes);
+                          }} />
+                        )}
+                        <button type="button" onClick={() => {
+                          const newTimes = [...cartTimes];
+                          while (newTimes.length <= timeIndex) newTimes.push('07:00');
+                          newTimes[timeIndex] = time === 'TBD' ? '07:00' : 'TBD';
+                          setCartTimes(newTimes);
+                        }}
+                          className={`text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0 ${time === 'TBD' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-400'}`}>
+                          {time === 'TBD' ? '시간입력' : '미정'}
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
               <div>
