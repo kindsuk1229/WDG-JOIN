@@ -39,7 +39,10 @@ export default function MyScoresPage() {
         const myPlayer = players.find((p: any) => p.name === name);
         if (!myPlayer) return;
 
-        const myScore = myPlayer.scores.reduce((a: number, b: number) => a + b, 0);
+        // ✅ 간편입력(totalOverride) 또는 홀별 합산
+        const myScore = myPlayer.totalOverride > 0
+          ? myPlayer.totalOverride
+          : myPlayer.scores.reduce((a: number, b: number) => a + b, 0);
         if (myScore === 0) return;
 
         myRecords.push({

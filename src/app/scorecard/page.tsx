@@ -205,13 +205,27 @@ function ScorecardContent() {
     if (!meetupId) return;
     setSaving(true);
     try {
+      // ✅ 1박2일의 경우 합산 스코어도 players에 저장 (히스토리 조회용)
+      const savedPlayers = isOvernight
+        ? players.map(p => {
+            const d2 = day2Players.find(d => d.name === p.name);
+            const t1 = inputMode === 'simple' ? (p.totalOverride || 0) : p.scores.reduce((a, b) => a + b, 0);
+            const t2 = inputMode === 'simple' ? (d2?.totalOverride || 0) : (d2?.scores.reduce((a, b) => a + b, 0) || 0);
+            return {
+              ...p,
+              totalOverride: t1 + t2,
+              scores: p.scores, // 1일차 홀별 스코어
+            };
+          })
+        : players;
+
       await setDoc(doc(db, 'scorecards', meetupId), {
         meetupId,
         meetupTitle: meetup?.title,
         golfCourse: meetup?.golfCourse,
         date: meetup?.date,
         pars,
-        players,
+        players: savedPlayers,
         totalPar: pars.reduce((a, b) => a + b, 0),
         inputMode,
         ...(isOvernight ? { day2Pars, day2Players } : {}),
@@ -282,7 +296,7 @@ function ScorecardContent() {
           }`}>
           {analyzing ? <><span className="animate-spin">⏳</span> AI 분석 중...</> : <><span>📸</span> 사진으로 자동 입력 {isOvernight ? `(${roundDay === 'day1' ? '1일차' : '2일차'})` : ''}</>}
         </button>
-        <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoAnalysis} className="hidden" />
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoAnalysis} className="hidden" />
       </div>
 
       {/* 간편 입력 모드 */}
