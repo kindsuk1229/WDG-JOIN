@@ -40,7 +40,7 @@ export default function MyScoresPage() {
         if (!myPlayer) return;
 
         // ✅ 간편입력(totalOverride) 또는 홀별 합산
-        const myScore = myPlayer.totalOverride > 0
+        const myScore = (myPlayer.totalOverride || 0) > 0
           ? myPlayer.totalOverride
           : myPlayer.scores.reduce((a: number, b: number) => a + b, 0);
         if (myScore === 0) return;

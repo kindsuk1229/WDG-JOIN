@@ -205,32 +205,37 @@ function ScorecardContent() {
     if (!meetupId) return;
     setSaving(true);
     try {
-      // ✅ 1박2일의 경우 합산 스코어도 players에 저장 (히스토리 조회용)
-      const savedPlayers = isOvernight
-        ? players.map(p => {
-            const d2 = day2Players.find(d => d.name === p.name);
-            const t1 = inputMode === 'simple' ? (p.totalOverride || 0) : p.scores.reduce((a, b) => a + b, 0);
-            const t2 = inputMode === 'simple' ? (d2?.totalOverride || 0) : (d2?.scores.reduce((a, b) => a + b, 0) || 0);
-            return {
-              ...p,
-              totalOverride: t1 + t2,
-              scores: p.scores, // 1일차 홀별 스코어
-            };
-          })
-        : players;
-
+      // ✅ 1일차 저장
       await setDoc(doc(db, 'scorecards', meetupId), {
         meetupId,
-        meetupTitle: meetup?.title,
+        meetupTitle: meetup?.title + (isOvernight ? ' (1일차)' : ''),
         golfCourse: meetup?.golfCourse,
         date: meetup?.date,
         pars,
-        players: savedPlayers,
+        players,
         totalPar: pars.reduce((a, b) => a + b, 0),
         inputMode,
-        ...(isOvernight ? { day2Pars, day2Players } : {}),
+        isOvernight,
         updatedAt: new Date().toISOString(),
       });
+
+      // ✅ 1박2일의 경우 2일차도 별도 문서로 저장
+      if (isOvernight) {
+        await setDoc(doc(db, 'scorecards', meetupId + '_day2'), {
+          meetupId: meetupId + '_day2',
+          meetupTitle: meetup?.title + ' (2일차)',
+          golfCourse: meetup?.golfCourse,
+          date: meetup?.endDate || meetup?.date,
+          pars: day2Pars,
+          players: day2Players,
+          totalPar: day2Pars.reduce((a, b) => a + b, 0),
+          inputMode,
+          isOvernight,
+          isDay2: true,
+          parentMeetupId: meetupId,
+          updatedAt: new Date().toISOString(),
+        });
+      }
       alert('성적표가 저장되었습니다! ⛳');
     } catch (error) {
       alert('저장 중 오류가 발생했습니다.');

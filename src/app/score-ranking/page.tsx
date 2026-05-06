@@ -42,7 +42,7 @@ export default function ScoreRankingPage() {
         const players = data.players || [];
         players.forEach((p: any) => {
           // ✅ 간편입력(totalOverride) 또는 홀별 합산
-          const total = (p.totalOverride > 0)
+          const total = ((p.totalOverride || 0) > 0)
             ? p.totalOverride
             : (p.scores || []).reduce((a: number, b: number) => a + b, 0);
           if (total === 0) return;
