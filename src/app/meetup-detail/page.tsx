@@ -264,10 +264,7 @@ function MeetupDetailContent() {
             location: {
               name: meetupData.golfCourse,
             },
-            description: `⛳ 골프 벙개
-장소: ${meetupData.golfCourse}
-날짜: ${meetupData.date}${startTime && startTime !== 'TBD' ? '
-티오프: ' + startTime : ''}`,
+            description: `⛳ 골프 벙개\n장소: ${meetupData.golfCourse}\n날짜: ${meetupData.date}${startTime && startTime !== 'TBD' ? '\n티오프: ' + startTime : ''}`,
           })
         }).toString()
       });
