@@ -180,7 +180,10 @@ function MeetupDetailContent() {
             }),
           });
         }
-        alert(newIsFull ? '참여 완료! 벙개가 마감되었습니다 ⛳' : '참여 신청이 완료되었습니다! ⛳');
+        const msg = newIsFull ? '참여 완료! 벙개가 마감되었습니다 ⛳' : '참여 신청이 완료되었습니다! ⛳';
+        if (window.confirm(`${msg}\n\n카카오 캘린더에 일정을 추가할까요?`)) {
+          await addToKakaoCalendar(meetup);
+        }
       }
 
       window.location.reload();
@@ -210,6 +213,75 @@ function MeetupDetailContent() {
       window.location.reload();
     } catch (error) {
       alert('게스트 추가 중 오류가 발생했습니다.');
+    }
+  };
+
+  // ✅ 카카오 캘린더 등록
+  const addToKakaoCalendar = async (meetupData: any) => {
+    try {
+      const Kakao = (window as any).Kakao;
+      if (!Kakao || !Kakao.Auth) {
+        alert('카카오 로그인이 필요해요!');
+        return;
+      }
+
+      // 날짜/시간 포맷 변환 (YYYYMMDDTHHMMSSZ)
+      const formatKakaoDate = (date: string, time: string) => {
+        if (!date) return '';
+        const timeStr = (!time || time === 'TBD') ? '09:00' : time;
+        const [h, m] = timeStr.split(':').map(Number);
+        const d = new Date(`${date}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
+        return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      };
+
+      const startTime = meetupData.cartTimes?.[0];
+      const startAt = formatKakaoDate(meetupData.date, startTime);
+      const endAt = formatKakaoDate(meetupData.endDate || meetupData.date, '22:00');
+
+      const accessToken = localStorage.getItem('kakao_access_token');
+      if (!accessToken) {
+        alert('카카오 로그인이 필요해요! 다시 로그인해주세요.');
+        return;
+      }
+
+      const response = await fetch('https://api.kakao.com/v2/api/calendar/create/event', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          calendar_id: 'primary',
+          event: JSON.stringify({
+            title: meetupData.title,
+            time: {
+              start_at: startAt,
+              end_at: endAt,
+              time_zone: 'Asia/Seoul',
+              all_day: false,
+              lunar: false,
+            },
+            location: {
+              name: meetupData.golfCourse,
+            },
+            description: `⛳ 골프 벙개
+장소: ${meetupData.golfCourse}
+날짜: ${meetupData.date}${startTime && startTime !== 'TBD' ? '
+티오프: ' + startTime : ''}`,
+          })
+        }).toString()
+      });
+
+      if (response.ok) {
+        alert('카카오 캘린더에 일정이 추가되었어요! 📅');
+      } else {
+        const err = await response.json();
+        console.error('캘린더 오류:', err);
+        alert('캘린더 등록에 실패했어요. 다시 시도해주세요.');
+      }
+    } catch (error) {
+      console.error('캘린더 등록 실패:', error);
+      alert('캘린더 등록 중 오류가 발생했어요.');
     }
   };
 
