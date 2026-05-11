@@ -16,24 +16,7 @@ export default function KakaoLoginButton() {
       localStorage.setItem('kakao_access_token', res.response.access_token);
     }
 
-    // ✅ 캘린더 추가 권한 요청
-    const Kakao = (window as any).Kakao;
-    if (Kakao?.Auth) {
-      Kakao.Auth.login({
-        scope: 'talk_calendar',
-        success: (authObj: any) => {
-          if (authObj.access_token) {
-            localStorage.setItem('kakao_access_token', authObj.access_token);
-          }
-          window.location.href = '/';
-        },
-        fail: () => {
-          window.location.href = '/';
-        }
-      });
-    } else {
-      window.location.href = '/';
-    }
+    window.location.href = '/';
   };
 
   return (
