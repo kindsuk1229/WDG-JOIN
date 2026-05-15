@@ -18,8 +18,11 @@ function MeetupDetailContent() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [joining, setJoining] = useState(false);
   const [showGuestInput, setShowGuestInput] = useState(false);
+  const [guestTab, setGuestTab] = useState<'external' | 'member'>('external');
   const [guestName, setGuestName] = useState('');
   const [guestNickname, setGuestNickname] = useState('');
+  const [memberSearch, setMemberSearch] = useState('');
+  const [allMembers, setAllMembers] = useState<any[]>([]);
 
   useEffect(() => {
     if (typeof initKakao === 'function') initKakao();
@@ -194,6 +197,18 @@ function MeetupDetailContent() {
     }
   };
 
+  // 회원 목록 불러오기
+  const fetchMembers = async () => {
+    if (allMembers.length > 0) return;
+    try {
+      const { collection, getDocs } = await import('firebase/firestore');
+      const snap = await getDocs(collection(db, 'users'));
+      setAllMembers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (error) {
+      console.error('회원 로딩 실패:', error);
+    }
+  };
+
   const handleAddGuest = async () => {
     if (!guestName.trim()) return alert('게스트 이름을 입력해주세요!');
     try {
@@ -279,6 +294,26 @@ function MeetupDetailContent() {
     } catch (error) {
       console.error('캘린더 등록 실패:', error);
       alert('캘린더 등록 중 오류가 발생했어요.');
+    }
+  };
+
+  const handleAddMemberAsGuest = async (member: any) => {
+    try {
+      const updatedParticipants = [...participants, {
+        name: member.name,
+        nickname: member.nickname || member.name,
+        isGuest: false,
+      }];
+      const newIsFull = updatedParticipants.length >= maxPlayers;
+      await updateDoc(doc(db, 'meetups', meetupId!), {
+        participants: updatedParticipants,
+        ...(newIsFull ? { status: 'closed' } : {}),
+      });
+      setMemberSearch('');
+      setShowGuestInput(false);
+      window.location.reload();
+    } catch (error) {
+      alert('추가 중 오류가 발생했습니다.');
     }
   };
 
@@ -563,26 +598,53 @@ function MeetupDetailContent() {
             </div>
             {showGuestInput && (
               <div className="space-y-3">
-                <input
-                  type="text"
-                  placeholder="이름 (필수)"
-                  value={guestName}
-                  onChange={(e) => setGuestName(e.target.value)}
-                  className="w-full p-3 bg-gray-50 rounded-xl text-sm border-none focus:ring-2 focus:ring-green-500"
-                />
-                <input
-                  type="text"
-                  placeholder="닉네임 (선택)"
-                  value={guestNickname}
-                  onChange={(e) => setGuestNickname(e.target.value)}
-                  className="w-full p-3 bg-gray-50 rounded-xl text-sm border-none focus:ring-2 focus:ring-green-500"
-                />
-                <button
-                  onClick={handleAddGuest}
-                  className="w-full py-3 bg-green-600 text-white rounded-xl text-sm font-bold"
-                >
-                  게스트 추가하기
-                </button>
+                {/* 탭 */}
+                <div className="flex gap-2">
+                  <button onClick={() => setGuestTab('external')}
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold ${guestTab === 'external' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                    👤 외부 게스트
+                  </button>
+                  <button onClick={() => { setGuestTab('member'); fetchMembers(); }}
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold ${guestTab === 'member' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                    🔍 회원 검색
+                  </button>
+                </div>
+
+                {guestTab === 'external' ? (
+                  <>
+                    <input type="text" placeholder="이름 (필수)" value={guestName}
+                      onChange={(e) => setGuestName(e.target.value)}
+                      className="w-full p-3 bg-gray-50 rounded-xl text-sm border-none focus:ring-2 focus:ring-green-500" />
+                    <input type="text" placeholder="닉네임 (선택)" value={guestNickname}
+                      onChange={(e) => setGuestNickname(e.target.value)}
+                      className="w-full p-3 bg-gray-50 rounded-xl text-sm border-none focus:ring-2 focus:ring-green-500" />
+                    <p className="text-xs text-gray-400">외부 게스트는 점수에 반영되지 않아요</p>
+                    <button onClick={handleAddGuest}
+                      className="w-full py-3 bg-green-600 text-white rounded-xl text-sm font-bold">
+                      게스트 추가하기
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <input type="text" placeholder="이름 또는 닉네임 검색"
+                      value={memberSearch}
+                      onChange={(e) => setMemberSearch(e.target.value)}
+                      className="w-full p-3 bg-gray-50 rounded-xl text-sm border-none focus:ring-2 focus:ring-green-500" />
+                    <p className="text-xs text-gray-400">회원 추가 시 점수에 반영돼요</p>
+                    <div className="max-h-40 overflow-y-auto space-y-1">
+                      {allMembers
+                        .filter(m => !participants.some((p: any) => p.name === m.name))
+                        .filter(m => !memberSearch || m.name?.includes(memberSearch) || m.nickname?.includes(memberSearch))
+                        .map((m: any) => (
+                          <button key={m.id} onClick={() => handleAddMemberAsGuest(m)}
+                            className="w-full text-left px-3 py-2.5 bg-gray-50 rounded-xl text-sm hover:bg-blue-50 flex justify-between items-center">
+                            <span className="font-bold">{m.nickname || m.name}</span>
+                            <span className="text-gray-400 text-xs">{m.name}</span>
+                          </button>
+                        ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
             {/* 게스트 목록 */}
