@@ -130,8 +130,8 @@ export default function MembersPage() {
           bestScore: hasScore ? Math.min(...stats!.scores) : 0,
           rounds: hasScore ? stats!.scores.length : 0,
           hasScoreRecord: hasScore,
-          // ✅ 성적 있으면 평균타수를 필드핸디로 자동 반영, 없으면 수동입력값 사용
-          fieldHandicap: hasScore ? avgScore : (data.handicap || 0),
+          // ✅ 성적 있으면 평균타수 기준 오버파(avgScore-72)를 필드핸디로 자동 반영, 없으면 수동입력값 사용
+          fieldHandicap: hasScore ? (avgScore - 72) : (data.handicap || 0),
           manualHandicap: data.handicap || 0,
           // ✅ gHandicap은 음수도 허용 (undefined/null이면 null로 처리)
           gHandicap: data.gHandicap !== undefined && data.gHandicap !== null ? data.gHandicap : null,
@@ -313,12 +313,14 @@ export default function MembersPage() {
                     )}
 
                     {/* ✅ 핸디 표시 */}
-                    {(member.fieldHandicap > 0 || member.gHandicap !== null) && (
+                    {(member.fieldHandicap !== 0 || member.gHandicap !== null) && (
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        {/* 필드핸디: 성적 있으면 평균타수 자동반영, 없으면 수동입력값 */}
-                        {member.fieldHandicap > 0 && (
+                        {/* 필드핸디: 성적 있으면 오버파 자동반영(+11 형식), 없으면 수동입력값 */}
+                        {member.fieldHandicap !== 0 && (
                           <span className="text-sm font-bold text-blue-500">
-                            필드핸디 {member.fieldHandicap}
+                            필드핸디 {member.hasScoreRecord
+                              ? (member.fieldHandicap >= 0 ? `+${member.fieldHandicap}` : `${member.fieldHandicap}`)
+                              : member.fieldHandicap}
                             {member.hasScoreRecord && (
                               <span className="text-xs font-normal text-gray-400 ml-0.5">(성적반영)</span>
                             )}
