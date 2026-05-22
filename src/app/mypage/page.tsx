@@ -14,9 +14,11 @@ export default function MyPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [tempNickname, setTempNickname] = useState('');
   const [handicap, setHandicap] = useState(0);
-  const [gHandicap, setGHandicap] = useState(0);
-  const [tempHandicap, setTempHandicap] = useState(0);
-  const [tempGHandicap, setTempGHandicap] = useState(0);
+  const [gHandicap, setGHandicap] = useState<number | null>(null);
+  const [tempHandicap, setTempHandicap] = useState<string>('');
+  // G핸디: 절댓값(문자열) + 부호 분리 관리
+  const [tempGHandicapAbs, setTempGHandicapAbs] = useState<string>('');
+  const [tempGHandicapSign, setTempGHandicapSign] = useState<1 | -1>(1);
 
   const [stats, setStats] = useState({
     totalCount: 0,
@@ -27,6 +29,12 @@ export default function MyPage() {
     yearlyScore: 0,
   });
   const [loading, setLoading] = useState(true);
+
+  // G핸디 최종값 계산
+  const getFinalGHandicap = (): number | null => {
+    if (tempGHandicapAbs === '') return null;
+    return tempGHandicapSign * Number(tempGHandicapAbs);
+  };
 
   useEffect(() => {
     const rawName = localStorage.getItem('user_name') || '회원';
@@ -42,11 +50,15 @@ export default function MyPage() {
         const userSnap = await getDoc(doc(db, 'users', rawName.trim()));
         if (userSnap.exists()) {
           const h = userSnap.data().handicap || 0;
-          const gh = userSnap.data().gHandicap || 0;
+          const gh = userSnap.data().gHandicap;
           setHandicap(h);
-          setGHandicap(gh);
-          setTempHandicap(h);
-          setTempGHandicap(gh);
+          setGHandicap(gh !== undefined && gh !== null ? gh : null);
+          setTempHandicap(h > 0 ? String(h) : '');
+          // G핸디 부호/절댓값 분리
+          if (gh !== undefined && gh !== null) {
+            setTempGHandicapSign(gh < 0 ? -1 : 1);
+            setTempGHandicapAbs(String(Math.abs(gh)));
+          }
         }
       } catch {}
     };
@@ -66,7 +78,6 @@ export default function MyPage() {
           const data = doc.data();
           const isJoined = data.participants?.some((p: any) => p.name === savedName);
           if (isJoined) {
-            // ✅ completed 또는 날짜가 지난 closed/manually_closed만 카운트
             const nowCheck = new Date();
             const timeStrCheck = (data.cartTimes?.[0] === 'TBD' || !data.cartTimes?.[0]) ? '23:59' : data.cartTimes[0];
             const meetupDTCheck = new Date(`${data.date}T${timeStrCheck}:00`);
@@ -94,7 +105,6 @@ export default function MyPage() {
           pendingTotal += (totalAmount - perPerson);
         });
 
-        // ✅ 내가 내야 할 금액 (settlement_members)
         const owingSnap = await getDocs(
           query(
             collection(db, "settlement_members"),
@@ -107,7 +117,6 @@ export default function MyPage() {
           owingTotal += doc.data().amount || 0;
         });
 
-        // ✅ 시즌/연간 점수 계산
         const nowDate = new Date();
         const scoreYear = nowDate.getFullYear().toString();
         const scoreMonth = nowDate.getMonth() + 1;
@@ -121,7 +130,6 @@ export default function MyPage() {
         meetupSnap.forEach((d) => {
           const data = d.data();
           if (!data.date || !data.date.startsWith(scoreYear)) return;
-          // ✅ completed 또는 날짜가 지난 closed/manually_closed만 점수 카운트
           const nowScore = new Date();
           if (data.status === 'cancelled' || data.status === 'open') return;
           if (data.status === 'closed' || data.status === 'manually_closed') {
@@ -131,7 +139,7 @@ export default function MyPage() {
           }
           const isJoined = data.participants?.some((p: any) => p.name === savedName);
           if (!isJoined) return;
-          if (data.meetupType === 'etc' || data.isEtc) return; // 기타벙 점수 제외
+          if (data.meetupType === 'etc' || data.isEtc) return;
           const point = data.meetupType === 'overnight' || data.isOvernight ? 4 : data.meetupType === 'field' ? 2 : 1;
           yearlyScore += point;
           if (data.date >= seasonStart && data.date <= `${seasonEnd}-31`) {
@@ -152,14 +160,14 @@ export default function MyPage() {
 
   const handleSaveProfile = async () => {
     const trimmedNickname = tempNickname.trim();
+    const finalHandicap = tempHandicap === '' ? 0 : Number(tempHandicap);
+    const finalGHandicap = getFinalGHandicap();
 
-    // 1. 로컬스토리지에 저장
     localStorage.setItem('user_nickname', trimmedNickname);
     setUserNickname(trimmedNickname);
-    setHandicap(tempHandicap);
-    setGHandicap(tempGHandicap);
+    setHandicap(finalHandicap);
+    setGHandicap(finalGHandicap);
 
-    // ✅ 2. Firebase users 컬렉션에도 저장
     try {
       const userRef = doc(db, 'users', userName.trim());
       const userSnap = await getDoc(userRef);
@@ -167,25 +175,27 @@ export default function MyPage() {
         await setDoc(userRef, {
           ...userSnap.data(),
           nickname: trimmedNickname,
-          handicap: tempHandicap,
-          gHandicap: tempGHandicap,
+          handicap: finalHandicap,
+          gHandicap: finalGHandicap,
           updatedAt: new Date().toISOString(),
         });
       } else {
         await setDoc(userRef, {
           name: userName.trim(),
           nickname: trimmedNickname,
+          handicap: finalHandicap,
+          gHandicap: finalGHandicap,
           joinedAt: new Date().toISOString(),
           lastLoginAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         });
       }
     } catch (error) {
-      console.error('Firebase 닉네임 저장 실패:', error);
+      console.error('Firebase 저장 실패:', error);
     }
 
     setIsEditing(false);
-    alert('닉네임이 설정되었습니다! ⛳');
+    alert('프로필이 저장되었습니다! ⛳');
   };
 
   const menus = [
@@ -216,6 +226,19 @@ export default function MyPage() {
                 {userName === '김근석' ? '우동골 관리자' : '우동골 정회원'}
                 {userNickname && <span className="ml-1.5 not-italic opacity-70">({userName})</span>}
               </p>
+              {/* 핸디 표시 */}
+              {(handicap > 0 || gHandicap !== null) && (
+                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                  {handicap > 0 && (
+                    <span className="text-sm font-bold text-blue-500">필드핸디 {handicap}</span>
+                  )}
+                  {gHandicap !== null && (
+                    <span className="text-sm font-bold text-purple-500">
+                      G핸디 {gHandicap >= 0 ? `+${gHandicap}` : gHandicap}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -232,9 +255,7 @@ export default function MyPage() {
           ].map((s, i) => (
             <div key={i} className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
               <p className="text-[15px] text-gray-400 font-medium">{s.label}</p>
-              <p className={`text-[17px] font-bold mt-0.5 ${s.color}`}>
-                {s.value}
-              </p>
+              <p className={`text-[17px] font-bold mt-0.5 ${s.color}`}>{s.value}</p>
             </div>
           ))}
         </div>
@@ -279,10 +300,14 @@ export default function MyPage() {
 
             <div className="flex-1 overflow-y-auto px-8 pb-4" style={{ WebkitOverflowScrolling: 'touch' }}>
               <div className="space-y-6">
+                {/* 실명 */}
                 <div>
                   <label className="text-[17px] font-black text-gray-400 uppercase tracking-wider">정산용 실명 (수정 불가)</label>
-                  <input type="text" value={userName} disabled className="w-full mt-2 p-4 bg-gray-50 rounded-2xl border-none text-gray-400 font-bold" />
+                  <input type="text" value={userName} disabled
+                    className="w-full mt-2 p-4 bg-gray-50 rounded-2xl border-none text-gray-400 font-bold" />
                 </div>
+
+                {/* 닉네임 */}
                 <div>
                   <label className="text-[17px] font-black text-gray-400 uppercase tracking-wider">활동 닉네임 설정</label>
                   <input
@@ -296,35 +321,65 @@ export default function MyPage() {
                     💡 닉네임은 모든 기기에서 자동으로 동기화됩니다. 벙개 명단에는 닉네임이 우선 표시되며, 정산은 실명({userName}) 기준으로 처리됩니다.
                   </p>
                 </div>
+
+                {/* 필드 핸디캡 */}
                 <div>
                   <label className="text-[17px] font-black text-gray-400 uppercase tracking-wider">핸디캡 (필드)</label>
                   <input
                     type="number"
-                    value={tempHandicap || ''}
-                    onChange={(e) => setTempHandicap(Number(e.target.value))}
-                    placeholder="0"
+                    inputMode="numeric"
+                    value={tempHandicap}
+                    onChange={(e) => setTempHandicap(e.target.value)}
+                    placeholder="예: 15"
                     min="0" max="54"
                     className="w-full mt-2 p-4 bg-gray-100 rounded-2xl border-none font-bold text-gray-800 focus:ring-2 focus:ring-green-500"
                   />
+                  <p className="text-sm text-gray-400 mt-1">성적 기록이 쌓이면 자동으로 반영돼요</p>
                 </div>
+
+                {/* G핸디 — +/- 토글 방식 */}
                 <div>
                   <label className="text-[17px] font-black text-gray-400 uppercase tracking-wider">스크린 핸디캡 (G핸디)</label>
-                  <input
-                    type="number"
-                    value={tempGHandicap || ''}
-                    onChange={(e) => setTempGHandicap(Number(e.target.value))}
-                    placeholder="0"
-                    min="0" max="54"
-                    className="w-full mt-2 p-4 bg-gray-100 rounded-2xl border-none font-bold text-gray-800 focus:ring-2 focus:ring-green-500"
-                  />
-                  <p className="text-sm text-gray-400 mt-1">스크린 벙개 조 편성 시 사용돼요</p>
+                  <div className="flex items-center gap-3 mt-2">
+                    {/* 부호 토글 버튼 */}
+                    <button
+                      type="button"
+                      onClick={() => setTempGHandicapSign(prev => prev === 1 ? -1 : 1)}
+                      className="w-14 h-14 rounded-2xl bg-gray-200 text-2xl font-black text-gray-700 flex-shrink-0 flex items-center justify-center active:bg-gray-300"
+                    >
+                      {tempGHandicapSign === 1 ? '+' : '−'}
+                    </button>
+                    {/* 숫자만 입력 */}
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={tempGHandicapAbs}
+                      onChange={(e) => setTempGHandicapAbs(e.target.value.replace(/[^0-9]/g, ''))}
+                      placeholder="숫자만"
+                      min="0" max="54"
+                      className="flex-1 p-4 bg-gray-100 rounded-2xl border-none font-black text-xl text-center text-gray-800 focus:ring-2 focus:ring-green-500"
+                    />
+                    {/* 미리보기 */}
+                    <div className="w-14 text-center flex-shrink-0">
+                      {tempGHandicapAbs !== '' ? (
+                        <span className={`text-lg font-black ${tempGHandicapSign === -1 ? 'text-purple-500' : 'text-blue-500'}`}>
+                          {tempGHandicapSign === 1 ? '+' : '−'}{tempGHandicapAbs}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300 text-sm">미입력</span>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-400 mt-2">왼쪽 버튼으로 +/− 부호를 바꿀 수 있어요. 스크린 벙개 조 편성 시 사용돼요</p>
                 </div>
               </div>
             </div>
 
             <div className="flex gap-3 px-8 pt-4 pb-8 shrink-0 border-t border-gray-100">
-              <button onClick={() => setIsEditing(false)} className="flex-1 p-4 bg-gray-100 rounded-2xl font-bold text-gray-500">취소</button>
-              <button onClick={handleSaveProfile} className="flex-1 p-4 bg-green-600 rounded-2xl font-bold text-white shadow-lg shadow-green-100">저장하기 ⛳</button>
+              <button onClick={() => setIsEditing(false)}
+                className="flex-1 p-4 bg-gray-100 rounded-2xl font-bold text-gray-500">취소</button>
+              <button onClick={handleSaveProfile}
+                className="flex-1 p-4 bg-green-600 rounded-2xl font-bold text-white shadow-lg shadow-green-100">저장하기 ⛳</button>
             </div>
           </div>
         </div>
