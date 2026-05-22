@@ -98,7 +98,10 @@ export default function MembersPage() {
         const data = d.data();
         const players = data.players || [];
         players.forEach((p: any) => {
-          const total = (p.scores || []).reduce((a: number, b: number) => a + b, 0);
+          // ✅ 간편입력(totalOverride) 또는 홀별 합산
+          const total = (p.totalOverride || 0) > 0
+            ? p.totalOverride
+            : (p.scores || []).reduce((a: number, b: number) => a + b, 0);
           if (total === 0) return;
           if (!scoreStatsMap[p.name]) scoreStatsMap[p.name] = { scores: [] };
           scoreStatsMap[p.name].scores.push(total);
