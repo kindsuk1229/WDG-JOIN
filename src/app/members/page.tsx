@@ -414,14 +414,41 @@ export default function MembersPage() {
             </div>
             <div>
               <label className="text-xs font-bold text-gray-400 block mb-1.5">G핸디캡 (스크린 핸디)</label>
-              <input
-                type="number"
-                value={tempGHandicap}
-                onChange={(e) => setTempGHandicap(e.target.value)}
-                placeholder="예: -8 (음수 입력 가능)"
-                className="w-full p-4 bg-gray-50 rounded-2xl text-sm focus:ring-2 focus:ring-green-500 outline-none"
-              />
-              <p className="text-xs text-gray-400 mt-1">스크린 벙개 조 편성 시 사용돼요. 음수도 입력 가능해요</p>
+              <div className="flex items-center gap-3">
+                {/* 부호 토글 버튼 */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const num = Number(tempGHandicap) || 0;
+                    setTempGHandicap(num === 0 ? '' : String(-num));
+                  }}
+                  className="w-14 h-14 rounded-2xl bg-gray-100 text-xl font-black text-gray-600 flex-shrink-0 active:bg-gray-200"
+                >
+                  {tempGHandicap !== '' && Number(tempGHandicap) < 0 ? '−' : '+'}
+                </button>
+                {/* 절댓값 입력 */}
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={tempGHandicap === '' ? '' : Math.abs(Number(tempGHandicap))}
+                  onChange={(e) => {
+                    const abs = Number(e.target.value);
+                    const isNeg = tempGHandicap !== '' && Number(tempGHandicap) < 0;
+                    setTempGHandicap(e.target.value === '' ? '' : String(isNeg ? -abs : abs));
+                  }}
+                  placeholder="숫자만"
+                  min="0" max="54"
+                  className="flex-1 p-4 bg-gray-50 rounded-2xl text-center text-xl font-black text-gray-800 focus:ring-2 focus:ring-green-500 outline-none"
+                />
+                <span className="text-sm text-gray-400 flex-shrink-0">
+                  {tempGHandicap !== '' ? (
+                    <span className={`font-black text-base ${Number(tempGHandicap) < 0 ? 'text-purple-500' : 'text-blue-500'}`}>
+                      {Number(tempGHandicap) >= 0 ? '+' : ''}{tempGHandicap}
+                    </span>
+                  ) : '-'}
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 mt-2">왼쪽 버튼으로 +/− 부호를 바꿀 수 있어요</p>
             </div>
             <div className="flex gap-3">
               <button onClick={() => { setEditingHandicap(null); setTempHandicap(''); setTempGHandicap(''); }}
