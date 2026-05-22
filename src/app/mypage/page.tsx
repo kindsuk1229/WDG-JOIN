@@ -308,7 +308,7 @@ export default function MyPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-[17px] font-black text-gray-400 uppercase tracking-wider">G핸디캡</label>
+                  <label className="text-[17px] font-black text-gray-400 uppercase tracking-wider">스크린 핸디캡 (G핸디)</label>
                   <input
                     type="number"
                     value={tempGHandicap || ''}
@@ -317,7 +317,7 @@ export default function MyPage() {
                     min="0" max="54"
                     className="w-full mt-2 p-4 bg-gray-100 rounded-2xl border-none font-bold text-gray-800 focus:ring-2 focus:ring-green-500"
                   />
-                  <p className="text-sm text-gray-400 mt-1">G핸디는 조 편성 시 우선 적용돼요</p>
+                  <p className="text-sm text-gray-400 mt-1">스크린 벙개 조 편성 시 사용돼요</p>
                 </div>
               </div>
             </div>

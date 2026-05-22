@@ -29,6 +29,7 @@ function GroupAssignContent() {
   const [saving, setSaving] = useState(false);
   const [myName, setMyName] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [groupSize, setGroupSize] = useState(4); // 조당 인원
 
   useEffect(() => {
     const name = (localStorage.getItem('user_name') || '').trim();
@@ -57,10 +58,37 @@ function GroupAssignContent() {
       const { collection, getDocs } = await import('firebase/firestore');
       const usersSnap = await getDocs(collection(db, 'users'));
       const handicapMap: Record<string, number> = {};
+
+      // ✅ 성적 기록 불러오기 (평균타수 → 핸디캡)
+      const scoreSnap = await getDocs(collection(db, 'scorecards'));
+      const avgScoreMap: Record<string, number> = {};
+      const scoreCountMap: Record<string, number[]> = {};
+      scoreSnap.docs.forEach(d => {
+        const sd = d.data();
+        (sd.players || []).forEach((p: any) => {
+          const total = (p.totalOverride || 0) > 0
+            ? p.totalOverride
+            : (p.scores || []).reduce((a: number, b: number) => a + b, 0);
+          if (total === 0) return;
+          if (!scoreCountMap[p.name]) scoreCountMap[p.name] = [];
+          scoreCountMap[p.name].push(total);
+        });
+      });
+      Object.entries(scoreCountMap).forEach(([name, scores]) => {
+        avgScoreMap[name] = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+      });
+
+      const isScreen = data?.meetupType === 'screen';
       usersSnap.docs.forEach(d => {
         const ud = d.data();
-        // G핸디 우선, 없으면 일반 핸디캡
-        handicapMap[ud.name || d.id] = ud.gHandicap || ud.handicap || 0;
+        const name = ud.name || d.id;
+        if (isScreen) {
+          // 스크린: G핸디 우선, 없으면 평균타수, 없으면 수동핸디
+          handicapMap[name] = ud.gHandicap || avgScoreMap[name] || ud.handicap || 0;
+        } else {
+          // 필드: 평균타수 우선, 없으면 수동핸디
+          handicapMap[name] = avgScoreMap[name] || ud.handicap || 0;
+        }
       });
 
       const participants: GroupMember[] = (data.participants || []).map((p: any) => ({
@@ -87,16 +115,27 @@ function GroupAssignContent() {
     }
   };
 
-  const autoAssign = (meetupData: any, participants: GroupMember[]) => {
-    const cartCount = meetupData.cartCount || 1;
+  const calcGroupCount = (total: number, size: number) => Math.ceil(total / size);
+
+  const autoAssign = (meetupData: any, participants: GroupMember[], size?: number) => {
+    const isScreen = meetupData.meetupType === 'screen';
+    const currentSize = size || groupSize;
     const cartTimes = meetupData.cartTimes || [];
-    const newGroups: Group[] = Array.from({ length: cartCount }, (_, i) => ({
+
+    let groupCount: number;
+    if (isScreen) {
+      groupCount = calcGroupCount(participants.length, currentSize);
+    } else {
+      groupCount = meetupData.cartCount || 1;
+    }
+
+    const newGroups: Group[] = Array.from({ length: groupCount }, (_, i) => ({
       groupNumber: i + 1,
       teeTime: cartTimes[i] || 'TBD',
       members: [],
     }));
     participants.forEach((member, idx) => {
-      newGroups[idx % cartCount].members.push(member);
+      newGroups[idx % groupCount].members.push(member);
     });
     setGroups(newGroups);
     setUnassigned([]);
@@ -112,7 +151,10 @@ function GroupAssignContent() {
       return ha - hb;
     });
 
-    const cartCount = meetup?.cartCount || 1;
+    const isScreen = meetup?.meetupType === 'screen';
+    const cartCount = isScreen
+      ? calcGroupCount(sorted.length, groupSize)
+      : (meetup?.cartCount || 1);
     const cartTimes = meetup?.cartTimes || [];
     const newGroups: Group[] = Array.from({ length: cartCount }, (_, i) => ({
       groupNumber: i + 1,
@@ -142,18 +184,7 @@ function GroupAssignContent() {
   const handleRandomAssign = () => {
     const all = [...unassigned, ...groups.flatMap(g => g.members)];
     const shuffled = [...all].sort(() => Math.random() - 0.5);
-    const cartCount = meetup?.cartCount || 1;
-    const cartTimes = meetup?.cartTimes || [];
-    const newGroups: Group[] = Array.from({ length: cartCount }, (_, i) => ({
-      groupNumber: i + 1,
-      teeTime: cartTimes[i] || 'TBD',
-      members: [],
-    }));
-    shuffled.forEach((member, idx) => {
-      newGroups[idx % cartCount].members.push(member);
-    });
-    setGroups(newGroups);
-    setUnassigned([]);
+    autoAssign(meetup, shuffled);
   };
 
   const moveMember = (member: GroupMember, fromGroup: number, toGroup: number) => {
@@ -238,6 +269,29 @@ function GroupAssignContent() {
       </header>
 
       <div className="p-4 space-y-4 pb-20">
+        {/* 스크린 벙개: 조당 인원 선택 */}
+        {meetup?.meetupType === 'screen' && (
+          <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+            <p className="text-sm font-bold text-gray-600 mb-3">조당 인원 선택</p>
+            <div className="flex gap-2">
+              {[2, 3, 4].map(size => (
+                <button key={size} onClick={() => {
+                  setGroupSize(size);
+                  const all = [...unassigned, ...groups.flatMap(g => g.members)];
+                  autoAssign(meetup, all, size);
+                }} className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                  groupSize === size ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'
+                }`}>
+                  {size}명
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-2 text-center">
+              총 {[...unassigned, ...groups.flatMap(g => g.members)].length}명 → {calcGroupCount([...unassigned, ...groups.flatMap(g => g.members)].length, groupSize)}조
+            </p>
+          </div>
+        )}
+
         {/* 액션 버튼 */}
         {isAdmin && (
           <div className="flex gap-2">

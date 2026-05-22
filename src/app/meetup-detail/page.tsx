@@ -720,8 +720,8 @@ function MeetupDetailContent() {
           </button>
         </div>
 
-        {/* ✅ 조 편성 버튼 (필드/1박2일, 관리자/등록자) */}
-        {(isAdmin || meetup?.creatorId === myName) && (meetup?.meetupType === 'field' || meetup?.meetupType === 'overnight') && (
+        {/* ✅ 조 편성 버튼 (필드/스크린/1박2일, 관리자/등록자) */}
+        {(isAdmin || meetup?.creatorId === myName) && (meetup?.meetupType === 'field' || meetup?.meetupType === 'overnight' || meetup?.meetupType === 'screen') && (
           <button
             onClick={() => router.push(`/group-assign?meetupId=${meetupId}`)}
             className="w-full py-4 rounded-2xl font-bold text-white text-base bg-blue-600 shadow-lg shadow-blue-200 active:scale-95 transition-all"

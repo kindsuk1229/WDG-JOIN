@@ -22,7 +22,8 @@ interface Member {
   avgScore: number;
   bestScore: number;
   rounds: number;
-  handicap: number;
+  handicap: number;   // 평균타수 or 수동입력
+  manualHandicap: number; // 수동입력 핸디캡
   gHandicap: number;
 }
 
@@ -123,7 +124,11 @@ export default function MembersPage() {
           avgScore: stats ? Math.round(stats.scores.reduce((a, b) => a + b, 0) / stats.scores.length) : 0,
           bestScore: stats ? Math.min(...stats.scores) : 0,
           rounds: stats ? stats.scores.length : 0,
-          handicap: data.handicap || 0,
+          // ✅ 성적 기록 있으면 평균타수를 핸디캡으로 자동 반영, 없으면 수동 입력값 사용
+          handicap: stats && stats.scores.length > 0
+            ? Math.round(stats.scores.reduce((a, b) => a + b, 0) / stats.scores.length)
+            : (data.handicap || 0),
+          manualHandicap: data.handicap || 0,
           gHandicap: data.gHandicap || 0,
         };
       });
@@ -291,10 +296,17 @@ export default function MembersPage() {
                         <span className="text-sm font-bold text-orange-500">베스트 {member.bestScore}타</span>
                       </div>
                     )}
-                    {(member.handicap > 0 || member.gHandicap > 0) && (
+                    {(member.handicap > 0 || member.manualHandicap > 0 || member.gHandicap > 0) && (
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        {member.handicap > 0 && <span className="text-sm font-bold text-blue-500">필드핸디 {member.handicap}</span>}
-                        {member.gHandicap > 0 && <span className="text-sm font-bold text-purple-500">G핸디 {member.gHandicap}</span>}
+                        {member.rounds > 0 && member.handicap > 0 && (
+                          <span className="text-sm font-bold text-green-600">평균 {member.handicap}타</span>
+                        )}
+                        {member.manualHandicap > 0 && (
+                          <span className="text-sm font-bold text-blue-500">필드핸디 {member.manualHandicap}</span>
+                        )}
+                        {member.gHandicap > 0 && (
+                          <span className="text-sm font-bold text-purple-500">스크린핸디 {member.gHandicap}</span>
+                        )}
                       </div>
                     )}
                   </div>
@@ -378,7 +390,7 @@ export default function MembersPage() {
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-400 block mb-1.5">G핸디캡</label>
+              <label className="text-xs font-bold text-gray-400 block mb-1.5">스크린 핸디캡 (G핸디)</label>
               <input
                 type="number"
                 value={tempGHandicap || ''}
@@ -387,7 +399,7 @@ export default function MembersPage() {
                 min="0" max="54"
                 className="w-full p-4 bg-gray-50 rounded-2xl text-sm focus:ring-2 focus:ring-green-500 outline-none"
               />
-              <p className="text-xs text-gray-400 mt-1">G핸디는 조 편성 시 우선 적용돼요</p>
+              <p className="text-xs text-gray-400 mt-1">스크린 벙개 조 편성 시 사용돼요</p>
             </div>
             <div className="flex gap-3">
               <button onClick={() => { setEditingHandicap(null); setTempHandicap(0); setTempGHandicap(0); }}
