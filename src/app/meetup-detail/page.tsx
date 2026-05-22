@@ -555,10 +555,21 @@ function MeetupDetailContent() {
                           const maxPlayers = meetup.meetupType === 'screen' || meetup.meetupType === 'etc'
                             ? meetup.playerCount
                             : (meetup.cartCount || 0) * 4;
+
+                          // ✅ 대기자 자동 승격
+                          const updatedWaitlist = [...(meetup.waitlist || [])];
+                          let promoted = null;
+                          if (updatedWaitlist.length > 0) {
+                            promoted = updatedWaitlist.shift();
+                            updatedParticipants.push(promoted);
+                          }
+
                           await updateDoc(doc(db, 'meetups', meetupId!), {
                             participants: updatedParticipants,
+                            waitlist: updatedWaitlist,
                             status: updatedParticipants.length >= maxPlayers ? 'closed' : 'open',
                           });
+
                           // 취소된 멤버에게 알림
                           await fetch('/api/send-notification', {
                             method: 'POST',
@@ -570,6 +581,21 @@ function MeetupDetailContent() {
                               url: `/meetup-detail?id=${meetupId}`,
                             }),
                           });
+
+                          // ✅ 승격된 대기자에게 알림
+                          if (promoted) {
+                            await fetch('/api/send-notification', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                toUserName: promoted.name,
+                                title: '🎉 대기 → 참여 확정!',
+                                body: `"${meetup.title}" 대기에서 참여로 확정됐어요!`,
+                                url: `/meetup-detail?id=${meetupId}`,
+                              }),
+                            });
+                          }
+
                           window.location.reload();
                         } catch (error) {
                           alert('처리 중 오류가 발생했습니다.');
