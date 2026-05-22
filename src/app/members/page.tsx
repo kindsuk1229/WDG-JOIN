@@ -22,6 +22,8 @@ interface Member {
   avgScore: number;
   bestScore: number;
   rounds: number;
+  handicap: number;
+  gHandicap: number;
 }
 
 export default function MembersPage() {
@@ -35,6 +37,9 @@ export default function MembersPage() {
   const [toggling, setToggling] = useState<string | null>(null);
   const [editingNickname, setEditingNickname] = useState<string | null>(null);
   const [tempNickname, setTempNickname] = useState('');
+  const [editingHandicap, setEditingHandicap] = useState<string | null>(null);
+  const [tempHandicap, setTempHandicap] = useState(0);
+  const [tempGHandicap, setTempGHandicap] = useState(0);
 
   const fetchMembers = async (myNameStr: string) => {
     try {
@@ -118,6 +123,8 @@ export default function MembersPage() {
           avgScore: stats ? Math.round(stats.scores.reduce((a, b) => a + b, 0) / stats.scores.length) : 0,
           bestScore: stats ? Math.min(...stats.scores) : 0,
           rounds: stats ? stats.scores.length : 0,
+          handicap: data.handicap || 0,
+          gHandicap: data.gHandicap || 0,
         };
       });
 
@@ -190,6 +197,22 @@ export default function MembersPage() {
       alert('처리 중 오류가 발생했습니다.');
     } finally {
       setToggling(null);
+    }
+  };
+
+  const handleEditHandicap = async (member: Member) => {
+    try {
+      const userRef = doc(db, 'users', member.name);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        await setDoc(userRef, { ...userSnap.data(), handicap: tempHandicap, gHandicap: tempGHandicap, updatedAt: new Date().toISOString() });
+      }
+      setEditingHandicap(null);
+      setTempHandicap(0);
+      setTempGHandicap(0);
+      fetchMembers(myName);
+    } catch {
+      alert('핸디캡 수정 중 오류가 발생했습니다.');
     }
   };
 
@@ -268,6 +291,12 @@ export default function MembersPage() {
                         <span className="text-sm font-bold text-orange-500">베스트 {member.bestScore}타</span>
                       </div>
                     )}
+                    {(member.handicap > 0 || member.gHandicap > 0) && (
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        {member.handicap > 0 && <span className="text-sm font-bold text-blue-500">필드핸디 {member.handicap}</span>}
+                        {member.gHandicap > 0 && <span className="text-sm font-bold text-purple-500">G핸디 {member.gHandicap}</span>}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-col gap-1.5">
@@ -278,6 +307,16 @@ export default function MembersPage() {
                         className="text-sm font-bold px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600"
                       >
                         닉네임 수정
+                      </button>
+                    )}
+
+                    {/* 핸디캡 수정 (오너/매니저만) */}
+                    {isAdmin && member.name !== myName && (
+                      <button
+                        onClick={() => { setEditingHandicap(member.name); setTempHandicap(member.handicap || 0); setTempGHandicap(member.gHandicap || 0); }}
+                        className="text-sm font-bold px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600"
+                      >
+                        핸디 수정
                       </button>
                     )}
 
@@ -318,6 +357,49 @@ export default function MembersPage() {
           })
         )}
       </div>
+
+      {/* 핸디캡 수정 모달 */}
+      {editingHandicap && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center" style={{ paddingBottom: '64px' }}>
+          <div className="w-full max-w-md bg-white rounded-t-[32px] p-6 space-y-4">
+            <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto" />
+            <h3 className="text-lg font-black">핸디캡 수정</h3>
+            <p className="text-sm text-gray-400">{editingHandicap}님의 핸디캡을 입력해주세요</p>
+            <div>
+              <label className="text-xs font-bold text-gray-400 block mb-1.5">필드 핸디캡</label>
+              <input
+                type="number"
+                value={tempHandicap || ''}
+                onChange={(e) => setTempHandicap(Number(e.target.value))}
+                placeholder="예: 12"
+                min="0" max="54"
+                className="w-full p-4 bg-gray-50 rounded-2xl text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-400 block mb-1.5">G핸디캡</label>
+              <input
+                type="number"
+                value={tempGHandicap || ''}
+                onChange={(e) => setTempGHandicap(Number(e.target.value))}
+                placeholder="예: 15"
+                min="0" max="54"
+                className="w-full p-4 bg-gray-50 rounded-2xl text-sm focus:ring-2 focus:ring-green-500 outline-none"
+              />
+              <p className="text-xs text-gray-400 mt-1">G핸디는 조 편성 시 우선 적용돼요</p>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => { setEditingHandicap(null); setTempHandicap(0); setTempGHandicap(0); }}
+                className="flex-1 py-3 bg-gray-100 rounded-2xl font-bold text-gray-500">취소</button>
+              <button onClick={() => {
+                const member = members.find(m => m.name === editingHandicap);
+                if (member) handleEditHandicap(member);
+              }} className="flex-1 py-3 bg-green-600 text-white rounded-2xl font-bold">저장</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 닉네임 수정 모달 */}
       {editingNickname && (
