@@ -58,7 +58,9 @@ function GroupAssignContent() {
       const usersSnap = await getDocs(collection(db, 'users'));
       const handicapMap: Record<string, number> = {};
       usersSnap.docs.forEach(d => {
-        handicapMap[d.data().name || d.id] = d.data().handicap || 0;
+        const ud = d.data();
+        // G핸디 우선, 없으면 일반 핸디캡
+        handicapMap[ud.name || d.id] = ud.gHandicap || ud.handicap || 0;
       });
 
       const participants: GroupMember[] = (data.participants || []).map((p: any) => ({

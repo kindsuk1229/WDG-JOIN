@@ -13,6 +13,10 @@ export default function MyPage() {
   const [userNickname, setUserNickname] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [tempNickname, setTempNickname] = useState('');
+  const [handicap, setHandicap] = useState(0);
+  const [gHandicap, setGHandicap] = useState(0);
+  const [tempHandicap, setTempHandicap] = useState(0);
+  const [tempGHandicap, setTempGHandicap] = useState(0);
 
   const [stats, setStats] = useState({
     totalCount: 0,
@@ -31,6 +35,22 @@ export default function MyPage() {
     setUserName(rawName.trim());
     setUserNickname(rawNickname.trim());
     setTempNickname(rawNickname.trim());
+
+    // 핸디캡 불러오기
+    const loadHandicap = async () => {
+      try {
+        const userSnap = await getDoc(doc(db, 'users', rawName.trim()));
+        if (userSnap.exists()) {
+          const h = userSnap.data().handicap || 0;
+          const gh = userSnap.data().gHandicap || 0;
+          setHandicap(h);
+          setGHandicap(gh);
+          setTempHandicap(h);
+          setTempGHandicap(gh);
+        }
+      } catch {}
+    };
+    loadHandicap();
 
     const fetchMyData = async () => {
       try {
@@ -136,6 +156,8 @@ export default function MyPage() {
     // 1. 로컬스토리지에 저장
     localStorage.setItem('user_nickname', trimmedNickname);
     setUserNickname(trimmedNickname);
+    setHandicap(tempHandicap);
+    setGHandicap(tempGHandicap);
 
     // ✅ 2. Firebase users 컬렉션에도 저장
     try {
@@ -145,6 +167,8 @@ export default function MyPage() {
         await setDoc(userRef, {
           ...userSnap.data(),
           nickname: trimmedNickname,
+          handicap: tempHandicap,
+          gHandicap: tempGHandicap,
           updatedAt: new Date().toISOString(),
         });
       } else {
@@ -271,6 +295,29 @@ export default function MyPage() {
                   <p className="text-[16px] text-green-600 mt-3 font-medium bg-green-50 p-2 rounded-lg">
                     💡 닉네임은 모든 기기에서 자동으로 동기화됩니다. 벙개 명단에는 닉네임이 우선 표시되며, 정산은 실명({userName}) 기준으로 처리됩니다.
                   </p>
+                </div>
+                <div>
+                  <label className="text-[17px] font-black text-gray-400 uppercase tracking-wider">핸디캡 (필드)</label>
+                  <input
+                    type="number"
+                    value={tempHandicap || ''}
+                    onChange={(e) => setTempHandicap(Number(e.target.value))}
+                    placeholder="0"
+                    min="0" max="54"
+                    className="w-full mt-2 p-4 bg-gray-100 rounded-2xl border-none font-bold text-gray-800 focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[17px] font-black text-gray-400 uppercase tracking-wider">G핸디캡</label>
+                  <input
+                    type="number"
+                    value={tempGHandicap || ''}
+                    onChange={(e) => setTempGHandicap(Number(e.target.value))}
+                    placeholder="0"
+                    min="0" max="54"
+                    className="w-full mt-2 p-4 bg-gray-100 rounded-2xl border-none font-bold text-gray-800 focus:ring-2 focus:ring-green-500"
+                  />
+                  <p className="text-sm text-gray-400 mt-1">G핸디는 조 편성 시 우선 적용돼요</p>
                 </div>
               </div>
             </div>
