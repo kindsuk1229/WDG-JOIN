@@ -22,9 +22,10 @@ interface Member {
   avgScore: number;
   bestScore: number;
   rounds: number;
-  handicap: number;   // 평균타수 or 수동입력
-  manualHandicap: number; // 수동입력 핸디캡
-  gHandicap: number;
+  fieldHandicap: number;  // 성적 있으면 평균타수, 없으면 수동입력
+  manualHandicap: number; // 수동입력 필드핸디
+  gHandicap: number;      // G핸디 (음수 포함)
+  hasScoreRecord: boolean; // 성적 기록 존재 여부
 }
 
 export default function MembersPage() {
@@ -39,8 +40,8 @@ export default function MembersPage() {
   const [editingNickname, setEditingNickname] = useState<string | null>(null);
   const [tempNickname, setTempNickname] = useState('');
   const [editingHandicap, setEditingHandicap] = useState<string | null>(null);
-  const [tempHandicap, setTempHandicap] = useState(0);
-  const [tempGHandicap, setTempGHandicap] = useState(0);
+  const [tempHandicap, setTempHandicap] = useState<string>('');
+  const [tempGHandicap, setTempGHandicap] = useState<string>('');
 
   const fetchMembers = async (myNameStr: string) => {
     try {
@@ -67,15 +68,12 @@ export default function MembersPage() {
       meetupsSnap.forEach((d) => {
         const data = d.data();
         if (!data.date || !data.date.startsWith(currentYear)) return;
-
-        // completed 또는 날짜가 지난 closed/manually_closed만 카운트
         if (data.status === 'cancelled' || data.status === 'open') return;
         if (data.status === 'closed' || data.status === 'manually_closed') {
           const timeStr = (data.cartTimes?.[0] === 'TBD' || !data.cartTimes?.[0]) ? '23:59' : data.cartTimes[0];
           const meetupDateTime = new Date(`${data.date}T${timeStr}:00`);
           if (now < meetupDateTime) return;
         }
-
         if (data.meetupType === 'etc' || data.isEtc) return;
         const point = data.meetupType === 'overnight' || data.isOvernight ? 4 : data.meetupType === 'field' ? 2 : 1;
         const isInSeason = data.date >= seasonStart && data.date <= `${seasonEnd}-31`;
@@ -98,7 +96,6 @@ export default function MembersPage() {
         const data = d.data();
         const players = data.players || [];
         players.forEach((p: any) => {
-          // ✅ 간편입력(totalOverride) 또는 홀별 합산
           const total = (p.totalOverride || 0) > 0
             ? p.totalOverride
             : (p.scores || []).reduce((a: number, b: number) => a + b, 0);
@@ -113,6 +110,11 @@ export default function MembersPage() {
         const name = data.name || d.id;
         const role = name === OWNER_NAME ? 'owner' : (adminMap[name] || '');
         const stats = scoreStatsMap[name];
+        const hasScore = !!(stats && stats.scores.length > 0);
+        const avgScore = hasScore
+          ? Math.round(stats!.scores.reduce((a, b) => a + b, 0) / stats!.scores.length)
+          : 0;
+
         return {
           name,
           nickname: data.nickname || '',
@@ -124,15 +126,15 @@ export default function MembersPage() {
           meetupCount: meetupCountMap[name] || 0,
           seasonScore: seasonScoreMap[name] || 0,
           yearlyScore: yearlyScoreMap[name] || 0,
-          avgScore: stats ? Math.round(stats.scores.reduce((a, b) => a + b, 0) / stats.scores.length) : 0,
-          bestScore: stats ? Math.min(...stats.scores) : 0,
-          rounds: stats ? stats.scores.length : 0,
-          // ✅ 성적 기록 있으면 평균타수를 핸디캡으로 자동 반영, 없으면 수동 입력값 사용
-          handicap: stats && stats.scores.length > 0
-            ? Math.round(stats.scores.reduce((a, b) => a + b, 0) / stats.scores.length)
-            : (data.handicap || 0),
+          avgScore,
+          bestScore: hasScore ? Math.min(...stats!.scores) : 0,
+          rounds: hasScore ? stats!.scores.length : 0,
+          hasScoreRecord: hasScore,
+          // ✅ 성적 있으면 평균타수를 필드핸디로 자동 반영, 없으면 수동입력값 사용
+          fieldHandicap: hasScore ? avgScore : (data.handicap || 0),
           manualHandicap: data.handicap || 0,
-          gHandicap: data.gHandicap || 0,
+          // ✅ gHandicap은 음수도 허용 (undefined/null이면 null로 처리)
+          gHandicap: data.gHandicap !== undefined && data.gHandicap !== null ? data.gHandicap : null,
         };
       });
 
@@ -212,12 +214,20 @@ export default function MembersPage() {
     try {
       const userRef = doc(db, 'users', member.name);
       const userSnap = await getDoc(userRef);
+      // ✅ 빈 문자열이면 null로 저장 (미입력 구분)
+      const handicapVal = tempHandicap === '' ? null : Number(tempHandicap);
+      const gHandicapVal = tempGHandicap === '' ? null : Number(tempGHandicap);
       if (userSnap.exists()) {
-        await setDoc(userRef, { ...userSnap.data(), handicap: tempHandicap, gHandicap: tempGHandicap, updatedAt: new Date().toISOString() });
+        await setDoc(userRef, {
+          ...userSnap.data(),
+          handicap: handicapVal,
+          gHandicap: gHandicapVal,
+          updatedAt: new Date().toISOString(),
+        });
       }
       setEditingHandicap(null);
-      setTempHandicap(0);
-      setTempGHandicap(0);
+      setTempHandicap('');
+      setTempGHandicap('');
       fetchMembers(myName);
     } catch {
       alert('핸디캡 수정 중 오류가 발생했습니다.');
@@ -292,6 +302,8 @@ export default function MembersPage() {
                       <span className="text-sm font-bold text-blue-500">시즌 {member.seasonScore}점</span>
                       <span className="text-sm font-bold text-green-600">연간 {member.yearlyScore}점</span>
                     </div>
+
+                    {/* 성적 기록이 있을 때만 라운드/평균/베스트 표시 */}
                     {member.rounds > 0 && (
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         <span className="text-sm text-gray-400">🏌️ {member.rounds}라운드</span>
@@ -299,23 +311,30 @@ export default function MembersPage() {
                         <span className="text-sm font-bold text-orange-500">베스트 {member.bestScore}타</span>
                       </div>
                     )}
-                    {(member.handicap > 0 || member.manualHandicap > 0 || member.gHandicap > 0) && (
+
+                    {/* ✅ 핸디 표시 */}
+                    {(member.fieldHandicap > 0 || member.gHandicap !== null) && (
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        {member.rounds > 0 && member.handicap > 0 && (
-                          <span className="text-sm font-bold text-green-600">평균 {member.handicap}타</span>
+                        {/* 필드핸디: 성적 있으면 평균타수 자동반영, 없으면 수동입력값 */}
+                        {member.fieldHandicap > 0 && (
+                          <span className="text-sm font-bold text-blue-500">
+                            필드핸디 {member.fieldHandicap}
+                            {member.hasScoreRecord && (
+                              <span className="text-xs font-normal text-gray-400 ml-0.5">(성적반영)</span>
+                            )}
+                          </span>
                         )}
-                        {member.manualHandicap > 0 && (
-                          <span className="text-sm font-bold text-blue-500">필드핸디 {member.manualHandicap}</span>
-                        )}
-                        {member.gHandicap > 0 && (
-                          <span className="text-sm font-bold text-purple-500">스크린핸디 {member.gHandicap}</span>
+                        {/* G핸디: null이 아닐 때만 표시 (0도 표시, 음수도 표시) */}
+                        {member.gHandicap !== null && (
+                          <span className="text-sm font-bold text-purple-500">
+                            G핸디 {member.gHandicap}
+                          </span>
                         )}
                       </div>
                     )}
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    {/* 닉네임 수정 (오너/매니저만) */}
                     {isAdmin && member.name !== myName && (
                       <button
                         onClick={() => { setEditingNickname(member.name); setTempNickname(member.nickname || ''); }}
@@ -324,18 +343,18 @@ export default function MembersPage() {
                         닉네임 수정
                       </button>
                     )}
-
-                    {/* 핸디캡 수정 (오너/매니저만) */}
                     {isAdmin && member.name !== myName && (
                       <button
-                        onClick={() => { setEditingHandicap(member.name); setTempHandicap(member.handicap || 0); setTempGHandicap(member.gHandicap || 0); }}
+                        onClick={() => {
+                          setEditingHandicap(member.name);
+                          setTempHandicap(member.manualHandicap > 0 ? String(member.manualHandicap) : '');
+                          setTempGHandicap(member.gHandicap !== null ? String(member.gHandicap) : '');
+                        }}
                         className="text-sm font-bold px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600"
                       >
                         핸디 수정
                       </button>
                     )}
-
-                    {/* 매니저 지정/해제 (오너만) */}
                     {isOwner && !member.isOwner && (
                       <button
                         onClick={() => handleToggleManager(member)}
@@ -348,8 +367,6 @@ export default function MembersPage() {
                         {toggling === member.name ? '처리중' : member.role === 'manager' ? '매니저 해제' : '매니저 지정'}
                       </button>
                     )}
-
-                    {/* 삭제 (오너/매니저만, 본인/관리자 제외) */}
                     {isAdmin && member.name !== myName && !member.isAdmin && (
                       <button
                         onClick={() => handleDelete(member)}
@@ -384,28 +401,28 @@ export default function MembersPage() {
               <label className="text-xs font-bold text-gray-400 block mb-1.5">필드 핸디캡</label>
               <input
                 type="number"
-                value={tempHandicap || ''}
-                onChange={(e) => setTempHandicap(Number(e.target.value))}
-                placeholder="예: 12"
+                value={tempHandicap}
+                onChange={(e) => setTempHandicap(e.target.value)}
+                placeholder="예: 15 (미입력 시 성적 자동반영)"
                 min="0" max="54"
                 className="w-full p-4 bg-gray-50 rounded-2xl text-sm focus:ring-2 focus:ring-green-500 outline-none"
                 autoFocus
               />
+              <p className="text-xs text-gray-400 mt-1">성적 기록이 있으면 평균타수로 자동 반영돼요</p>
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-400 block mb-1.5">스크린 핸디캡 (G핸디)</label>
+              <label className="text-xs font-bold text-gray-400 block mb-1.5">G핸디캡 (스크린 핸디)</label>
               <input
                 type="number"
-                value={tempGHandicap || ''}
-                onChange={(e) => setTempGHandicap(Number(e.target.value))}
-                placeholder="예: 15"
-                min="0" max="54"
+                value={tempGHandicap}
+                onChange={(e) => setTempGHandicap(e.target.value)}
+                placeholder="예: -8 (음수 입력 가능)"
                 className="w-full p-4 bg-gray-50 rounded-2xl text-sm focus:ring-2 focus:ring-green-500 outline-none"
               />
-              <p className="text-xs text-gray-400 mt-1">스크린 벙개 조 편성 시 사용돼요</p>
+              <p className="text-xs text-gray-400 mt-1">스크린 벙개 조 편성 시 사용돼요. 음수도 입력 가능해요</p>
             </div>
             <div className="flex gap-3">
-              <button onClick={() => { setEditingHandicap(null); setTempHandicap(0); setTempGHandicap(0); }}
+              <button onClick={() => { setEditingHandicap(null); setTempHandicap(''); setTempGHandicap(''); }}
                 className="flex-1 py-3 bg-gray-100 rounded-2xl font-bold text-gray-500">취소</button>
               <button onClick={() => {
                 const member = members.find(m => m.name === editingHandicap);
