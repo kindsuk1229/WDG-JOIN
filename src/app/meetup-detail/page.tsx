@@ -59,6 +59,30 @@ function MeetupDetailContent() {
     }
   }, [meetupId]);
 
+  const getMaxPlayers = (m: any) =>
+    m.meetupType === 'screen' || m.meetupType === 'etc'
+      ? m.playerCount
+      : (m.cartCount || 0) * 4;
+
+  // ✅ 대기자 자동 승격 - 자리 있을 때만
+  const tryPromoteWaitlist = (
+    currentParticipants: any[],
+    currentWaitlist: any[],
+    max: number
+  ): { updatedParticipants: any[]; updatedWaitlist: any[]; promoted: any | null } => {
+    const updatedParticipants = [...currentParticipants];
+    const updatedWaitlist = [...currentWaitlist];
+    let promoted = null;
+
+    // 자리가 있고 대기자가 있을 때만 승격
+    if (updatedParticipants.length < max && updatedWaitlist.length > 0) {
+      promoted = updatedWaitlist.shift();
+      updatedParticipants.push(promoted);
+    }
+
+    return { updatedParticipants, updatedWaitlist, promoted };
+  };
+
   const handleDelete = async () => {
     if (!window.confirm('이 벙개를 삭제하시겠습니까?')) return;
     try {
@@ -76,9 +100,7 @@ function MeetupDetailContent() {
 
     const participants = meetup.participants || [];
     const waitlist = meetup.waitlist || [];
-    const maxPlayers = meetup.meetupType === 'screen' || meetup.meetupType === 'etc'
-      ? meetup.playerCount
-      : (meetup.cartCount || 0) * 4;
+    const maxPlayers = getMaxPlayers(meetup);
 
     const isJoined = participants.some((p: any) => p.name === myName);
     const isWaiting = waitlist.some((p: any) => p.name === myName);
@@ -88,15 +110,10 @@ function MeetupDetailContent() {
       const meetupRef = doc(db, 'meetups', meetupId);
 
       if (isJoined) {
-        // ✅ 참여 취소 → 대기자 1번 자동 승격
-        const updatedParticipants = participants.filter((p: any) => p.name !== myName);
-        const updatedWaitlist = [...waitlist];
-        let promoted = null;
-
-        if (updatedWaitlist.length > 0) {
-          promoted = updatedWaitlist.shift(); // 대기 1번 꺼내기
-          updatedParticipants.push(promoted);
-        }
+        // ✅ 참여 취소 → 자리 생기므로 대기자 1번 자동 승격
+        const afterCancel = participants.filter((p: any) => p.name !== myName);
+        const { updatedParticipants, updatedWaitlist, promoted } =
+          tryPromoteWaitlist(afterCancel, waitlist, maxPlayers);
 
         await updateDoc(meetupRef, {
           participants: updatedParticipants,
@@ -104,7 +121,6 @@ function MeetupDetailContent() {
           status: updatedParticipants.length >= maxPlayers ? 'closed' : 'open',
         });
 
-        // 대기자 승격 알림
         if (promoted) {
           await fetch('/api/send-notification', {
             method: 'POST',
@@ -117,8 +133,6 @@ function MeetupDetailContent() {
             }),
           });
         }
-
-        // 등록자 알림
         if (meetup.creatorId && meetup.creatorId !== myName) {
           await fetch('/api/send-notification', {
             method: 'POST',
@@ -144,7 +158,6 @@ function MeetupDetailContent() {
         const updatedWaitlist = [...waitlist, { name: myName, nickname: myNickname, joinedAt: new Date().toISOString() }];
         await updateDoc(meetupRef, { waitlist: updatedWaitlist });
 
-        // 등록자에게 대기 알림
         if (meetup.creatorId && meetup.creatorId !== myName) {
           await fetch('/api/send-notification', {
             method: 'POST',
@@ -197,7 +210,136 @@ function MeetupDetailContent() {
     }
   };
 
-  // 회원 목록 불러오기
+  // ✅ 관리자: 참여자 강제 취소
+  const handleForceRemove = async (p: any, idx: number) => {
+    if (!window.confirm(`${p.nickname || p.name}님의 참여를 취소하시겠습니까?`)) return;
+    try {
+      const currentParticipants = meetup.participants || [];
+      const currentWaitlist = meetup.waitlist || [];
+      const maxPlayers = getMaxPlayers(meetup);
+
+      const afterRemove = currentParticipants.filter((_: any, i: number) => i !== idx);
+
+      // ✅ 자리 생기므로 대기자 자동 승격
+      const { updatedParticipants, updatedWaitlist, promoted } =
+        tryPromoteWaitlist(afterRemove, currentWaitlist, maxPlayers);
+
+      await updateDoc(doc(db, 'meetups', meetupId!), {
+        participants: updatedParticipants,
+        waitlist: updatedWaitlist,
+        status: updatedParticipants.length >= maxPlayers ? 'closed' : 'open',
+      });
+
+      await fetch('/api/send-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toUserName: p.name,
+          title: '⛳ 참여 취소 안내',
+          body: `"${meetup.title}" 참여가 취소되었습니다.`,
+          url: `/meetup-detail?id=${meetupId}`,
+        }),
+      });
+
+      if (promoted) {
+        await fetch('/api/send-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toUserName: promoted.name,
+            title: '🎉 대기 → 참여 확정!',
+            body: `"${meetup.title}" 대기에서 참여로 확정됐어요!`,
+            url: `/meetup-detail?id=${meetupId}`,
+          }),
+        });
+      }
+
+      window.location.reload();
+    } catch (error) {
+      alert('처리 중 오류가 발생했습니다.');
+    }
+  };
+
+  // ✅ 관리자: 참여자 → 대기로 이동
+  const handleMoveToWaitlist = async (p: any, idx: number) => {
+    if (!window.confirm(`${p.nickname || p.name}님을 대기로 이동하시겠습니까?`)) return;
+    try {
+      const currentParticipants = meetup.participants || [];
+      const currentWaitlist = meetup.waitlist || [];
+      const maxPlayers = getMaxPlayers(meetup);
+
+      // 참여자에서 제거
+      const afterRemove = currentParticipants.filter((_: any, i: number) => i !== idx);
+
+      // 대기 맨 뒤에 추가
+      const updatedWaitlist = [
+        ...currentWaitlist,
+        { name: p.name, nickname: p.nickname || p.name, joinedAt: new Date().toISOString(), movedFromParticipants: true },
+      ];
+
+      await updateDoc(doc(db, 'meetups', meetupId!), {
+        participants: afterRemove,
+        waitlist: updatedWaitlist,
+        status: afterRemove.length >= maxPlayers ? 'closed' : 'open',
+      });
+
+      await fetch('/api/send-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toUserName: p.name,
+          title: '⛳ 대기 이동 안내',
+          body: `"${meetup.title}" 참여가 대기로 변경되었습니다.`,
+          url: `/meetup-detail?id=${meetupId}`,
+        }),
+      });
+
+      window.location.reload();
+    } catch (error) {
+      alert('처리 중 오류가 발생했습니다.');
+    }
+  };
+
+  // ✅ 관리자: 대기자 → 참여로 수동 승격 (자리 있을 때만)
+  const handlePromoteFromWaitlist = async (p: any, idx: number) => {
+    const currentParticipants = meetup.participants || [];
+    const maxPlayers = getMaxPlayers(meetup);
+
+    if (currentParticipants.length >= maxPlayers) {
+      alert('정원이 가득 찼어요. 먼저 참여자를 취소하거나 대기로 내려주세요.');
+      return;
+    }
+
+    if (!window.confirm(`${p.nickname || p.name}님을 참여로 올리시겠습니까?`)) return;
+    try {
+      const currentWaitlist = meetup.waitlist || [];
+      const updatedWaitlist = currentWaitlist.filter((_: any, i: number) => i !== idx);
+      const updatedParticipants = [...currentParticipants, { name: p.name, nickname: p.nickname || p.name }];
+      const newIsFull = updatedParticipants.length >= maxPlayers;
+
+      await updateDoc(doc(db, 'meetups', meetupId!), {
+        participants: updatedParticipants,
+        waitlist: updatedWaitlist,
+        status: newIsFull ? 'closed' : 'open',
+      });
+
+      await fetch('/api/send-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toUserName: p.name,
+          title: '🎉 대기 → 참여 확정!',
+          body: `"${meetup.title}" 대기에서 참여로 확정됐어요!`,
+          url: `/meetup-detail?id=${meetupId}`,
+        }),
+      });
+
+      window.location.reload();
+    } catch (error) {
+      alert('처리 중 오류가 발생했습니다.');
+    }
+  };
+
   const fetchMembers = async () => {
     if (allMembers.length > 0) return;
     try {
@@ -231,16 +373,10 @@ function MeetupDetailContent() {
     }
   };
 
-  // ✅ 카카오 캘린더 등록
   const addToKakaoCalendar = async (meetupData: any) => {
     try {
       const Kakao = (window as any).Kakao;
-      if (!Kakao || !Kakao.Auth) {
-        alert('카카오 로그인이 필요해요!');
-        return;
-      }
-
-      // 날짜/시간 포맷 변환 (YYYYMMDDTHHMMSSZ)
+      if (!Kakao || !Kakao.Auth) { alert('카카오 로그인이 필요해요!'); return; }
       const formatKakaoDate = (date: string, time: string) => {
         if (!date) return '';
         const timeStr = (!time || time === 'TBD') ? '09:00' : time;
@@ -248,62 +384,32 @@ function MeetupDetailContent() {
         const d = new Date(`${date}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
         return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
       };
-
       const startTime = meetupData.cartTimes?.[0];
       const startAt = formatKakaoDate(meetupData.date, startTime);
       const endAt = formatKakaoDate(meetupData.endDate || meetupData.date, '22:00');
-
       const accessToken = localStorage.getItem('kakao_access_token');
-      if (!accessToken) {
-        alert('카카오 로그인이 필요해요! 다시 로그인해주세요.');
-        return;
-      }
-
+      if (!accessToken) { alert('카카오 로그인이 필요해요! 다시 로그인해주세요.'); return; }
       const response = await fetch('https://api.kakao.com/v2/api/calendar/create/event', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
           calendar_id: 'primary',
           event: JSON.stringify({
             title: meetupData.title,
-            time: {
-              start_at: startAt,
-              end_at: endAt,
-              time_zone: 'Asia/Seoul',
-              all_day: false,
-              lunar: false,
-            },
-            location: {
-              name: meetupData.golfCourse,
-            },
+            time: { start_at: startAt, end_at: endAt, time_zone: 'Asia/Seoul', all_day: false, lunar: false },
+            location: { name: meetupData.golfCourse },
             description: `⛳ 골프 벙개\n장소: ${meetupData.golfCourse}\n날짜: ${meetupData.date}${startTime && startTime !== 'TBD' ? '\n티오프: ' + startTime : ''}`,
           })
         }).toString()
       });
-
-      if (response.ok) {
-        alert('카카오 캘린더에 일정이 추가되었어요! 📅');
-      } else {
-        const err = await response.json();
-        console.error('캘린더 오류:', err);
-        alert('캘린더 등록에 실패했어요. 다시 시도해주세요.');
-      }
-    } catch (error) {
-      console.error('캘린더 등록 실패:', error);
-      alert('캘린더 등록 중 오류가 발생했어요.');
-    }
+      if (response.ok) { alert('카카오 캘린더에 일정이 추가되었어요! 📅'); }
+      else { alert('캘린더 등록에 실패했어요. 다시 시도해주세요.'); }
+    } catch (error) { alert('캘린더 등록 중 오류가 발생했어요.'); }
   };
 
   const handleAddMemberAsGuest = async (member: any) => {
     try {
-      const updatedParticipants = [...participants, {
-        name: member.name,
-        nickname: member.nickname || member.name,
-        isGuest: false,
-      }];
+      const updatedParticipants = [...participants, { name: member.name, nickname: member.nickname || member.name, isGuest: false }];
       const newIsFull = updatedParticipants.length >= maxPlayers;
       await updateDoc(doc(db, 'meetups', meetupId!), {
         participants: updatedParticipants,
@@ -312,9 +418,7 @@ function MeetupDetailContent() {
       setMemberSearch('');
       setShowGuestInput(false);
       window.location.reload();
-    } catch (error) {
-      alert('추가 중 오류가 발생했습니다.');
-    }
+    } catch (error) { alert('추가 중 오류가 발생했습니다.'); }
   };
 
   const handleManualClose = async () => {
@@ -323,37 +427,25 @@ function MeetupDetailContent() {
       await updateDoc(doc(db, 'meetups', meetupId!), { status: 'manually_closed' });
       alert('벙개가 마감 처리되었습니다! ⛳');
       window.location.reload();
-    } catch (error) {
-      alert('처리 중 오류가 발생했습니다.');
-    }
+    } catch (error) { alert('처리 중 오류가 발생했습니다.'); }
   };
 
   const handleShare = () => {
     if (!meetup) return;
-
     const shortDate = meetup.date ? (() => {
       const d = new Date(meetup.date + 'T00:00:00');
       const days = ['일', '월', '화', '수', '목', '금', '토'];
       return `${d.getMonth() + 1}/${d.getDate()}(${days[d.getDay()]})`;
     })() : '';
-
     const timeStr = meetup.cartTimes?.[0] ? (() => {
       const [h, m] = meetup.cartTimes[0].split(':').map(Number);
       const isPM = h >= 12;
       const hour12 = h % 12 || 12;
       return `${isPM ? '오후' : '오전'} ${hour12}:${String(m).padStart(2, '0')}`;
     })() : '';
-
     const title = `${meetup.title} ! ${meetup.golfCourse}`;
-    const participantNames = (meetup.participants || [])
-      .map((p: any) => p.nickname || p.name)
-      .join(', ');
-    const description = [
-      `${shortDate}${timeStr ? ` ${timeStr}` : ''}`,
-      participantNames ? `참 : ${participantNames}` : '',
-      `👉 벙개 참여하기`,
-    ].filter(Boolean).join('\n');
-
+    const participantNames = (meetup.participants || []).map((p: any) => p.nickname || p.name).join(', ');
+    const description = [`${shortDate}${timeStr ? ` ${timeStr}` : ''}`, participantNames ? `참 : ${participantNames}` : '', `👉 벙개 참여하기`].filter(Boolean).join('\n');
     shareToKakao(window.location.href, title, description);
   };
 
@@ -365,8 +457,9 @@ function MeetupDetailContent() {
   const isJoined = participants.some((p: any) => p.name === myName);
   const isWaiting = waitlist.some((p: any) => p.name === myName);
   const isParticipant = isJoined;
-  const maxPlayers = (meetup.meetupType === 'screen' || meetup.meetupType === 'etc') ? meetup.playerCount : (meetup.cartCount || 0) * 4;
+  const maxPlayers = getMaxPlayers(meetup);
   const isFull = participants.length >= maxPlayers;
+  const isManager = isAdmin || meetup?.creatorId === myName;
 
   const formatTime = (timeStr: string) => {
     if (!timeStr) return '';
@@ -379,7 +472,6 @@ function MeetupDetailContent() {
 
   const myWaitPosition = waitlist.findIndex((p: any) => p.name === myName) + 1;
 
-  // 버튼 텍스트/색상 결정
   const getButtonStyle = () => {
     if (joining) return { text: '처리 중...', className: 'bg-gray-300 text-gray-400' };
     if (isJoined) return { text: '참여 취소하기', className: 'bg-gray-200 text-gray-600' };
@@ -415,60 +507,28 @@ function MeetupDetailContent() {
         <div className="bg-white p-6 rounded-3xl shadow-sm">
           <div className="flex items-center gap-2 mb-2">
             <h2 className="text-2xl font-black text-gray-800">{meetup.title}</h2>
-            {meetup.meetupType === 'screen' && (
-              <span className="text-[13px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">스크린</span>
-            )}
-            {meetup.meetupType === 'etc' && (
-              <span className="text-[13px] bg-yellow-50 text-yellow-600 px-2 py-0.5 rounded-full font-bold">{meetup.etcType || '기타'}</span>
-            )}
-            {meetup.meetupType === 'overnight' && (
-              <span className="text-[13px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-bold">🌙 1박2일</span>
-            )}
-            {(isFull || meetup?.status === 'manually_closed') && (
-              <span className="text-[13px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold">마감</span>
-            )}
+            {meetup.meetupType === 'screen' && <span className="text-[13px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">스크린</span>}
+            {meetup.meetupType === 'etc' && <span className="text-[13px] bg-yellow-50 text-yellow-600 px-2 py-0.5 rounded-full font-bold">{meetup.etcType || '기타'}</span>}
+            {meetup.meetupType === 'overnight' && <span className="text-[13px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-bold">🌙 1박2일</span>}
+            {(isFull || meetup?.status === 'manually_closed') && <span className="text-[13px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold">마감</span>}
           </div>
           <p className="text-green-600 font-bold mb-4">{meetup.golfCourse}</p>
-
           <div className="space-y-2 text-base text-gray-600 border-t pt-4">
             <div className="flex items-center gap-2">
               <span>📅</span>
-              <span>{meetup.date ? (() => {
-                const d = new Date(meetup.date + 'T00:00:00');
-                const days = ['일', '월', '화', '수', '목', '금', '토'];
-                return `${meetup.date} (${days[d.getDay()]})`;
-              })() : '-'}</span>
+              <span>{meetup.date ? (() => { const d = new Date(meetup.date + 'T00:00:00'); const days = ['일','월','화','수','목','금','토']; return `${meetup.date} (${days[d.getDay()]})`; })() : '-'}</span>
             </div>
             {meetup.meetupType === 'screen' ? (
               <>
-                {meetup.cartTimes?.[0] && (
-                  <div className="flex items-center gap-2"><span>⏰</span><span>{formatTime(meetup.cartTimes[0])}</span></div>
-                )}
+                {meetup.cartTimes?.[0] && <div className="flex items-center gap-2"><span>⏰</span><span>{formatTime(meetup.cartTimes[0])}</span></div>}
                 <div className="flex items-center gap-2"><span>👥</span><span>{meetup.playerCount}명 모집</span></div>
               </>
             ) : (
               <>
                 <div className="flex items-center gap-2"><span>🛒</span><span>{meetup.cartCount}카트 ({meetup.cartCount * 4}명 정원)</span></div>
-                {meetup.greenFee > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span>💰</span>
-                    <span className="font-bold text-green-600">
-                      {meetup.isOvernight ? '패키지' : '그린피'} {meetup.greenFee.toLocaleString()}원 (1인)
-                    </span>
-                  </div>
-                )}
-                {meetup.isOvernight && meetup.endDate && (
-                  <div className="flex items-center gap-2">
-                    <span>📅</span>
-                    <span>~ {meetup.endDate} (종료)</span>
-                  </div>
-                )}
-                {meetup.description && (
-                  <div className="flex items-start gap-2 mt-1">
-                    <span>📋</span>
-                    <span className="text-gray-600 text-sm leading-relaxed">{meetup.description}</span>
-                  </div>
-                )}
+                {meetup.greenFee > 0 && <div className="flex items-center gap-2"><span>💰</span><span className="font-bold text-green-600">{meetup.isOvernight ? '패키지' : '그린피'} {meetup.greenFee.toLocaleString()}원 (1인)</span></div>}
+                {meetup.isOvernight && meetup.endDate && <div className="flex items-center gap-2"><span>📅</span><span>~ {meetup.endDate} (종료)</span></div>}
+                {meetup.description && <div className="flex items-start gap-2 mt-1"><span>📋</span><span className="text-gray-600 text-sm leading-relaxed">{meetup.description}</span></div>}
               </>
             )}
           </div>
@@ -524,7 +584,6 @@ function MeetupDetailContent() {
             <h3 className="font-bold text-base">참여 멤버 ({participants.length}명)</h3>
             <span className="text-gray-400 text-base">최대 {maxPlayers}명</span>
           </div>
-
           <div className="mb-3">
             <div className="flex justify-between text-[13px] text-gray-400 mb-1">
               <span>참여 현황</span>
@@ -541,68 +600,25 @@ function MeetupDetailContent() {
               <p className="text-gray-400 text-base py-2">가장 먼저 참여해보세요! ⛳</p>
             ) : (
               participants.map((p: any, idx: number) => (
-                <div key={idx} className={`flex items-center gap-1 px-4 py-2 rounded-full text-base font-bold ${
+                <div key={idx} className={`flex items-center gap-1 px-3 py-2 rounded-full text-base font-bold ${
                   p.name === myName ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
                 }`}>
                   <span>{p.nickname || p.name}</span>
-                  {/* ✅ 등록자/관리자만 강제 취소 가능 (본인 제외) */}
-                  {(isAdmin || meetup?.creatorId === myName) && p.name !== myName && (
-                    <button
-                      onClick={async () => {
-                        if (!window.confirm(`${p.nickname || p.name}님의 참여를 취소하시겠습니까?`)) return;
-                        try {
-                          const updatedParticipants = participants.filter((_: any, i: number) => i !== idx);
-                          const maxPlayers = meetup.meetupType === 'screen' || meetup.meetupType === 'etc'
-                            ? meetup.playerCount
-                            : (meetup.cartCount || 0) * 4;
-
-                          // ✅ 대기자 자동 승격
-                          const updatedWaitlist = [...(meetup.waitlist || [])];
-                          let promoted = null;
-                          if (updatedWaitlist.length > 0) {
-                            promoted = updatedWaitlist.shift();
-                            updatedParticipants.push(promoted);
-                          }
-
-                          await updateDoc(doc(db, 'meetups', meetupId!), {
-                            participants: updatedParticipants,
-                            waitlist: updatedWaitlist,
-                            status: updatedParticipants.length >= maxPlayers ? 'closed' : 'open',
-                          });
-
-                          // 취소된 멤버에게 알림
-                          await fetch('/api/send-notification', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              toUserName: p.name,
-                              title: '⛳ 참여 취소 안내',
-                              body: `"${meetup.title}" 참여가 취소되었습니다.`,
-                              url: `/meetup-detail?id=${meetupId}`,
-                            }),
-                          });
-
-                          // ✅ 승격된 대기자에게 알림
-                          if (promoted) {
-                            await fetch('/api/send-notification', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({
-                                toUserName: promoted.name,
-                                title: '🎉 대기 → 참여 확정!',
-                                body: `"${meetup.title}" 대기에서 참여로 확정됐어요!`,
-                                url: `/meetup-detail?id=${meetupId}`,
-                              }),
-                            });
-                          }
-
-                          window.location.reload();
-                        } catch (error) {
-                          alert('처리 중 오류가 발생했습니다.');
-                        }
-                      }}
-                      className="ml-1 text-gray-400 hover:text-red-400 font-black text-base"
-                    >×</button>
+                  {isManager && p.name !== myName && (
+                    <div className="flex items-center gap-0.5 ml-1">
+                      {/* ✅ 대기로 내리기 버튼 */}
+                      <button
+                        onClick={() => handleMoveToWaitlist(p, idx)}
+                        className="text-orange-400 hover:text-orange-600 text-xs font-black px-1"
+                        title="대기로 이동"
+                      >↓</button>
+                      {/* ✅ 강제 취소 버튼 */}
+                      <button
+                        onClick={() => handleForceRemove(p, idx)}
+                        className="text-gray-400 hover:text-red-400 font-black text-base"
+                        title="참여 취소"
+                      >×</button>
+                    </div>
                   )}
                 </div>
               ))
@@ -610,21 +626,18 @@ function MeetupDetailContent() {
           </div>
         </div>
 
-        {/* ✅ 게스트 초빙 (등록자/관리자만) */}
-        {(isAdmin || meetup?.creatorId === myName) && (
+        {/* 게스트 초빙 */}
+        {isManager && (
           <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
             <div className="flex justify-between items-center mb-3">
               <p className="font-bold text-base text-gray-700">게스트 초빙</p>
-              <button
-                onClick={() => setShowGuestInput(!showGuestInput)}
-                className="text-sm font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-full border border-green-100"
-              >
+              <button onClick={() => setShowGuestInput(!showGuestInput)}
+                className="text-sm font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-full border border-green-100">
                 {showGuestInput ? '취소' : '+ 게스트 추가'}
               </button>
             </div>
             {showGuestInput && (
               <div className="space-y-3">
-                {/* 탭 */}
                 <div className="flex gap-2">
                   <button onClick={() => setGuestTab('external')}
                     className={`flex-1 py-2 rounded-xl text-xs font-bold ${guestTab === 'external' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
@@ -635,26 +648,18 @@ function MeetupDetailContent() {
                     🔍 회원 검색
                   </button>
                 </div>
-
                 {guestTab === 'external' ? (
                   <>
-                    <input type="text" placeholder="이름 (필수)" value={guestName}
-                      onChange={(e) => setGuestName(e.target.value)}
+                    <input type="text" placeholder="이름 (필수)" value={guestName} onChange={(e) => setGuestName(e.target.value)}
                       className="w-full p-3 bg-gray-50 rounded-xl text-sm border-none focus:ring-2 focus:ring-green-500" />
-                    <input type="text" placeholder="닉네임 (선택)" value={guestNickname}
-                      onChange={(e) => setGuestNickname(e.target.value)}
+                    <input type="text" placeholder="닉네임 (선택)" value={guestNickname} onChange={(e) => setGuestNickname(e.target.value)}
                       className="w-full p-3 bg-gray-50 rounded-xl text-sm border-none focus:ring-2 focus:ring-green-500" />
                     <p className="text-xs text-gray-400">외부 게스트는 점수에 반영되지 않아요</p>
-                    <button onClick={handleAddGuest}
-                      className="w-full py-3 bg-green-600 text-white rounded-xl text-sm font-bold">
-                      게스트 추가하기
-                    </button>
+                    <button onClick={handleAddGuest} className="w-full py-3 bg-green-600 text-white rounded-xl text-sm font-bold">게스트 추가하기</button>
                   </>
                 ) : (
                   <>
-                    <input type="text" placeholder="이름 또는 닉네임 검색"
-                      value={memberSearch}
-                      onChange={(e) => setMemberSearch(e.target.value)}
+                    <input type="text" placeholder="이름 또는 닉네임 검색" value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)}
                       className="w-full p-3 bg-gray-50 rounded-xl text-sm border-none focus:ring-2 focus:ring-green-500" />
                     <p className="text-xs text-gray-400">회원 추가 시 점수에 반영돼요</p>
                     <div className="max-h-40 overflow-y-auto space-y-1">
@@ -673,7 +678,6 @@ function MeetupDetailContent() {
                 )}
               </div>
             )}
-            {/* 게스트 목록 */}
             {participants.filter((p: any) => p.isGuest).length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">
                 {participants.filter((p: any) => p.isGuest).map((p: any, i: number) => (
@@ -691,15 +695,31 @@ function MeetupDetailContent() {
           <div className="bg-orange-50 p-5 rounded-3xl border border-orange-100">
             <h3 className="font-bold text-base text-orange-700 mb-3">
               대기자 ({waitlist.length}명)
+              {isFull && <span className="ml-2 text-xs font-normal text-orange-400">정원 마감 · 자리 생기면 자동 승격</span>}
+              {!isFull && <span className="ml-2 text-xs font-normal text-green-600">자리 있음 · 아래 ↑ 버튼으로 수동 승격 가능</span>}
             </h3>
             <div className="space-y-2">
               {waitlist.map((p: any, idx: number) => (
                 <div key={idx} className="flex items-center gap-3">
                   <span className="text-[13px] font-black text-orange-500 w-6">{idx + 1}</span>
-                  <span className={`text-base font-bold ${p.name === myName ? 'text-orange-600' : 'text-gray-700'}`}>
+                  <span className={`flex-1 text-base font-bold ${p.name === myName ? 'text-orange-600' : 'text-gray-700'}`}>
                     {p.nickname || p.name}
                     {p.name === myName && <span className="ml-1 text-[13px]">(나)</span>}
                   </span>
+                  {/* ✅ 관리자: 대기 → 참여 수동 승격 (자리 있을 때만 활성화) */}
+                  {isManager && (
+                    <button
+                      onClick={() => handlePromoteFromWaitlist(p, idx)}
+                      disabled={isFull}
+                      className={`text-xs font-bold px-2.5 py-1.5 rounded-lg ${
+                        isFull
+                          ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                          : 'bg-green-100 text-green-700 active:bg-green-200'
+                      }`}
+                    >
+                      ↑ 참여로
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -713,39 +733,29 @@ function MeetupDetailContent() {
             <span className="text-lg">💬</span>
             <span className="text-base">카톡 공유</span>
           </button>
-
           <button onClick={handleJoin} disabled={joining}
             className={`flex-1 p-4 rounded-2xl font-bold transition-all active:scale-95 ${buttonStyle.className}`}>
             {buttonStyle.text}
           </button>
         </div>
 
-        {/* ✅ 조 편성 버튼 (필드/스크린/1박2일, 관리자/등록자) */}
         {(isAdmin || meetup?.creatorId === myName) && (meetup?.meetupType === 'field' || meetup?.meetupType === 'overnight' || meetup?.meetupType === 'screen') && (
-          <button
-            onClick={() => router.push(`/group-assign?meetupId=${meetupId}`)}
-            className="w-full py-4 rounded-2xl font-bold text-white text-base bg-blue-600 shadow-lg shadow-blue-200 active:scale-95 transition-all"
-          >
+          <button onClick={() => router.push(`/group-assign?meetupId=${meetupId}`)}
+            className="w-full py-4 rounded-2xl font-bold text-white text-base bg-blue-600 shadow-lg shadow-blue-200 active:scale-95 transition-all">
             👥 조 편성하기
           </button>
         )}
 
-        {/* ✅ 필드/1박2일 벙개만 성적표 버튼 표시 */}
         {(meetup?.meetupType === 'field' || meetup?.meetupType === 'overnight') && (
-          <button
-            onClick={() => router.push(`/scorecard?meetupId=${meetupId}`)}
-            className="w-full py-3.5 rounded-2xl font-bold text-sm bg-blue-600 text-white active:scale-95 transition-all"
-          >
+          <button onClick={() => router.push(`/scorecard?meetupId=${meetupId}`)}
+            className="w-full py-3.5 rounded-2xl font-bold text-sm bg-blue-600 text-white active:scale-95 transition-all">
             📊 성적표 입력/보기
           </button>
         )}
 
-        {/* ✅ 관리자/등록자만 수동 마감 버튼 표시 */}
         {(isAdmin || meetup?.creatorId === myName) && meetup?.status !== 'closed' && meetup?.status !== 'manually_closed' && meetup?.status !== 'completed' && meetup?.status !== 'cancelled' && (
-          <button
-            onClick={handleManualClose}
-            className="w-full py-3.5 rounded-2xl font-bold text-sm bg-gray-800 text-white active:scale-95 transition-all"
-          >
+          <button onClick={handleManualClose}
+            className="w-full py-3.5 rounded-2xl font-bold text-sm bg-gray-800 text-white active:scale-95 transition-all">
             🔒 벙개 수동 마감하기
           </button>
         )}
