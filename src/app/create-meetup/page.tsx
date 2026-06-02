@@ -1,0 +1,570 @@
+'use client';
+
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, collection, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { sendNotificationToAll } from '@/lib/fcm';
+
+function TimeInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const totalMinutes = value ? (() => {
+    const [h, m] = value.split(':').map(Number);
+    return h * 60 + (m || 0);
+  })() : 7 * 60;
+
+  const isPM = totalMinutes >= 12 * 60;
+  const hour12 = Math.floor(totalMinutes / 60) % 12 || 12;
+  const minute = totalMinutes % 60;
+
+  const [hourStr, setHourStr] = useState(value ? String(hour12) : '');
+  const [minStr, setMinStr] = useState(value ? String(minute).padStart(2, '0') : '');
+
+  const buildTime = (newIsPM: boolean, h: number, m: number) => {
+    let hour = h % 12;
+    if (newIsPM) hour += 12;
+    return `${String(hour).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="flex items-center gap-2 flex-1">
+      <select
+        value={isPM ? 'PM' : 'AM'}
+        onChange={(e) => {
+          if (hourStr) onChange(buildTime(e.target.value === 'PM', parseInt(hourStr), parseInt(minStr) || 0));
+        }}
+        className="bg-white border border-green-200 rounded-xl px-2 py-2 text-sm font-bold text-green-700 focus:ring-2 focus:ring-green-500"
+      >
+        <option value="AM">오전</option>
+        <option value="PM">오후</option>
+      </select>
+      <input
+        type="text"
+        inputMode="numeric"
+        placeholder="시"
+        maxLength={2}
+        value={hourStr}
+        onChange={(e) => {
+          const v = e.target.value.replace(/[^0-9]/g, '');
+          setHourStr(v);
+          const h = parseInt(v);
+          if (v && h >= 1 && h <= 12) onChange(buildTime(isPM, h, parseInt(minStr) || 0));
+        }}
+        className="w-12 bg-white border border-gray-200 rounded-xl px-2 py-2 text-sm font-bold text-gray-800 text-center focus:ring-2 focus:ring-green-500"
+      />
+      <span className="text-gray-400 font-bold">:</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        placeholder="분"
+        maxLength={2}
+        value={minStr}
+        onChange={(e) => {
+          const v = e.target.value.replace(/[^0-9]/g, '');
+          setMinStr(v);
+          const m = parseInt(v);
+          if (hourStr && v.length === 2 && m >= 0 && m <= 59) onChange(buildTime(isPM, parseInt(hourStr), m));
+        }}
+        className="w-12 bg-white border border-gray-200 rounded-xl px-2 py-2 text-sm font-bold text-gray-800 text-center focus:ring-2 focus:ring-green-500"
+      />
+    </div>
+  );
+}
+
+function CreateMeetupContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const meetupId = searchParams.get('id');
+
+  const [meetupType, setMeetupType] = useState<'field' | 'screen' | 'etc' | 'overnight'>('field');
+  const [endDate, setEndDate] = useState('');
+  const [description, setDescription] = useState('');
+  const [etcType, setEtcType] = useState('술벙');
+  const [title, setTitle] = useState('');
+  const [golfCourse, setGolfCourse] = useState('');
+  const [date, setDate] = useState('');
+  const [cartCount, setCartCount] = useState(1);
+  const [cartTimes, setCartTimes] = useState<string[]>(['07:00']);
+  const [greenFee, setGreenFee] = useState<number>(0);
+  const [playerCount, setPlayerCount] = useState(4);
+  const [loading, setLoading] = useState(false);
+  const [creatorId, setCreatorId] = useState('');
+  const [myName, setMyName] = useState('');
+  const [canEdit, setCanEdit] = useState(false);
+
+  useEffect(() => {
+    const savedName = (localStorage.getItem('user_name') || '').trim();
+    setMyName(savedName);
+
+    if (meetupId) {
+      const fetchMeetup = async () => {
+        try {
+          const docSnap = await getDoc(doc(db, 'meetups', meetupId));
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setTitle(data.title || '');
+            setGolfCourse(data.golfCourse || '');
+            setDate(data.date || '');
+            setMeetupType(data.meetupType || 'field');
+            setEtcType(data.etcType || '술벙');
+            setCartCount(data.cartCount || 1);
+            setCartTimes(data.cartTimes || Array(data.cartCount || 1).fill('07:00'));
+            setGreenFee(data.greenFee || 0);
+            setPlayerCount(data.playerCount || 4);
+            setCreatorId(data.creatorId || '');
+
+            const adminDoc = await getDoc(doc(db, 'admins', savedName));
+            const isAdminUser = adminDoc.exists();
+            const isCreator = data.creatorId === savedName;
+            const isParticipant = (data.participants || []).some((p: any) => p.name === savedName);
+            setCanEdit(isCreator || isAdminUser || isParticipant);
+          }
+        } catch (error) {
+          console.error("데이터 불러오기 실패:", error);
+        }
+      };
+      fetchMeetup();
+    }
+  }, [meetupId]);
+
+  const handleCartCountChange = (count: number) => {
+    setCartCount(count);
+    setCartTimes(Array(count).fill('').map((_, i) => cartTimes[i] || '07:00'));
+  };
+
+  const updateCartTime = (index: number, value: string) => {
+    const newTimes = [...cartTimes];
+    newTimes[index] = value;
+    setCartTimes(newTimes);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (meetupId && !canEdit) { alert('수정 권한이 없습니다.'); return; }
+
+    // 오늘 날짜인 경우 현재 시간 이전 시간 체크
+    const today = new Date().toISOString().split('T')[0];
+    if (date === today && meetupType === 'field') {
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      for (const time of cartTimes) {
+        if (time) {
+          const [h, m] = time.split(':').map(Number);
+          if (h * 60 + m <= currentMinutes) {
+            alert('오늘 날짜는 현재 시간 이후로만 설정할 수 있어요!');
+            return;
+          }
+        }
+      }
+    }
+    if (date === today && (meetupType === 'screen' || meetupType === 'etc') && cartTimes[0]) {
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const [h, m] = cartTimes[0].split(':').map(Number);
+      if (h * 60 + m <= currentMinutes) {
+        alert('오늘 날짜는 현재 시간 이후로만 설정할 수 있어요!');
+        return;
+      }
+    }
+
+    setLoading(true);
+    try {
+      const meetupData: any = {
+        title: title || 'WDG 벙개',
+        golfCourse,
+        date,
+        meetupType,
+        authorName: myName,
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (meetupType === 'field' || meetupType === 'overnight') {
+        meetupData.cartCount = cartCount;
+        meetupData.cartTimes = cartTimes;
+        meetupData.greenFee = greenFee;
+        meetupData.maxPlayers = cartCount * 4;
+        if (meetupType === 'overnight') {
+          meetupData.endDate = endDate;
+          meetupData.isOvernight = true;
+          meetupData.description = description;
+        }
+      } else if (meetupType === 'etc') {
+        meetupData.etcType = etcType;
+        meetupData.playerCount = playerCount;
+        meetupData.cartTimes = cartTimes;
+        meetupData.cartCount = 0;
+        meetupData.maxPlayers = playerCount;
+        meetupData.isEtc = true;
+      } else {
+        meetupData.playerCount = playerCount;
+        meetupData.cartTimes = cartTimes;
+        meetupData.cartCount = 0;
+        meetupData.maxPlayers = playerCount;
+      }
+
+      if (meetupId) {
+        await updateDoc(doc(db, 'meetups', meetupId), meetupData);
+        alert('⛳ 벙개가 수정되었습니다!');
+      } else {
+        const myNickname = (localStorage.getItem('user_nickname') || '').trim();
+        const newDoc = await addDoc(collection(db, 'meetups'), {
+          ...meetupData,
+          creatorId: myName,
+          createdAt: new Date().toISOString(),
+          players: 1,
+          participants: [{ name: myName, nickname: myNickname }],
+        });
+
+        const typeLabel = meetupType === 'screen' ? '스크린' : meetupType === 'etc' ? etcType : meetupType === 'overnight' ? '1박2일' : '필드';
+        await sendNotificationToAll({
+          title: `⛳ 새로운 ${typeLabel} 벙개가 열렸어요!`,
+          body: `${golfCourse} | ${date}`,
+          url: `/meetup-detail?id=${newDoc.id}`,
+          excludeUserName: myName,
+        });
+
+        alert('⛳ 새로운 벙개가 등록되었습니다!');
+      }
+      router.push('/meetups');
+    } catch (error) {
+      alert('오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (meetupId && creatorId && !canEdit) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-full p-10 text-center">
+        <p className="text-4xl mb-4">🚫</p>
+        <p className="font-black text-gray-800 mb-2">접근 권한이 없어요</p>
+        <p className="text-base text-gray-400 mb-6">벙개 참여자, 등록자 또는 관리자만 수정할 수 있어요.</p>
+        <button onClick={() => router.back()} className="px-6 py-3 bg-green-600 text-white rounded-2xl font-bold">돌아가기</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-gray-50 min-h-full">
+      <header className="p-4 bg-white border-b flex justify-between items-center sticky top-0 z-10 shadow-sm">
+        <div className="flex items-center">
+          <button type="button" onClick={() => router.back()} className="mr-4 text-xl font-bold text-gray-600">←</button>
+          <h1 className="text-xl font-bold text-green-700">
+            {meetupId ? '벙개 정보 수정' : '새로운 벙개 만들기'}
+          </h1>
+        </div>
+      </header>
+
+      <form onSubmit={handleSubmit} className="p-5 space-y-6 pb-6">
+
+        {/* 벙개 종류 선택 */}
+        {!meetupId && (
+          <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
+            <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">벙개 종류</label>
+            <div className="grid grid-cols-4 gap-2">
+              <button type="button" onClick={() => setMeetupType('field')}
+                className={`p-4 rounded-2xl border-2 text-center transition-all ${meetupType === 'field' ? 'border-green-500 bg-green-50' : 'border-gray-100 bg-gray-50'}`}>
+                <p className="text-2xl mb-1">⛳</p>
+                <p className={`text-sm font-black ${meetupType === 'field' ? 'text-green-700' : 'text-gray-500'}`}>필드</p>
+              </button>
+              <button type="button" onClick={() => setMeetupType('screen')}
+                className={`p-4 rounded-2xl border-2 text-center transition-all ${meetupType === 'screen' ? 'border-green-500 bg-green-50' : 'border-gray-100 bg-gray-50'}`}>
+                <p className="text-2xl mb-1">🖥️</p>
+                <p className={`text-sm font-black ${meetupType === 'screen' ? 'text-green-700' : 'text-gray-500'}`}>스크린</p>
+              </button>
+              <button type="button" onClick={() => setMeetupType('etc')}
+                className={`p-4 rounded-2xl border-2 text-center transition-all ${meetupType === 'etc' ? 'border-green-500 bg-green-50' : 'border-gray-100 bg-gray-50'}`}>
+                <p className="text-2xl mb-1">🎉</p>
+                <p className={`text-sm font-black ${meetupType === 'etc' ? 'text-green-700' : 'text-gray-500'}`}>기타벙</p>
+              </button>
+              <button type="button" onClick={() => setMeetupType('overnight')}
+                className={`p-4 rounded-2xl border-2 text-center transition-all ${meetupType === 'overnight' ? 'border-green-500 bg-green-50' : 'border-gray-100 bg-gray-50'}`}>
+                <p className="text-2xl mb-1">🌙</p>
+                <p className={`text-sm font-black ${meetupType === 'overnight' ? 'text-green-700' : 'text-gray-500'}`}>1박2일</p>
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="bg-white p-6 rounded-3xl shadow-sm space-y-6 border border-gray-100">
+          <div>
+            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">벙개 제목</label>
+            <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)}
+              placeholder="예: [WDG] 주말 정기 라운딩"
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 text-gray-900" />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">
+              {meetupType === 'etc' ? '장소' : meetupType === 'screen' ? '스크린 골프장' : '골프장 이름'}
+            </label>
+            <input type="text" required value={golfCourse} onChange={(e) => setGolfCourse(e.target.value)}
+              placeholder={meetupType === 'etc' ? '예: 강남 맛집' : meetupType === 'screen' ? '예: 골프존 강남점' : '예: 샤인데일 CC'}
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 text-gray-900" />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">
+              {meetupType === 'overnight' ? '시작 날짜' : '날짜 선택'}
+            </label>
+            <input type="date" required value={date} onChange={(e) => setDate(e.target.value)}
+              min={new Date().toISOString().split('T')[0]}
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 text-gray-900" />
+          </div>
+
+          {meetupType === 'overnight' && (
+            <div>
+              <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">종료 날짜</label>
+              <input type="date" required={meetupType === 'overnight'} value={endDate} onChange={(e) => setEndDate(e.target.value)}
+                min={date || new Date().toISOString().split('T')[0]}
+                className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 text-gray-900" />
+            </div>
+          )}
+
+          {/* 필드: 그린피 + 카트 수 + 티타임 */}
+          {meetupType === 'field' && (
+            <div className="border-t pt-6 space-y-5">
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">그린피 (1인)</label>
+                <div className="flex items-center gap-2">
+                  <input type="number" value={greenFee || ''} onChange={(e) => setGreenFee(Number(e.target.value))}
+                    placeholder="예: 180000" step="10000"
+                    className="flex-1 p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 text-gray-900" />
+                  <span className="text-gray-400 font-bold pr-2">원</span>
+                </div>
+                {greenFee > 0 && <p className="text-[11px] text-green-600 mt-1.5 font-bold">💰 1인 {greenFee.toLocaleString()}원</p>}
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">모집 규모 및 조별 티타임</label>
+                <select value={cartCount} onChange={(e) => handleCartCountChange(Number(e.target.value))}
+                  className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg mb-4 focus:ring-2 focus:ring-green-500 text-gray-900">
+                  {[...Array(15)].map((_, i) => (
+                    <option key={i+1} value={i+1}>{i+1}카트 ({(i+1)*4}명)</option>
+                  ))}
+                </select>
+                <div className="grid grid-cols-1 gap-3">
+                  {cartTimes.map((time, index) => (
+                    <div key={index} className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
+                      <span className="text-[11px] font-black text-green-700 w-10 text-center flex-shrink-0">{index + 1}조</span>
+                      {time === 'TBD' ? (
+                        <span className="flex-1 text-sm font-bold text-orange-500">시간 미정</span>
+                      ) : (
+                        <TimeInput value={time} onChange={(v) => updateCartTime(index, v)} />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => updateCartTime(index, time === 'TBD' ? '07:00' : 'TBD')}
+                        className={`text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0 ${
+                          time === 'TBD' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-400'
+                        }`}
+                      >
+                        {time === 'TBD' ? '시간입력' : '미정'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 스크린: 시작 시간 + 인원 */}
+          {meetupType === 'screen' && (
+            <div className="border-t pt-6 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">시작 시간</label>
+                <div className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
+                  <span className="text-[11px] font-black text-green-700 flex-shrink-0">시작</span>
+                  {cartTimes[0] === 'TBD' ? (
+                    <span className="flex-1 text-sm font-bold text-orange-500">시간 미정</span>
+                  ) : (
+                    <TimeInput value={cartTimes[0] || '07:00'} onChange={(v) => setCartTimes([v])} />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setCartTimes([cartTimes[0] === 'TBD' ? '07:00' : 'TBD'])}
+                    className={`text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0 ${
+                      cartTimes[0] === 'TBD' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-400'
+                    }`}
+                  >
+                    {cartTimes[0] === 'TBD' ? '시간입력' : '미정'}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">모집 인원</label>
+                <select value={playerCount} onChange={(e) => setPlayerCount(Number(e.target.value))}
+                  className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg focus:ring-2 focus:ring-green-500 text-gray-900">
+                  {[...Array(50)].map((_, i) => (
+                    <option key={i+1} value={i+1}>{i+1}명</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* 1박2일: 필드와 동일 설정 */}
+          {meetupType === 'overnight' && (
+            <div className="border-t pt-6 space-y-5">
+              <div className="bg-yellow-50 rounded-2xl p-3 border border-yellow-100">
+                <p className="text-sm text-yellow-700 font-bold text-center">🌙 1박2일 벙개 - 4점 부여</p>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">패키지 금액 (1인)</label>
+                <div className="flex items-center gap-2">
+                  <input type="number" value={greenFee || ''} onChange={(e) => setGreenFee(Number(e.target.value))}
+                    placeholder="예: 350000" step="10000"
+                    className="flex-1 p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 text-gray-900" />
+                  <span className="text-gray-400 font-bold pr-2">원</span>
+                </div>
+                {greenFee > 0 && <p className="text-[11px] text-green-600 mt-1.5 font-bold">💰 1인 {greenFee.toLocaleString()}원</p>}
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">카트 수</label>
+                <select value={cartCount} onChange={(e) => handleCartCountChange(Number(e.target.value))}
+                  className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg mb-4 focus:ring-2 focus:ring-green-500 text-gray-900">
+                  {[...Array(15)].map((_, i) => (
+                    <option key={i+1} value={i+1}>{i+1}카트 ({(i+1)*4}명)</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 1일차 티타임 */}
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">1일차 티오프 시간</label>
+                <div className="grid grid-cols-1 gap-3">
+                  {Array.from({ length: cartCount }).map((_, index) => {
+                    const time = cartTimes[index] || '07:00';
+                    return (
+                      <div key={index} className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
+                        <span className="text-[11px] font-black text-green-700 w-10 text-center flex-shrink-0">{index + 1}조</span>
+                        {time === 'TBD' ? (
+                          <span className="flex-1 text-sm font-bold text-orange-500">시간 미정</span>
+                        ) : (
+                          <TimeInput value={time} onChange={(v) => updateCartTime(index, v)} />
+                        )}
+                        <button type="button" onClick={() => updateCartTime(index, time === 'TBD' ? '07:00' : 'TBD')}
+                          className={`text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0 ${time === 'TBD' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-400'}`}>
+                          {time === 'TBD' ? '시간입력' : '미정'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 2일차 티타임 */}
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">2일차 티오프 시간</label>
+                <div className="grid grid-cols-1 gap-3">
+                  {Array.from({ length: cartCount }).map((_, index) => {
+                    const timeIndex = cartCount + index;
+                    const time = cartTimes[timeIndex] || '07:00';
+                    return (
+                      <div key={index} className="flex items-center gap-3 bg-purple-50/50 p-3 rounded-2xl border border-purple-100">
+                        <span className="text-[11px] font-black text-purple-700 w-10 text-center flex-shrink-0">{index + 1}조</span>
+                        {time === 'TBD' ? (
+                          <span className="flex-1 text-sm font-bold text-orange-500">시간 미정</span>
+                        ) : (
+                          <TimeInput value={time} onChange={(v) => {
+                            const newTimes = [...cartTimes];
+                            while (newTimes.length <= timeIndex) newTimes.push('07:00');
+                            newTimes[timeIndex] = v;
+                            setCartTimes(newTimes);
+                          }} />
+                        )}
+                        <button type="button" onClick={() => {
+                          const newTimes = [...cartTimes];
+                          while (newTimes.length <= timeIndex) newTimes.push('07:00');
+                          newTimes[timeIndex] = time === 'TBD' ? '07:00' : 'TBD';
+                          setCartTimes(newTimes);
+                        }}
+                          className={`text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0 ${time === 'TBD' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-400'}`}>
+                          {time === 'TBD' ? '시간입력' : '미정'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">상세 내용 (선택)</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="예: 숙박 포함, 조식/중식/석식 제공, 라운딩 2회"
+                  rows={3}
+                  className="w-full p-4 bg-gray-50 rounded-2xl border-none text-sm focus:ring-2 focus:ring-green-500 text-gray-900 resize-none"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* 기타벙: 종류 + 시작 시간 + 인원 */}
+          {meetupType === 'etc' && (
+            <div className="border-t pt-6 space-y-5">
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">벙개 종류</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {['술벙', '밥벙', '모임벙', '여행벙', '운동벙', '기타'].map((type) => (
+                    <button key={type} type="button" onClick={() => setEtcType(type)}
+                      className={`py-2.5 rounded-xl text-sm font-bold transition-all ${
+                        etcType === type ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'
+                      }`}>
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wide">시작 시간</label>
+                <div className="flex items-center gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100">
+                  <span className="text-[11px] font-black text-green-700 flex-shrink-0">시작</span>
+                  {cartTimes[0] === 'TBD' ? (
+                    <span className="flex-1 text-sm font-bold text-orange-500">시간 미정</span>
+                  ) : (
+                    <TimeInput value={cartTimes[0] || '19:00'} onChange={(v) => setCartTimes([v])} />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setCartTimes([cartTimes[0] === 'TBD' ? '19:00' : 'TBD'])}
+                    className={`text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0 ${
+                      cartTimes[0] === 'TBD' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-400'
+                    }`}
+                  >
+                    {cartTimes[0] === 'TBD' ? '시간입력' : '미정'}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-400 block mb-3 uppercase tracking-wide">모집 인원</label>
+                <select value={playerCount} onChange={(e) => setPlayerCount(Number(e.target.value))}
+                  className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-lg focus:ring-2 focus:ring-green-500 text-gray-900">
+                  {[...Array(50)].map((_, i) => (
+                    <option key={i+1} value={i+1}>{i+1}명</option>
+                  ))}
+                </select>
+                <div className="mt-3 bg-yellow-50 rounded-2xl p-3 border border-yellow-100">
+                  <p className="text-sm text-yellow-700 font-bold text-center">🎉 기타벙은 점수에 포함되지 않아요</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <button type="submit" disabled={loading}
+          className={`w-full p-4 rounded-2xl font-black text-lg text-white transition-all active:scale-95 ${
+            loading ? 'bg-gray-400' : 'bg-green-600 shadow-lg shadow-green-200'
+          }`}>
+          {loading ? '처리 중...' : meetupId ? '수정 완료하기 ⛳' : '벙개 등록하기 ⛳'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+export default function CreateMeetupPage() {
+  return (
+    <Suspense fallback={<div className="p-10 text-center font-bold text-gray-400">데이터를 불러오는 중...</div>}>
+      <CreateMeetupContent />
+    </Suspense>
+  );
+}

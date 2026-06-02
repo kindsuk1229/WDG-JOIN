@@ -1,0 +1,35 @@
+rules_version = '2';
+
+// ════════════════════════════════════
+// 우동골 Firestore 보안 규칙
+// Firebase 콘솔 > Firestore > 규칙 탭에 붙여넣기
+// ════════════════════════════════════
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── 벙개 ──
+    match /meetups/{meetupId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.hostId == request.auth.uid;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null
+        && resource.data.hostId == request.auth.uid;
+
+      // ── 채팅 ──
+      match /chats/{chatId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null
+          && request.resource.data.senderId == request.auth.uid;
+      }
+
+      // ── 더치페이 비용 ──
+      match /expenses/{expenseId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null;
+        allow delete: if request.auth != null;
+      }
+    }
+  }
+}
