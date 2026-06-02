@@ -300,6 +300,23 @@ function MeetupDetailContent() {
     }
   };
 
+  // ✅ 관리자: 대기자 순서 변경
+  const handleWaitlistReorder = async (idx: number, direction: 'up' | 'down') => {
+    const currentWaitlist = [...(meetup.waitlist || [])];
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= currentWaitlist.length) return;
+
+    // swap
+    [currentWaitlist[idx], currentWaitlist[targetIdx]] = [currentWaitlist[targetIdx], currentWaitlist[idx]];
+
+    try {
+      await updateDoc(doc(db, 'meetups', meetupId!), { waitlist: currentWaitlist });
+      setMeetup((prev: any) => ({ ...prev, waitlist: currentWaitlist }));
+    } catch (error) {
+      alert('순서 변경 중 오류가 발생했습니다.');
+    }
+  };
+
   // ✅ 관리자: 대기자 → 참여로 수동 승격 (자리 있을 때만)
   const handlePromoteFromWaitlist = async (p: any, idx: number) => {
     const currentParticipants = meetup.participants || [];
@@ -706,19 +723,30 @@ function MeetupDetailContent() {
                     {p.nickname || p.name}
                     {p.name === myName && <span className="ml-1 text-[13px]">(나)</span>}
                   </span>
-                  {/* ✅ 관리자: 대기 → 참여 수동 승격 (자리 있을 때만 활성화) */}
                   {isManager && (
-                    <button
-                      onClick={() => handlePromoteFromWaitlist(p, idx)}
-                      disabled={isFull}
-                      className={`text-xs font-bold px-2.5 py-1.5 rounded-lg ${
-                        isFull
-                          ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
-                          : 'bg-green-100 text-green-700 active:bg-green-200'
-                      }`}
-                    >
-                      ↑ 참여로
-                    </button>
+                    <div className="flex items-center gap-1">
+                      {/* 순서 위/아래 */}
+                      <button
+                        onClick={() => handleWaitlistReorder(idx, 'up')}
+                        disabled={idx === 0}
+                        className={`w-7 h-7 rounded-lg text-xs font-black ${idx === 0 ? 'bg-gray-100 text-gray-300' : 'bg-orange-100 text-orange-500 active:bg-orange-200'}`}
+                      >▲</button>
+                      <button
+                        onClick={() => handleWaitlistReorder(idx, 'down')}
+                        disabled={idx === waitlist.length - 1}
+                        className={`w-7 h-7 rounded-lg text-xs font-black ${idx === waitlist.length - 1 ? 'bg-gray-100 text-gray-300' : 'bg-orange-100 text-orange-500 active:bg-orange-200'}`}
+                      >▼</button>
+                      {/* ✅ 대기 → 참여 수동 승격 (자리 있을 때만) */}
+                      <button
+                        onClick={() => handlePromoteFromWaitlist(p, idx)}
+                        disabled={isFull}
+                        className={`text-xs font-bold px-2.5 py-1.5 rounded-lg ${
+                          isFull
+                            ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                            : 'bg-green-100 text-green-700 active:bg-green-200'
+                        }`}
+                      >↑ 참여로</button>
+                    </div>
                   )}
                 </div>
               ))}
