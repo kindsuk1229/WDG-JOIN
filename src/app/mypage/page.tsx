@@ -16,7 +16,6 @@ export default function MyPage() {
   const [handicap, setHandicap] = useState(0);
   const [gHandicap, setGHandicap] = useState<number | null>(null);
   const [tempHandicap, setTempHandicap] = useState<string>('');
-  // G핸디: 절댓값(문자열) + 부호 분리 관리
   const [tempGHandicapAbs, setTempGHandicapAbs] = useState<string>('');
   const [tempGHandicapSign, setTempGHandicapSign] = useState<1 | -1>(1);
 
@@ -30,7 +29,6 @@ export default function MyPage() {
   });
   const [loading, setLoading] = useState(true);
 
-  // G핸디 최종값 계산
   const getFinalGHandicap = (): number | null => {
     if (tempGHandicapAbs === '') return null;
     return tempGHandicapSign * Number(tempGHandicapAbs);
@@ -39,12 +37,10 @@ export default function MyPage() {
   useEffect(() => {
     const rawName = localStorage.getItem('user_name') || '회원';
     const rawNickname = localStorage.getItem('user_nickname') || '';
-
     setUserName(rawName.trim());
     setUserNickname(rawNickname.trim());
     setTempNickname(rawNickname.trim());
 
-    // 핸디캡 불러오기
     const loadHandicap = async () => {
       try {
         const userSnap = await getDoc(doc(db, 'users', rawName.trim()));
@@ -54,7 +50,6 @@ export default function MyPage() {
           setHandicap(h);
           setGHandicap(gh !== undefined && gh !== null ? gh : null);
           setTempHandicap(h > 0 ? String(h) : '');
-          // G핸디 부호/절댓값 분리
           if (gh !== undefined && gh !== null) {
             setTempGHandicapSign(gh < 0 ? -1 : 1);
             setTempGHandicapAbs(String(Math.abs(gh)));
@@ -68,7 +63,6 @@ export default function MyPage() {
       try {
         setLoading(true);
         const savedName = rawName.trim();
-
         const meetupSnap = await getDocs(collection(db, "meetups"));
         let total = 0;
         let monthly = 0;
@@ -90,32 +84,19 @@ export default function MyPage() {
         });
 
         const settlementSnap = await getDocs(
-          query(
-            collection(db, "settlements"),
-            where("userName", "==", savedName),
-            where("status", "==", "pending")
-          )
+          query(collection(db, "settlements"), where("userName", "==", savedName), where("status", "==", "pending"))
         );
-
         let pendingTotal = 0;
         settlementSnap.forEach((doc) => {
           const data = doc.data();
-          const totalAmount = data.totalAmount || 0;
-          const perPerson = data.perPerson || 0;
-          pendingTotal += (totalAmount - perPerson);
+          pendingTotal += (data.totalAmount || 0) - (data.perPerson || 0);
         });
 
         const owingSnap = await getDocs(
-          query(
-            collection(db, "settlement_members"),
-            where("fromName", "==", savedName),
-            where("status", "==", "pending")
-          )
+          query(collection(db, "settlement_members"), where("fromName", "==", savedName), where("status", "==", "pending"))
         );
         let owingTotal = 0;
-        owingSnap.forEach((doc) => {
-          owingTotal += doc.data().amount || 0;
-        });
+        owingSnap.forEach((doc) => { owingTotal += doc.data().amount || 0; });
 
         const nowDate = new Date();
         const scoreYear = nowDate.getFullYear().toString();
@@ -123,28 +104,23 @@ export default function MyPage() {
         const seasonStartMonth = Math.floor((scoreMonth - 1) / 2) * 2 + 1;
         const seasonStart = `${scoreYear}-${String(seasonStartMonth).padStart(2, '0')}`;
         const seasonEnd = `${scoreYear}-${String(seasonStartMonth + 1).padStart(2, '0')}`;
-
         let seasonScore = 0;
         let yearlyScore = 0;
 
         meetupSnap.forEach((d) => {
           const data = d.data();
           if (!data.date || !data.date.startsWith(scoreYear)) return;
-          const nowScore = new Date();
           if (data.status === 'cancelled' || data.status === 'open') return;
           if (data.status === 'closed' || data.status === 'manually_closed') {
             const timeStrS = (data.cartTimes?.[0] === 'TBD' || !data.cartTimes?.[0]) ? '23:59' : data.cartTimes[0];
-            const meetupDTS = new Date(`${data.date}T${timeStrS}:00`);
-            if (nowScore < meetupDTS) return;
+            if (new Date() < new Date(`${data.date}T${timeStrS}:00`)) return;
           }
           const isJoined = data.participants?.some((p: any) => p.name === savedName);
           if (!isJoined) return;
           if (data.meetupType === 'etc' || data.isEtc) return;
           const point = data.meetupType === 'overnight' || data.isOvernight ? 4 : data.meetupType === 'field' ? 2 : 1;
           yearlyScore += point;
-          if (data.date >= seasonStart && data.date <= `${seasonEnd}-31`) {
-            seasonScore += point;
-          }
+          if (data.date >= seasonStart && data.date <= `${seasonEnd}-31`) seasonScore += point;
         });
 
         setStats({ totalCount: total, monthlyCount: monthly, pendingAmount: pendingTotal, owingAmount: owingTotal, seasonScore, yearlyScore });
@@ -172,23 +148,9 @@ export default function MyPage() {
       const userRef = doc(db, 'users', userName.trim());
       const userSnap = await getDoc(userRef);
       if (userSnap.exists()) {
-        await setDoc(userRef, {
-          ...userSnap.data(),
-          nickname: trimmedNickname,
-          handicap: finalHandicap,
-          gHandicap: finalGHandicap,
-          updatedAt: new Date().toISOString(),
-        });
+        await setDoc(userRef, { ...userSnap.data(), nickname: trimmedNickname, handicap: finalHandicap, gHandicap: finalGHandicap, updatedAt: new Date().toISOString() });
       } else {
-        await setDoc(userRef, {
-          name: userName.trim(),
-          nickname: trimmedNickname,
-          handicap: finalHandicap,
-          gHandicap: finalGHandicap,
-          joinedAt: new Date().toISOString(),
-          lastLoginAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
+        await setDoc(userRef, { name: userName.trim(), nickname: trimmedNickname, handicap: finalHandicap, gHandicap: finalGHandicap, joinedAt: new Date().toISOString(), lastLoginAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
       }
     } catch (error) {
       console.error('Firebase 저장 실패:', error);
@@ -201,6 +163,7 @@ export default function MyPage() {
   const menus = [
     { label: '내 벙개 내역', icon: '📋', href: '/my-meetups' },
     { label: '필드 벙개 히스토리', icon: '🏌️', href: '/meetup-history' },
+    { label: '벙 점수 랭킹', icon: '🏅', href: '/bung-ranking' },  // ✅ 추가
     { label: '내 성적 히스토리', icon: '⛳', href: '/my-scores' },
     { label: '성적 랭킹', icon: '🏆', href: '/score-ranking' },
     { label: '정산 내역', icon: '💰', href: '/settlement/history' },
@@ -214,24 +177,18 @@ export default function MyPage() {
       <div className="px-5 pt-6 pb-6">
         <h1 className="text-2xl font-bold mb-6">마이페이지</h1>
 
-        {/* Profile Card */}
         <div className="bg-gray-50 rounded-3xl p-5 mb-6 shadow-sm border border-gray-100">
           <div className="flex items-center gap-4">
             <Avatar name={userName} size={60} />
             <div>
-              <p className="text-lg font-black text-gray-800">
-                {userNickname || userName}
-              </p>
+              <p className="text-lg font-black text-gray-800">{userNickname || userName}</p>
               <p className="text-[16px] text-gray-400 mt-0.5 font-medium italic">
                 {userName === '김근석' ? '우동골 관리자' : '우동골 정회원'}
                 {userNickname && <span className="ml-1.5 not-italic opacity-70">({userName})</span>}
               </p>
-              {/* 핸디 표시 */}
               {(handicap > 0 || gHandicap !== null) && (
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                  {handicap > 0 && (
-                    <span className="text-sm font-bold text-blue-500">필드핸디 {handicap}</span>
-                  )}
+                  {handicap > 0 && <span className="text-sm font-bold text-blue-500">필드핸디 {handicap}</span>}
                   {gHandicap !== null && (
                     <span className="text-sm font-bold text-purple-500">
                       G핸디 {gHandicap >= 0 ? `+${gHandicap}` : gHandicap}
@@ -243,7 +200,6 @@ export default function MyPage() {
           </div>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 gap-2 mb-6">
           {[
             { label: '참여 벙개', value: loading ? '-' : `${stats.totalCount}회`, color: 'text-gray-800' },
@@ -260,11 +216,9 @@ export default function MyPage() {
           ))}
         </div>
 
-        {/* Menu List */}
         <div className="space-y-1">
           {menus.map((item, i) => (
-            <div
-              key={i}
+            <div key={i}
               onClick={() => {
                 if (item.onClick) item.onClick();
                 else if (item.href !== '#') router.push(item.href!);
@@ -284,82 +238,49 @@ export default function MyPage() {
 
       {/* 프로필 수정 바텀 시트 */}
       {isEditing && (
-        <div
-          className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center"
-          style={{ bottom: '64px' }}
-        >
-          <div
-            className="w-full max-w-md bg-white rounded-t-[32px] flex flex-col animate-in slide-in-from-bottom duration-300"
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center" style={{ bottom: '64px' }}>
+          <div className="w-full max-w-md bg-white rounded-t-[32px] flex flex-col animate-in slide-in-from-bottom duration-300"
             style={{ maxHeight: 'calc(100vh - 128px)' }}
-            onTouchMove={e => e.stopPropagation()}
-          >
+            onTouchMove={e => e.stopPropagation()}>
             <div className="px-8 pt-8 pb-4 shrink-0">
               <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
               <h3 className="text-xl font-black">프로필 수정</h3>
             </div>
-
             <div className="flex-1 overflow-y-auto px-8 pb-4" style={{ WebkitOverflowScrolling: 'touch' }}>
               <div className="space-y-6">
-                {/* 실명 */}
                 <div>
                   <label className="text-[17px] font-black text-gray-400 uppercase tracking-wider">정산용 실명 (수정 불가)</label>
-                  <input type="text" value={userName} disabled
-                    className="w-full mt-2 p-4 bg-gray-50 rounded-2xl border-none text-gray-400 font-bold" />
+                  <input type="text" value={userName} disabled className="w-full mt-2 p-4 bg-gray-50 rounded-2xl border-none text-gray-400 font-bold" />
                 </div>
-
-                {/* 닉네임 */}
                 <div>
                   <label className="text-[17px] font-black text-gray-400 uppercase tracking-wider">활동 닉네임 설정</label>
-                  <input
-                    type="text"
-                    value={tempNickname}
-                    onChange={(e) => setTempNickname(e.target.value)}
+                  <input type="text" value={tempNickname} onChange={(e) => setTempNickname(e.target.value)}
                     placeholder="닉네임을 입력하세요"
-                    className="w-full mt-2 p-4 bg-gray-100 rounded-2xl border-none font-bold text-gray-800 focus:ring-2 focus:ring-green-500"
-                  />
+                    className="w-full mt-2 p-4 bg-gray-100 rounded-2xl border-none font-bold text-gray-800 focus:ring-2 focus:ring-green-500" />
                   <p className="text-[16px] text-green-600 mt-3 font-medium bg-green-50 p-2 rounded-lg">
                     💡 닉네임은 모든 기기에서 자동으로 동기화됩니다. 벙개 명단에는 닉네임이 우선 표시되며, 정산은 실명({userName}) 기준으로 처리됩니다.
                   </p>
                 </div>
-
-                {/* 필드 핸디캡 */}
                 <div>
                   <label className="text-[17px] font-black text-gray-400 uppercase tracking-wider">핸디캡 (필드)</label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={tempHandicap}
+                  <input type="number" inputMode="numeric" value={tempHandicap}
                     onChange={(e) => setTempHandicap(e.target.value)}
-                    placeholder="예: 15"
-                    min="0" max="54"
-                    className="w-full mt-2 p-4 bg-gray-100 rounded-2xl border-none font-bold text-gray-800 focus:ring-2 focus:ring-green-500"
-                  />
+                    placeholder="예: 15" min="0" max="54"
+                    className="w-full mt-2 p-4 bg-gray-100 rounded-2xl border-none font-bold text-gray-800 focus:ring-2 focus:ring-green-500" />
                   <p className="text-sm text-gray-400 mt-1">성적 기록이 쌓이면 자동으로 반영돼요</p>
                 </div>
-
-                {/* G핸디 — +/- 토글 방식 */}
                 <div>
                   <label className="text-[17px] font-black text-gray-400 uppercase tracking-wider">스크린 핸디캡 (G핸디)</label>
                   <div className="flex items-center gap-3 mt-2">
-                    {/* 부호 토글 버튼 */}
-                    <button
-                      type="button"
+                    <button type="button"
                       onClick={() => setTempGHandicapSign(prev => prev === 1 ? -1 : 1)}
-                      className="w-14 h-14 rounded-2xl bg-gray-200 text-2xl font-black text-gray-700 flex-shrink-0 flex items-center justify-center active:bg-gray-300"
-                    >
+                      className="w-14 h-14 rounded-2xl bg-gray-200 text-2xl font-black text-gray-700 flex-shrink-0 flex items-center justify-center active:bg-gray-300">
                       {tempGHandicapSign === 1 ? '+' : '−'}
                     </button>
-                    {/* 숫자만 입력 */}
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      value={tempGHandicapAbs}
+                    <input type="number" inputMode="numeric" value={tempGHandicapAbs}
                       onChange={(e) => setTempGHandicapAbs(e.target.value.replace(/[^0-9]/g, ''))}
-                      placeholder="숫자만"
-                      min="0" max="54"
-                      className="flex-1 p-4 bg-gray-100 rounded-2xl border-none font-black text-xl text-center text-gray-800 focus:ring-2 focus:ring-green-500"
-                    />
-                    {/* 미리보기 */}
+                      placeholder="숫자만" min="0" max="54"
+                      className="flex-1 p-4 bg-gray-100 rounded-2xl border-none font-black text-xl text-center text-gray-800 focus:ring-2 focus:ring-green-500" />
                     <div className="w-14 text-center flex-shrink-0">
                       {tempGHandicapAbs !== '' ? (
                         <span className={`text-lg font-black ${tempGHandicapSign === -1 ? 'text-purple-500' : 'text-blue-500'}`}>
@@ -374,12 +295,9 @@ export default function MyPage() {
                 </div>
               </div>
             </div>
-
             <div className="flex gap-3 px-8 pt-4 pb-8 shrink-0 border-t border-gray-100">
-              <button onClick={() => setIsEditing(false)}
-                className="flex-1 p-4 bg-gray-100 rounded-2xl font-bold text-gray-500">취소</button>
-              <button onClick={handleSaveProfile}
-                className="flex-1 p-4 bg-green-600 rounded-2xl font-bold text-white shadow-lg shadow-green-100">저장하기 ⛳</button>
+              <button onClick={() => setIsEditing(false)} className="flex-1 p-4 bg-gray-100 rounded-2xl font-bold text-gray-500">취소</button>
+              <button onClick={handleSaveProfile} className="flex-1 p-4 bg-green-600 rounded-2xl font-bold text-white shadow-lg shadow-green-100">저장하기 ⛳</button>
             </div>
           </div>
         </div>
