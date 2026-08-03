@@ -64,7 +64,6 @@ export default function MyPage() {
         setLoading(true);
         const savedName = rawName.trim();
         const meetupSnap = await getDocs(collection(db, "meetups"));
-        const scorecardsSnap = await getDocs(collection(db, "scorecards"));
         let total = 0;
         let monthly = 0;
         const currentMonth = new Date().toISOString().substring(0, 7);
