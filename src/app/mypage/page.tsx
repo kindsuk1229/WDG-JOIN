@@ -64,6 +64,7 @@ export default function MyPage() {
         setLoading(true);
         const savedName = rawName.trim();
         const meetupSnap = await getDocs(collection(db, "meetups"));
+        const scorecardsSnap = await getDocs(collection(db, "scorecards"));
         let total = 0;
         let monthly = 0;
         const currentMonth = new Date().toISOString().substring(0, 7);
@@ -98,6 +99,15 @@ export default function MyPage() {
         let owingTotal = 0;
         owingSnap.forEach((doc) => { owingTotal += doc.data().amount || 0; });
 
+        const scorecardsSnap = await getDocs(collection(db, "scorecards"));
+
+        // ✅ 성적표 있는 meetupId 세트
+        const scorecardMeetupIds = new Set<string>();
+        scorecardsSnap.docs.forEach((d) => {
+          const mid = d.data().meetupId || d.id;
+          scorecardMeetupIds.add(mid.replace('_day2', ''));
+        });
+
         const nowDate = new Date();
         const scoreYear = nowDate.getFullYear().toString();
         const scoreMonth = nowDate.getMonth() + 1;
@@ -118,6 +128,10 @@ export default function MyPage() {
           const isJoined = data.participants?.some((p: any) => p.name === savedName);
           if (!isJoined) return;
           if (data.meetupType === 'etc' || data.isEtc) return;
+          const type = data.meetupType || 'field';
+          const isFieldType = type === 'field' || type === 'overnight' || data.isOvernight;
+          // ✅ 필드/1박2일은 성적표 있을 때만 점수 부여
+          if (isFieldType && !scorecardMeetupIds.has(d.id)) return;
           const point = data.meetupType === 'overnight' || data.isOvernight ? 4 : data.meetupType === 'field' ? 2 : 1;
           yearlyScore += point;
           if (data.date >= seasonStart && data.date <= `${seasonEnd}-31`) seasonScore += point;

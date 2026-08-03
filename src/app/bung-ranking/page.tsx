@@ -44,11 +44,20 @@ export default function BungRankingPage() {
       const seasonStart = `${currentYear}-${String(seasonStartMonth).padStart(2, '0')}`;
       const seasonEnd = `${currentYear}-${String(seasonStartMonth + 1).padStart(2, '0')}`;
 
-      const [meetupsSnap, usersSnap, adminsSnap] = await Promise.all([
+      const [meetupsSnap, usersSnap, adminsSnap, scorecardsSnap] = await Promise.all([
         getDocs(collection(db, 'meetups')),
         getDocs(collection(db, 'users')),
         getDocs(collection(db, 'admins')),
+        getDocs(collection(db, 'scorecards')),  // ✅ 성적표 목록
       ]);
+
+      // ✅ 성적표 있는 meetupId 세트
+      const scorecardMeetupIds = new Set<string>();
+      scorecardsSnap.docs.forEach(d => {
+        const mid = d.data().meetupId || d.id;
+        // day2 제거 (_day2 suffix 제거해서 원본 meetupId로)
+        scorecardMeetupIds.add(mid.replace('_day2', ''));
+      });
 
       // 닉네임/역할 맵
       const userMap: Record<string, { nickname: string; role: string }> = {};
@@ -67,6 +76,7 @@ export default function BungRankingPage() {
 
       meetupsSnap.forEach(d => {
         const data = d.data();
+        const meetupId = d.id;
         if (!data.date || !data.date.startsWith(currentYear)) return;
         if (data.status === 'cancelled') return;
         if (data.meetupType === 'etc' || data.isEtc) return;
@@ -79,6 +89,11 @@ export default function BungRankingPage() {
         }
 
         const type = data.meetupType || 'field';
+        const isFieldType = type === 'field' || type === 'overnight' || data.isOvernight;
+
+        // ✅ 필드/1박2일은 성적표 있을 때만 점수 부여
+        if (isFieldType && !scorecardMeetupIds.has(meetupId)) return;
+
         const point = type === 'overnight' || data.isOvernight ? 4 : type === 'field' ? 2 : 1;
         const isInSeason = data.date >= seasonStart && data.date <= `${seasonEnd}-31`;
 
