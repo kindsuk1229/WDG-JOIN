@@ -16,6 +16,7 @@ interface RoundRecord {
   meetupType: string;
   participants: { name: string; nickname: string }[];
   hasScorecard: boolean;
+  scorecardMissingCount: number; // ✅ 성적 미입력 인원 수
   playerScores: { name: string; nickname: string; score: number }[];
   ratingDeltas: Record<string, number>;
 }
@@ -117,7 +118,13 @@ export default function FieldHistoryAdminPage() {
           const hasScorecard = !!scorecardMap[id];
           const playerScores = scorecardMap[id] || [];
 
-          // Rating 변동은 users에서 가져온 lastDelta (이번 라운드 것만 표시)
+          // ✅ 성적 미입력 인원 계산
+          const scoredNames = new Set(playerScores.map(p => p.name));
+          const scorecardMissingCount = hasScorecard
+            ? participants.filter((p: { name: string; nickname: string }) => !scoredNames.has(p.name)).length
+            : participants.length;
+
+          // Rating 변동
           const ratingDeltas: Record<string, number> = {};
           playerScores.forEach(p => {
             ratingDeltas[p.name] = ratingDeltaMap[p.name] ?? 0;
@@ -131,6 +138,7 @@ export default function FieldHistoryAdminPage() {
             meetupType: type,
             participants,
             hasScorecard,
+            scorecardMissingCount,
             playerScores,
             ratingDeltas,
           } as RoundRecord;
@@ -154,18 +162,33 @@ export default function FieldHistoryAdminPage() {
   );
 
   const handleDelete = async (record: RoundRecord) => {
-    if (!window.confirm(`"${record.golfCourse || record.title}" 벙개를 삭제하시겠습니까?\n\n참여자 및 모든 데이터가 삭제됩니다.`)) return;
+    // ✅ 1단계 확인
+    const step1 = window.confirm(
+      `⚠️ "${record.golfCourse || record.title}" 벙개를 삭제하시겠습니까?\n\n` +
+      `📅 날짜: ${record.date}\n` +
+      `👥 참여자: ${record.participants.length}명\n` +
+      (record.hasScorecard ? `📊 성적표: 있음 (함께 삭제됩니다)\n` : `📊 성적표: 없음\n`) +
+      `\n[확인]을 누르면 다음 단계로 진행합니다.`
+    );
+    if (!step1) return;
+
+    // ✅ 2단계 최종 확인
+    const step2 = window.confirm(
+      `🚨 정말로 삭제하시겠습니까?\n\n` +
+      `"${record.golfCourse || record.title}" (${record.date})\n\n` +
+      `삭제 후에는 복구할 수 없습니다!`
+    );
+    if (!step2) return;
+
     setDeleting(record.id);
     try {
       await deleteDoc(doc(db, 'meetups', record.id));
-      // 성적표도 있으면 같이 삭제
-      if (record.hasScorecard) {
-        await deleteDoc(doc(db, 'scorecards', record.id)).catch(() => {});
-        await deleteDoc(doc(db, 'scorecards', record.id + '_day2')).catch(() => {});
-      }
+      // 성적표 있으면 함께 삭제
+      await deleteDoc(doc(db, 'scorecards', record.id)).catch(() => {});
+      await deleteDoc(doc(db, 'scorecards', record.id + '_day2')).catch(() => {});
       setRecords(prev => prev.filter(r => r.id !== record.id));
       setExpandedId(null);
-      alert('삭제되었습니다.');
+      alert('✅ 삭제되었습니다.');
     } catch (err) {
       alert('삭제 중 오류가 발생했습니다.');
     } finally {
@@ -249,32 +272,37 @@ export default function FieldHistoryAdminPage() {
                           {record.meetupType === 'overnight' && (
                             <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-bold">1박2일</span>
                           )}
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                            record.hasScorecard
-                              ? 'bg-green-50 text-green-600'
-                              : 'bg-red-50 text-red-400'
-                          }`}>
-                            {record.hasScorecard ? '✅ 성적표 있음' : '❌ 성적표 없음'}
-                          </span>
+                          {/* 성적표 상태 배지 */}
+                          {!record.hasScorecard ? (
+                            <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-red-50 text-red-400">
+                              ❌ 성적표 없음
+                            </span>
+                          ) : record.scorecardMissingCount > 0 ? (
+                            <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-orange-50 text-orange-500">
+                              ⚠️ {record.scorecardMissingCount}명 미입력
+                            </span>
+                          ) : (
+                            <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-green-50 text-green-600">
+                              ✅ 전원 입력
+                            </span>
+                          )}
                         </div>
                         <p className="font-black text-gray-800">{record.golfCourse || record.title}</p>
                         <p className="text-sm text-gray-400 mt-0.5">{formatDate(record.date)}</p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        {/* ✅ 삭제 버튼 — 성적표 없는 벙개만 표시 */}
-                        {!record.hasScorecard && (
-                          <button
-                            onClick={() => handleDelete(record)}
-                            disabled={deleting === record.id}
-                            className={`text-xs font-bold px-3 py-1.5 rounded-lg ${
-                              deleting === record.id
-                                ? 'bg-gray-100 text-gray-400'
-                                : 'bg-red-50 text-red-500 active:bg-red-100'
-                            }`}
-                          >
-                            {deleting === record.id ? '삭제중...' : '🗑️ 삭제'}
-                          </button>
-                        )}
+                        {/* ✅ 삭제 버튼 — 모든 벙개에 표시 */}
+                        <button
+                          onClick={() => handleDelete(record)}
+                          disabled={deleting === record.id}
+                          className={`text-xs font-bold px-3 py-1.5 rounded-lg ${
+                            deleting === record.id
+                              ? 'bg-gray-100 text-gray-400'
+                              : 'bg-red-50 text-red-500 active:bg-red-100'
+                          }`}
+                        >
+                          {deleting === record.id ? '삭제중...' : '🗑️ 삭제'}
+                        </button>
                         <div
                           className="cursor-pointer text-right"
                           onClick={() => setExpandedId(isExpanded ? null : record.id)}
