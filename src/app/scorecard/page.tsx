@@ -3,13 +3,14 @@
 import { useState, useEffect, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, getDocs, collection } from 'firebase/firestore';
+import { calcRoundRating, getInitialRating, RATING_DEFAULT, RATING_MIN } from '@/lib/rating';
 
 interface PlayerScore {
   name: string;
   nickname: string;
-  scores: number[]; // 18홀
-  totalOverride?: number; // 간편 입력 총타수
+  scores: number[];
+  totalOverride?: number;
 }
 
 function ScorecardContent() {
@@ -24,12 +25,11 @@ function ScorecardContent() {
   const [analyzing, setAnalyzing] = useState(false);
 
   const [pars, setPars] = useState<number[]>(Array(18).fill(4));
-  const [inputMode, setInputMode] = useState<'simple' | 'detail'>('simple'); // 간편/상세
+  const [inputMode, setInputMode] = useState<'simple' | 'detail'>('simple');
   const [holeGroup, setHoleGroup] = useState<'front' | 'back'>('front');
   const [activePlayer, setActivePlayer] = useState(0);
   const [players, setPlayers] = useState<PlayerScore[]>([]);
 
-  // 1박2일 전용
   const [roundDay, setRoundDay] = useState<'day1' | 'day2'>('day1');
   const [day2Players, setDay2Players] = useState<PlayerScore[]>([]);
   const [day2Pars, setDay2Pars] = useState<number[]>(Array(18).fill(4));
@@ -54,7 +54,6 @@ function ScorecardContent() {
           setPlayers(initPlayers);
           setDay2Players(initPlayers.map((p: any) => ({ ...p, scores: Array(18).fill(0), totalOverride: 0 })));
 
-          // 기존 성적표 불러오기
           const scorecardSnap = await getDoc(doc(db, 'scorecards', meetupId));
           if (scorecardSnap.exists()) {
             const sc = scorecardSnap.data();
@@ -187,8 +186,6 @@ function ScorecardContent() {
     return { label: `+${diff}`, color: 'text-red-500' };
   };
 
-  const getTotalPar = () => currentPars.reduce((a, b) => a + b, 0);
-
   const getRanking = () => {
     if (isOvernight) {
       return players.map(p => ({
@@ -201,11 +198,85 @@ function ScorecardContent() {
     })).filter(p => p.total > 0).sort((a, b) => a.total - b.total);
   };
 
+  // ✅ Rating 업데이트 함수
+  const updateRatings = async (scorePlayers: { name: string; score: number }[]) => {
+    const valid = scorePlayers.filter(p => p.score > 0);
+    if (valid.length < 2) return;
+
+    try {
+      // 모든 성적표에서 각 플레이어 평균타수 계산 (Smart-Score 초기값용)
+      const scorecardSnap = await getDocs(collection(db, 'scorecards'));
+      const allScoresMap: Record<string, number[]> = {};
+      scorecardSnap.docs.forEach(d => {
+        const sc = d.data();
+        (sc.players || []).forEach((pl: any) => {
+          const total = (pl.totalOverride || 0) > 0
+            ? pl.totalOverride
+            : (pl.scores || []).reduce((a: number, b: number) => a + b, 0);
+          if (total > 0) {
+            if (!allScoresMap[pl.name]) allScoresMap[pl.name] = [];
+            allScoresMap[pl.name].push(total);
+          }
+        });
+      });
+
+      // 각 플레이어 현재 Rating / rounds 불러오기
+      const playerData = await Promise.all(
+        valid.map(async (p) => {
+          const snap = await getDoc(doc(db, 'users', p.name));
+          const data = snap.exists() ? snap.data() : {};
+
+          let rating: number = data.rating ?? -1;
+          const rounds: number = data.ratingRounds ?? 0;
+
+          // Rating 없으면 Smart-Score로 초기값 산정
+          if (rating === -1) {
+            const scores = allScoresMap[p.name] || [];
+            const avg = scores.length > 0
+              ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+              : null;
+            rating = getInitialRating(avg, rounds).rating;
+          }
+
+          return { name: p.name, rating, rounds, score: p.score };
+        })
+      );
+
+      // Rating 변동 계산
+      const deltas = calcRoundRating(playerData);
+
+      // Firebase 업데이트
+      await Promise.all(
+        deltas.map(async ({ name, delta }) => {
+          const current = playerData.find(p => p.name === name)!;
+          const newRating = Math.max(RATING_MIN, Math.round(current.rating + delta));
+          const newRounds = current.rounds + 1;
+
+          const userRef = doc(db, 'users', name);
+          const userSnap = await getDoc(userRef);
+          if (userSnap.exists()) {
+            await updateDoc(userRef, {
+              rating: newRating,
+              ratingRounds: newRounds,
+              ratingDelta: delta,
+              ratingUpdatedAt: new Date().toISOString(),
+            });
+          }
+        })
+      );
+
+      console.log('✅ Rating 업데이트 완료');
+    } catch (err) {
+      console.error('Rating 업데이트 실패:', err);
+      // Rating 업데이트 실패해도 성적표 저장은 정상 완료됨
+    }
+  };
+
   const handleSave = async () => {
     if (!meetupId) return;
     setSaving(true);
     try {
-      // ✅ 1일차/2일차 동시 저장
+      // ✅ 성적표 저장
       const savePromises = [
         setDoc(doc(db, 'scorecards', meetupId), {
           meetupId,
@@ -221,7 +292,6 @@ function ScorecardContent() {
         })
       ];
 
-      // ✅ 1박2일의 경우 2일차도 항상 같이 저장
       if (isOvernight) {
         savePromises.push(
           setDoc(doc(db, 'scorecards', meetupId + '_day2'), {
@@ -242,6 +312,17 @@ function ScorecardContent() {
       }
 
       await Promise.all(savePromises);
+
+      // ✅ Rating 계산 — 성적표 저장 성공 후 자동 실행
+      // 1박2일은 합산 타수로 계산
+      const scorePlayers = players.map(p => ({
+        name: p.name,
+        score: isOvernight
+          ? getOvernightTotal(p.name)
+          : getPlayerTotal(p),
+      }));
+      await updateRatings(scorePlayers);
+
       alert('성적표가 저장되었습니다! ⛳');
     } catch (error) {
       alert('저장 중 오류가 발생했습니다.');
@@ -273,8 +354,6 @@ function ScorecardContent() {
       </header>
 
       <div className="px-4 pt-4 space-y-3">
-
-        {/* 1박2일 탭 */}
         {isOvernight && (
           <div className="flex gap-2">
             <button onClick={() => setRoundDay('day1')}
@@ -288,7 +367,6 @@ function ScorecardContent() {
           </div>
         )}
 
-        {/* 입력 방식 선택 */}
         <div className="flex gap-2">
           <button onClick={() => setInputMode('simple')}
             className={`flex-1 py-2 rounded-xl text-sm font-bold ${inputMode === 'simple' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'}`}>
@@ -300,7 +378,6 @@ function ScorecardContent() {
           </button>
         </div>
 
-        {/* 사진 분석 버튼 */}
         <button onClick={() => fileInputRef.current?.click()} disabled={analyzing}
           className={`w-full py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 ${
             analyzing ? 'bg-gray-200 text-gray-400' : 'bg-purple-600 text-white shadow-lg shadow-purple-200 active:scale-95'
@@ -310,7 +387,6 @@ function ScorecardContent() {
         <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoAnalysis} className="hidden" />
       </div>
 
-      {/* 간편 입력 모드 */}
       {inputMode === 'simple' && (
         <div className="p-4">
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
@@ -341,10 +417,8 @@ function ScorecardContent() {
         </div>
       )}
 
-      {/* 홀별 입력 모드 */}
       {inputMode === 'detail' && (
         <div className="px-4 pt-2 space-y-4">
-          {/* 전반/후반 탭 */}
           <div className="flex gap-2">
             <button onClick={() => setHoleGroup('front')}
               className={`flex-1 py-2 rounded-xl text-sm font-bold ${holeGroup === 'front' ? 'bg-slate-700 text-white' : 'bg-gray-100 text-gray-500'}`}>
@@ -356,7 +430,6 @@ function ScorecardContent() {
             </button>
           </div>
 
-          {/* 플레이어 탭 */}
           <div className="flex gap-2 overflow-x-auto pb-1">
             {currentPlayers.map((p, i) => (
               <button key={i} onClick={() => setActivePlayer(i)}
@@ -368,7 +441,6 @@ function ScorecardContent() {
             ))}
           </div>
 
-          {/* 홀별 스코어 */}
           {currentPlayers.length > 0 && (
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-4 border-b border-gray-50 flex justify-between items-center">
@@ -410,7 +482,6 @@ function ScorecardContent() {
         </div>
       )}
 
-      {/* 순위표 */}
       <div className="p-4">
         {getRanking().length > 0 && (
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">

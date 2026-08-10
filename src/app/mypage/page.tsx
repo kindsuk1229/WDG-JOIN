@@ -3,8 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, query, getDocs, where, doc, setDoc, getDoc } from 'firebase/firestore';
+import { collection, query, getDocs, where, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { Avatar } from '@/components/UI';
+import { calcRoundRating, getInitialRating, RATING_MIN } from '@/lib/rating';
+
+const OWNER_NAME = '김근석';
 
 export default function MyPage() {
   const router = useRouter();
@@ -18,6 +21,9 @@ export default function MyPage() {
   const [tempHandicap, setTempHandicap] = useState<string>('');
   const [tempGHandicapAbs, setTempGHandicapAbs] = useState<string>('');
   const [tempGHandicapSign, setTempGHandicapSign] = useState<1 | -1>(1);
+  const [recalculating, setRecalculating] = useState(false);
+  const [recalcLog, setRecalcLog] = useState<string[]>([]);
+  const [showRecalcLog, setShowRecalcLog] = useState(false);
 
   const [stats, setStats] = useState({
     totalCount: 0,
@@ -63,7 +69,7 @@ export default function MyPage() {
       try {
         setLoading(true);
         const savedName = rawName.trim();
-        const meetupSnap = await getDocs(collection(db, "meetups"));
+        const meetupSnap = await getDocs(collection(db, 'meetups'));
         let total = 0;
         let monthly = 0;
         const currentMonth = new Date().toISOString().substring(0, 7);
@@ -84,7 +90,7 @@ export default function MyPage() {
         });
 
         const settlementSnap = await getDocs(
-          query(collection(db, "settlements"), where("userName", "==", savedName), where("status", "==", "pending"))
+          query(collection(db, 'settlements'), where('userName', '==', savedName), where('status', '==', 'pending'))
         );
         let pendingTotal = 0;
         settlementSnap.forEach((doc) => {
@@ -93,14 +99,12 @@ export default function MyPage() {
         });
 
         const owingSnap = await getDocs(
-          query(collection(db, "settlement_members"), where("fromName", "==", savedName), where("status", "==", "pending"))
+          query(collection(db, 'settlement_members'), where('fromName', '==', savedName), where('status', '==', 'pending'))
         );
         let owingTotal = 0;
         owingSnap.forEach((doc) => { owingTotal += doc.data().amount || 0; });
 
-        const scorecardsSnap = await getDocs(collection(db, "scorecards"));
-
-        // ✅ 성적표 있는 meetupId 세트
+        const scorecardsSnap = await getDocs(collection(db, 'scorecards'));
         const scorecardMeetupIds = new Set<string>();
         scorecardsSnap.docs.forEach((d) => {
           const mid = d.data().meetupId || d.id;
@@ -129,7 +133,6 @@ export default function MyPage() {
           if (data.meetupType === 'etc' || data.isEtc) return;
           const type = data.meetupType || 'field';
           const isFieldType = type === 'field' || type === 'overnight' || data.isOvernight;
-          // ✅ 필드/1박2일은 성적표 있을 때만 점수 부여
           if (isFieldType && !scorecardMeetupIds.has(d.id)) return;
           const point = data.meetupType === 'overnight' || data.isOvernight ? 4 : data.meetupType === 'field' ? 2 : 1;
           yearlyScore += point;
@@ -138,7 +141,7 @@ export default function MyPage() {
 
         setStats({ totalCount: total, monthlyCount: monthly, pendingAmount: pendingTotal, owingAmount: owingTotal, seasonScore, yearlyScore });
       } catch (error) {
-        console.error("데이터 로딩 실패:", error);
+        console.error('데이터 로딩 실패:', error);
       } finally {
         setLoading(false);
       }
@@ -147,16 +150,174 @@ export default function MyPage() {
     fetchMyData();
   }, []);
 
+  // ✅ Rating 소급 계산 (오너 전용)
+  const handleRecalculateRatings = async () => {
+    if (!window.confirm('전체 성적표를 기반으로 Rating을 소급 계산합니다.\n기존 Rating이 모두 초기화되고 다시 계산돼요.\n진행할까요?')) return;
+
+    setRecalculating(true);
+    setRecalcLog([]);
+    setShowRecalcLog(true);
+
+    const log = (msg: string) => {
+      setRecalcLog(prev => [...prev, msg]);
+      console.log(msg);
+    };
+
+    try {
+      log('📋 성적표 불러오는 중...');
+
+      // 모든 성적표 로드
+      const scorecardsSnap = await getDocs(collection(db, 'scorecards'));
+
+      // 전체 타수 맵 (평균타수 계산용)
+      const allScoresMap: Record<string, number[]> = {};
+      scorecardsSnap.docs.forEach(d => {
+        const sc = d.data();
+        (sc.players || []).forEach((p: any) => {
+          const total = (p.totalOverride || 0) > 0
+            ? p.totalOverride
+            : (p.scores || []).reduce((a: number, b: number) => a + b, 0);
+          if (total > 0) {
+            if (!allScoresMap[p.name]) allScoresMap[p.name] = [];
+            allScoresMap[p.name].push(total);
+          }
+        });
+      });
+
+      // 유효 성적표 필터 & 날짜순 정렬
+      const validScorecards = scorecardsSnap.docs
+        .map(d => ({ id: d.id, ...d.data() } as any))
+        .filter(sc => {
+          if (sc.isDay2) return false; // 2일차는 건너뜀 (1일차에서 합산)
+          const validPlayers = (sc.players || []).filter((p: any) => {
+            const total = (p.totalOverride || 0) > 0
+              ? p.totalOverride
+              : (p.scores || []).reduce((a: number, b: number) => a + b, 0);
+            return total > 0;
+          });
+          return validPlayers.length >= 2;
+        })
+        .sort((a: any, b: any) => (a.date || '').localeCompare(b.date || ''));
+
+      log(`✅ 유효 성적표 ${validScorecards.length}개 확인`);
+
+      // Smart-Score 기반 초기 Rating 세팅
+      const ratingState: Record<string, { rating: number; rounds: number; lastDelta: number }> = {};
+
+      Object.keys(allScoresMap).forEach(name => {
+        const scores = allScoresMap[name];
+        const avg = Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length);
+        const initial = getInitialRating(avg, 0);
+        ratingState[name] = { rating: initial.rating, rounds: 0, lastDelta: 0 };
+      });
+
+      log(`👥 ${Object.keys(ratingState).length}명 초기 Rating 세팅 완료`);
+      log('');
+      log('⚡ 라운드별 계산 시작...');
+
+      // 날짜순으로 Rating 소급 계산
+      for (let i = 0; i < validScorecards.length; i++) {
+        const sc = validScorecards[i];
+
+        // day2 성적표 찾기 (1박2일 합산용)
+        const day2Sc = sc.isOvernight
+          ? scorecardsSnap.docs.find(d => d.id === (sc.meetupId + '_day2'))?.data()
+          : null;
+
+        const playerScores = (sc.players || []).map((p: any) => {
+          let score = (p.totalOverride || 0) > 0
+            ? p.totalOverride
+            : (p.scores || []).reduce((a: number, b: number) => a + b, 0);
+
+          // 1박2일 합산
+          if (day2Sc) {
+            const day2Player = (day2Sc.players || []).find((p2: any) => p2.name === p.name);
+            if (day2Player) {
+              const day2Score = (day2Player.totalOverride || 0) > 0
+                ? day2Player.totalOverride
+                : (day2Player.scores || []).reduce((a: number, b: number) => a + b, 0);
+              score += day2Score;
+            }
+          }
+
+          return { name: p.name, score };
+        }).filter((p: any) => p.score > 0);
+
+        if (playerScores.length < 2) continue;
+
+        const calcPlayers = playerScores.map((p: any) => ({
+          name: p.name,
+          rating: ratingState[p.name]?.rating ?? 1000,
+          rounds: ratingState[p.name]?.rounds ?? 0,
+          score: p.score,
+        }));
+
+        const deltas = calcRoundRating(calcPlayers);
+
+        const deltaStr = deltas.map(({ name, delta }) => {
+          if (!ratingState[name]) ratingState[name] = { rating: 1000, rounds: 0, lastDelta: 0 };
+          const newRating = Math.max(RATING_MIN, ratingState[name].rating + delta);
+          ratingState[name] = { rating: newRating, rounds: ratingState[name].rounds + 1, lastDelta: delta };
+          return `${name} ${delta >= 0 ? '+' : ''}${delta}→${newRating}`;
+        }).join(' / ');
+
+        log(`[${i + 1}/${validScorecards.length}] ${sc.date} ${sc.golfCourse || ''} | ${deltaStr}`);
+      }
+
+      log('');
+      log('💾 Firebase 업데이트 중...');
+
+      // Firebase 업데이트
+      let updateCount = 0;
+      for (const [name, state] of Object.entries(ratingState)) {
+        if (state.rounds === 0) continue;
+        try {
+          const userRef = doc(db, 'users', name);
+          const userSnap = await getDoc(userRef);
+          if (userSnap.exists()) {
+            await updateDoc(userRef, {
+              rating: state.rating,
+              ratingRounds: state.rounds,
+              ratingDelta: state.lastDelta,
+              ratingUpdatedAt: new Date().toISOString(),
+            });
+            updateCount++;
+          }
+        } catch (e) {
+          log(`⚠️ ${name} 업데이트 실패`);
+        }
+      }
+
+      log('');
+      log('🏆 최종 Rating 결과:');
+      Object.entries(ratingState)
+        .filter(([, s]) => s.rounds > 0)
+        .sort(([, a], [, b]) => b.rating - a.rating)
+        .forEach(([name, state], i) => {
+          const badge = state.rounds < 5 ? '❓' : state.rounds < 15 ? '⭐' : state.rounds < 30 ? '⭐⭐' : '⭐⭐⭐';
+          log(`  ${i + 1}위 ${name}: ${state.rating}점 ${badge} (${state.rounds}라운드)`);
+        });
+
+      log('');
+      log(`✅ 완료! ${updateCount}명 업데이트됨`);
+      alert(`✅ Rating 소급 계산 완료!\n${updateCount}명 업데이트됨`);
+
+    } catch (error) {
+      log(`❌ 오류 발생: ${error}`);
+      alert('오류가 발생했습니다.');
+    } finally {
+      setRecalculating(false);
+    }
+  };
+
   const handleSaveProfile = async () => {
     const trimmedNickname = tempNickname.trim();
     const finalHandicap = tempHandicap === '' ? 0 : Number(tempHandicap);
     const finalGHandicap = getFinalGHandicap();
-
     localStorage.setItem('user_nickname', trimmedNickname);
     setUserNickname(trimmedNickname);
     setHandicap(finalHandicap);
     setGHandicap(finalGHandicap);
-
     try {
       const userRef = doc(db, 'users', userName.trim());
       const userSnap = await getDoc(userRef);
@@ -168,20 +329,23 @@ export default function MyPage() {
     } catch (error) {
       console.error('Firebase 저장 실패:', error);
     }
-
     setIsEditing(false);
     alert('프로필이 저장되었습니다! ⛳');
   };
 
+  const isOwner = userName === OWNER_NAME;
+
   const menus = [
     { label: '내 벙개 내역', icon: '📋', href: '/my-meetups' },
     { label: '필드 벙개 히스토리', icon: '🏌️', href: '/meetup-history' },
-    { label: '벙 점수 랭킹', icon: '🏅', href: '/bung-ranking' },  // ✅ 추가
+    { label: '벙 점수 랭킹', icon: '🏅', href: '/bung-ranking' },
+    { label: 'Rating 랭킹', icon: '🎯', href: '/rating-ranking' },
     { label: '내 성적 히스토리', icon: '⛳', href: '/my-scores' },
     { label: '성적 랭킹', icon: '🏆', href: '/score-ranking' },
     { label: '정산 내역', icon: '💰', href: '/settlement/history' },
     { label: '알림 설정', icon: '🔔', href: '/notification-settings' },
     { label: '프로필 수정', icon: '✏️', onClick: () => setIsEditing(true) },
+    ...(isOwner ? [{ label: '필드 라운딩 기록 (관리)', icon: '📁', href: '/field-history-admin' }] : []),
     { label: '앱 정보', icon: 'ℹ️', href: '#' },
   ];
 
@@ -196,7 +360,7 @@ export default function MyPage() {
             <div>
               <p className="text-lg font-black text-gray-800">{userNickname || userName}</p>
               <p className="text-[16px] text-gray-400 mt-0.5 font-medium italic">
-                {userName === '김근석' ? '우동골 관리자' : '우동골 정회원'}
+                {isOwner ? '우동골 관리자' : '우동골 정회원'}
                 {userNickname && <span className="ml-1.5 not-italic opacity-70">({userName})</span>}
               </p>
               {(handicap > 0 || gHandicap !== null) && (
@@ -246,6 +410,43 @@ export default function MyPage() {
           ))}
         </div>
 
+        {/* ✅ 오너 전용 — Rating 소급 계산 버튼 */}
+        {isOwner && (
+          <div className="mt-8 space-y-3">
+            <p className="text-xs font-bold text-gray-400 text-center">🔧 관리자 도구</p>
+            <button
+              onClick={handleRecalculateRatings}
+              disabled={recalculating}
+              className={`w-full py-4 rounded-2xl font-bold text-sm transition-all ${
+                recalculating
+                  ? 'bg-gray-200 text-gray-400'
+                  : 'bg-gray-800 text-white active:scale-95'
+              }`}
+            >
+              {recalculating ? '⏳ Rating 계산 중...' : '🔄 Rating 소급 계산 (전체)'}
+            </button>
+
+            {/* 로그 보기/숨기기 */}
+            {recalcLog.length > 0 && (
+              <div>
+                <button
+                  onClick={() => setShowRecalcLog(v => !v)}
+                  className="w-full py-2 text-xs text-gray-400 underline"
+                >
+                  {showRecalcLog ? '로그 숨기기' : '로그 보기'}
+                </button>
+                {showRecalcLog && (
+                  <div className="bg-gray-900 rounded-2xl p-4 max-h-64 overflow-y-auto">
+                    {recalcLog.map((line, i) => (
+                      <p key={i} className="text-xs text-green-400 font-mono leading-relaxed">{line}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         <p className="text-center text-[16px] text-gray-300 mt-12 font-light italic">우동골 v1.0.0</p>
       </div>
 
@@ -271,7 +472,7 @@ export default function MyPage() {
                     placeholder="닉네임을 입력하세요"
                     className="w-full mt-2 p-4 bg-gray-100 rounded-2xl border-none font-bold text-gray-800 focus:ring-2 focus:ring-green-500" />
                   <p className="text-[16px] text-green-600 mt-3 font-medium bg-green-50 p-2 rounded-lg">
-                    💡 닉네임은 모든 기기에서 자동으로 동기화됩니다. 벙개 명단에는 닉네임이 우선 표시되며, 정산은 실명({userName}) 기준으로 처리됩니다.
+                    💡 닉네임은 모든 기기에서 자동으로 동기화됩니다.
                   </p>
                 </div>
                 <div>
@@ -304,7 +505,7 @@ export default function MyPage() {
                       )}
                     </div>
                   </div>
-                  <p className="text-sm text-gray-400 mt-2">왼쪽 버튼으로 +/− 부호를 바꿀 수 있어요. 스크린 벙개 조 편성 시 사용돼요</p>
+                  <p className="text-sm text-gray-400 mt-2">왼쪽 버튼으로 +/− 부호를 바꿀 수 있어요</p>
                 </div>
               </div>
             </div>
