@@ -84,10 +84,10 @@ export default function RatingRankingPage() {
         };
       });
 
-      // 4라운드 이상 → 정식 랭킹
-      const ranked = all.filter(p => p.rounds > 3).sort((a, b) => b.rating - a.rating);
-      // 3라운드 이하 → 배치고사 중 (아이언)
-      const notRanked = all.filter(p => p.rounds <= 3 && p.rounds > 0).sort((a, b) => b.rounds - a.rounds);
+      // 3라운드 이상 → 정식 랭킹 (배치고사 완료)
+      const ranked = all.filter(p => p.rounds >= 3).sort((a, b) => b.rating - a.rating);
+      // 3라운드 미만 → 배치고사 중 (아이언)
+      const notRanked = all.filter(p => p.rounds > 0 && p.rounds < 3).sort((a, b) => b.rounds - a.rounds);
 
       setPlayers(ranked);
       setUnranked(notRanked);
@@ -137,7 +137,7 @@ export default function RatingRankingPage() {
             ))}
           </div>
           <div className="mt-3 pt-3 border-t border-gray-50">
-            <p className="text-xs text-gray-400 text-center">4라운드 이상 성적표 입력 시 랭킹 등록 · 1개월 미참여 −10점</p>
+            <p className="text-xs text-gray-400 text-center">3라운드 완료 시 랭킹 등록 (배치고사) · 1개월 미참여 −10점</p>
           </div>
         </div>
 
@@ -147,7 +147,7 @@ export default function RatingRankingPage() {
           <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-200">
             <p className="text-4xl mb-3">🏌️</p>
             <p className="text-gray-400 text-sm">아직 랭킹에 오른 회원이 없어요.</p>
-            <p className="text-gray-300 text-xs mt-1">필드 벙개 4라운드 이상 성적표 입력 시 랭킹에 등록돼요!</p>
+            <p className="text-gray-300 text-xs mt-1">필드 벙개 3라운드 완료 시 랭킹에 등록돼요!</p>
           </div>
         ) : (
           <>
