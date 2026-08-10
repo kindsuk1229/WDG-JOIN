@@ -22,18 +22,18 @@ interface RatingPlayer {
 
 // ✅ 등급 시스템
 const TIERS = [
-  { name: '챌린저',    emoji: '🏆', color: 'text-red-500',    bg: 'bg-red-50',    border: 'border-red-200',    fixed: 5  },
-  { name: '그랜드마스터', emoji: '👑', color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-200', fixed: 5  },
-  { name: '마스터',    emoji: '💎', color: 'text-blue-600',   bg: 'bg-blue-50',   border: 'border-blue-200',   fixed: 10 },
-  { name: '다이아몬드', emoji: '🔷', color: 'text-cyan-500',   bg: 'bg-cyan-50',   border: 'border-cyan-200',   fixed: 15 },
-  { name: '에메랄드',  emoji: '💚', color: 'text-emerald-500',bg: 'bg-emerald-50',border: 'border-emerald-200', fixed: 20 },
-  { name: '플래티넘',  emoji: '⚪', color: 'text-slate-500',  bg: 'bg-slate-50',  border: 'border-slate-200',  fixed: 20 },
-  { name: '골드',     emoji: '🥇', color: 'text-yellow-500', bg: 'bg-yellow-50', border: 'border-yellow-200', fixed: 20 },
-  { name: '실버',     emoji: '🥈', color: 'text-gray-500',   bg: 'bg-gray-50',   border: 'border-gray-200',   fixed: 20 },
-  { name: '브론즈',   emoji: '🥉', color: 'text-orange-500', bg: 'bg-orange-50', border: 'border-orange-200', fixed: null }, // 나머지
+  { name: '챌린저',   emoji: '🏆', color: 'text-red-500',    bg: 'bg-red-50',    border: 'border-red-200',    fixed: 3  },
+  { name: '마스터',   emoji: '💎', color: 'text-blue-600',   bg: 'bg-blue-50',   border: 'border-blue-200',   fixed: 4  },
+  { name: '다이아몬드',emoji: '🔷', color: 'text-cyan-500',   bg: 'bg-cyan-50',   border: 'border-cyan-200',   fixed: 7  },
+  { name: '에메랄드', emoji: '💚', color: 'text-emerald-500',bg: 'bg-emerald-50',border: 'border-emerald-200', fixed: 10 },
+  { name: '플래티넘', emoji: '⚪', color: 'text-slate-500',  bg: 'bg-slate-50',  border: 'border-slate-200',  fixed: 15 },
+  { name: '골드',    emoji: '🥇', color: 'text-yellow-500', bg: 'bg-yellow-50', border: 'border-yellow-200', fixed: 20 },
+  { name: '실버',    emoji: '🥈', color: 'text-gray-500',   bg: 'bg-gray-50',   border: 'border-gray-200',   fixed: 25 },
+  { name: '브론즈',  emoji: '🥉', color: 'text-orange-500', bg: 'bg-orange-50', border: 'border-orange-200', fixed: 30 },
+  { name: '아이언',  emoji: '⚙️', color: 'text-gray-400',   bg: 'bg-gray-50',   border: 'border-gray-200',   fixed: null }, // 나머지
 ];
 
-const IRON = { name: '아이언', emoji: '⚙️', color: 'text-gray-400', bg: 'bg-gray-50', border: 'border-gray-200' };
+const IRON = TIERS[TIERS.length - 1]; // 아이언 = 마지막 등급 (나머지)
 
 function getTier(rank: number, total: number) {
   let cumulative = 0;
@@ -84,10 +84,10 @@ export default function RatingRankingPage() {
         };
       });
 
-      // 6라운드 이상 → 정식 랭킹
-      const ranked = all.filter(p => p.rounds > 5).sort((a, b) => b.rating - a.rating);
-      // 5라운드 이하 → 배치고사 중 (아이언)
-      const notRanked = all.filter(p => p.rounds <= 5 && p.rounds > 0).sort((a, b) => b.rounds - a.rounds);
+      // 4라운드 이상 → 정식 랭킹
+      const ranked = all.filter(p => p.rounds > 3).sort((a, b) => b.rating - a.rating);
+      // 3라운드 이하 → 배치고사 중 (아이언)
+      const notRanked = all.filter(p => p.rounds <= 3 && p.rounds > 0).sort((a, b) => b.rounds - a.rounds);
 
       setPlayers(ranked);
       setUnranked(notRanked);
@@ -135,14 +135,9 @@ export default function RatingRankingPage() {
                 <p className="text-xs text-gray-400">{t.fixed ? `${t.fixed}명` : '나머지'}</p>
               </div>
             ))}
-            <div className="bg-gray-50 rounded-xl p-2">
-              <p className="text-base">{IRON.emoji}</p>
-              <p className="text-xs font-bold text-gray-400">{IRON.name}</p>
-              <p className="text-xs text-gray-400">배치중</p>
-            </div>
           </div>
           <div className="mt-3 pt-3 border-t border-gray-50">
-            <p className="text-xs text-gray-400 text-center">6라운드 이상 성적표 입력 시 랭킹 등록 · 1개월 미참여 −10점</p>
+            <p className="text-xs text-gray-400 text-center">4라운드 이상 성적표 입력 시 랭킹 등록 · 1개월 미참여 −10점</p>
           </div>
         </div>
 
@@ -152,7 +147,7 @@ export default function RatingRankingPage() {
           <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-200">
             <p className="text-4xl mb-3">🏌️</p>
             <p className="text-gray-400 text-sm">아직 랭킹에 오른 회원이 없어요.</p>
-            <p className="text-gray-300 text-xs mt-1">필드 벙개 6라운드 이상 성적표 입력 시 랭킹에 등록돼요!</p>
+            <p className="text-gray-300 text-xs mt-1">필드 벙개 4라운드 이상 성적표 입력 시 랭킹에 등록돼요!</p>
           </div>
         ) : (
           <>
@@ -242,10 +237,10 @@ export default function RatingRankingPage() {
                                 {isMe && <span className="text-xs text-green-600 font-bold">(나)</span>}
                                 {badge && <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${badge.cls}`}>{badge.label}</span>}
                               </div>
-                              <p className="text-xs text-gray-400 mt-0.5">{player.rounds}/6 라운드 완료</p>
+                              <p className="text-xs text-gray-400 mt-0.5">{player.rounds}/3 라운드 완료</p>
                             </div>
                             <div className="text-right flex-shrink-0">
-                              <p className="text-sm font-black text-gray-400">{6 - player.rounds}라운드 남음</p>
+                              <p className="text-sm font-black text-gray-400">{3 - player.rounds}라운드 남음</p>
                             </div>
                           </div>
                         </div>
