@@ -4,7 +4,9 @@ import { useState, useEffect, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, updateDoc, getDocs, collection } from 'firebase/firestore';
-import { calcRoundRating, getInitialRating, RATING_DEFAULT, RATING_MIN } from '@/lib/rating';
+import { calcRoundRating, getInitialRating, RATING_MIN } from '@/lib/rating';
+
+const OWNER_NAME = '김근석';
 
 interface PlayerScore {
   name: string;
@@ -23,6 +25,7 @@ function ScorecardContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const [pars, setPars] = useState<number[]>(Array(18).fill(4));
   const [inputMode, setInputMode] = useState<'simple' | 'detail'>('simple');
@@ -34,6 +37,27 @@ function ScorecardContent() {
   const [day2Players, setDay2Players] = useState<PlayerScore[]>([]);
   const [day2Pars, setDay2Pars] = useState<number[]>(Array(18).fill(4));
   const isOvernight = meetup?.meetupType === 'overnight' || meetup?.isOvernight;
+
+  // ✅ 플레이어 이름 수정 상태
+  const [editingPlayerIdx, setEditingPlayerIdx] = useState<number | null>(null);
+  const [allMembers, setAllMembers] = useState<{ name: string; nickname: string }[]>([]);
+  const [memberSearch, setMemberSearch] = useState('');
+
+  useEffect(() => {
+    if (!meetupId) return;
+
+    // 전체 회원 목록 로드 (이름 수정용)
+    const loadMembers = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'users'));
+        setAllMembers(snap.docs.map(d => ({
+          name: d.data().name || d.id,
+          nickname: d.data().nickname || '',
+        })));
+      } catch {}
+    };
+    loadMembers();
+  }, []);
 
   useEffect(() => {
     if (!meetupId) return;
@@ -272,6 +296,17 @@ function ScorecardContent() {
     }
   };
 
+  // ✅ 플레이어 교체 (관리자 전용)
+  const handleReplacePlayer = (idx: number, newMember: { name: string; nickname: string }) => {
+    const replaceInList = (list: PlayerScore[]) => list.map((p, i) =>
+      i === idx ? { ...p, name: newMember.name, nickname: newMember.nickname } : p
+    );
+    setPlayers(replaceInList(players));
+    setDay2Players(replaceInList(day2Players));
+    setEditingPlayerIdx(null);
+    setMemberSearch('');
+  };
+
   const handleSave = async () => {
     if (!meetupId) return;
     setSaving(true);
@@ -397,19 +432,65 @@ function ScorecardContent() {
             </div>
             <div className="divide-y divide-gray-50">
               {currentPlayers.map((player, idx) => (
-                <div key={idx} className="flex items-center justify-between px-4 py-3">
-                  <span className="font-bold text-gray-700">{player.nickname || player.name}</span>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      value={player.totalOverride || ''}
-                      onChange={(e) => updateTotalOverride(idx, Number(e.target.value))}
-                      placeholder="총타수"
-                      className="w-20 text-center text-xl font-black text-gray-800 bg-gray-50 border-none rounded-xl p-2 focus:ring-2 focus:ring-green-500"
-                    />
-                    <span className="text-gray-400 text-sm">타</span>
+                <div key={idx} className="px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-gray-700">{player.nickname || player.name}</span>
+                      {/* ✅ 관리자 전용 이름 수정 버튼 */}
+                      {isAdmin && (
+                        <button
+                          onClick={() => { setEditingPlayerIdx(editingPlayerIdx === idx ? null : idx); setMemberSearch(''); }}
+                          className="text-xs text-blue-400 underline"
+                        >
+                          {editingPlayerIdx === idx ? '취소' : '수정'}
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={player.totalOverride || ''}
+                        onChange={(e) => updateTotalOverride(idx, Number(e.target.value))}
+                        placeholder="총타수"
+                        className="w-20 text-center text-xl font-black text-gray-800 bg-gray-50 border-none rounded-xl p-2 focus:ring-2 focus:ring-green-500"
+                      />
+                      <span className="text-gray-400 text-sm">타</span>
+                    </div>
                   </div>
+                  {/* ✅ 회원 검색 드롭다운 */}
+                  {isAdmin && editingPlayerIdx === idx && (
+                    <div className="mt-2 space-y-2">
+                      <input
+                        type="text"
+                        placeholder="이름 또는 닉네임 검색"
+                        value={memberSearch}
+                        onChange={e => setMemberSearch(e.target.value)}
+                        className="w-full p-2.5 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 outline-none"
+                        autoFocus
+                      />
+                      <div className="max-h-36 overflow-y-auto space-y-1 border border-gray-100 rounded-xl p-1">
+                        {allMembers
+                          .filter(m =>
+                            !memberSearch ||
+                            m.name.includes(memberSearch) ||
+                            m.nickname.includes(memberSearch)
+                          )
+                          .map(m => (
+                            <button
+                              key={m.name}
+                              onClick={() => handleReplacePlayer(idx, m)}
+                              className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-blue-50 flex justify-between items-center"
+                            >
+                              <span className="font-bold text-gray-700">{m.nickname || m.name}</span>
+                              <span className="text-gray-400 text-xs">{m.name}</span>
+                            </button>
+                          ))
+                        }
+                      </div>
+                      <p className="text-xs text-gray-400">선택하면 이름이 교체됩니다</p>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -432,7 +513,7 @@ function ScorecardContent() {
 
           <div className="flex gap-2 overflow-x-auto pb-1">
             {currentPlayers.map((p, i) => (
-              <button key={i} onClick={() => setActivePlayer(i)}
+              <button key={i} onClick={() => { setActivePlayer(i); setEditingPlayerIdx(null); }}
                 className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold ${
                   activePlayer === i ? 'bg-green-600 text-white' : 'bg-white text-gray-500 border border-gray-200'
                 }`}>
@@ -440,6 +521,43 @@ function ScorecardContent() {
               </button>
             ))}
           </div>
+
+          {/* ✅ 관리자 전용 — 현재 선택 플레이어 이름 수정 */}
+          {isAdmin && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400">현재: {currentPlayers[activePlayer]?.nickname || currentPlayers[activePlayer]?.name}</span>
+              <button
+                onClick={() => { setEditingPlayerIdx(editingPlayerIdx === activePlayer ? null : activePlayer); setMemberSearch(''); }}
+                className="text-xs text-blue-400 underline"
+              >
+                {editingPlayerIdx === activePlayer ? '취소' : '이름 수정'}
+              </button>
+            </div>
+          )}
+          {isAdmin && editingPlayerIdx === activePlayer && (
+            <div className="space-y-2 bg-white rounded-2xl p-3 border border-blue-100">
+              <input
+                type="text"
+                placeholder="이름 또는 닉네임 검색"
+                value={memberSearch}
+                onChange={e => setMemberSearch(e.target.value)}
+                className="w-full p-2.5 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 outline-none"
+                autoFocus
+              />
+              <div className="max-h-36 overflow-y-auto space-y-1">
+                {allMembers
+                  .filter(m => !memberSearch || m.name.includes(memberSearch) || m.nickname.includes(memberSearch))
+                  .map(m => (
+                    <button key={m.name} onClick={() => handleReplacePlayer(activePlayer, m)}
+                      className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-blue-50 flex justify-between items-center">
+                      <span className="font-bold text-gray-700">{m.nickname || m.name}</span>
+                      <span className="text-gray-400 text-xs">{m.name}</span>
+                    </button>
+                  ))
+                }
+              </div>
+            </div>
+          )}
 
           {currentPlayers.length > 0 && (
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
