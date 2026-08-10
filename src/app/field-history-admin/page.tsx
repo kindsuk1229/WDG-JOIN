@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import { Avatar } from '@/components/UI';
 
 const OWNER_NAME = '김근석';
@@ -17,7 +17,7 @@ interface RoundRecord {
   participants: { name: string; nickname: string }[];
   hasScorecard: boolean;
   playerScores: { name: string; nickname: string; score: number }[];
-  ratingDeltas: Record<string, number>; // name → delta
+  ratingDeltas: Record<string, number>;
 }
 
 export default function FieldHistoryAdminPage() {
@@ -28,6 +28,7 @@ export default function FieldHistoryAdminPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filterYear, setFilterYear] = useState<string>('전체');
   const [years, setYears] = useState<string[]>([]);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     const name = (localStorage.getItem('user_name') || '').trim();
@@ -152,6 +153,26 @@ export default function FieldHistoryAdminPage() {
     filterYear === '전체' || r.date.startsWith(filterYear)
   );
 
+  const handleDelete = async (record: RoundRecord) => {
+    if (!window.confirm(`"${record.golfCourse || record.title}" 벙개를 삭제하시겠습니까?\n\n참여자 및 모든 데이터가 삭제됩니다.`)) return;
+    setDeleting(record.id);
+    try {
+      await deleteDoc(doc(db, 'meetups', record.id));
+      // 성적표도 있으면 같이 삭제
+      if (record.hasScorecard) {
+        await deleteDoc(doc(db, 'scorecards', record.id)).catch(() => {});
+        await deleteDoc(doc(db, 'scorecards', record.id + '_day2')).catch(() => {});
+      }
+      setRecords(prev => prev.filter(r => r.id !== record.id));
+      setExpandedId(null);
+      alert('삭제되었습니다.');
+    } catch (err) {
+      alert('삭제 중 오류가 발생했습니다.');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '-';
     const d = new Date(dateStr + 'T00:00:00');
@@ -218,12 +239,12 @@ export default function FieldHistoryAdminPage() {
                   className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
 
                   {/* 헤더 */}
-                  <div
-                    className="p-4 cursor-pointer active:bg-gray-50"
-                    onClick={() => setExpandedId(isExpanded ? null : record.id)}
-                  >
+                  <div className="p-4">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
+                      <div
+                        className="flex-1 min-w-0 cursor-pointer active:opacity-70"
+                        onClick={() => setExpandedId(isExpanded ? null : record.id)}
+                      >
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           {record.meetupType === 'overnight' && (
                             <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-bold">1박2일</span>
@@ -239,14 +260,36 @@ export default function FieldHistoryAdminPage() {
                         <p className="font-black text-gray-800">{record.golfCourse || record.title}</p>
                         <p className="text-sm text-gray-400 mt-0.5">{formatDate(record.date)}</p>
                       </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-sm text-gray-500">{record.participants.length}명 참여</p>
-                        <p className="text-gray-300 text-lg">{isExpanded ? '▲' : '▼'}</p>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {/* ✅ 삭제 버튼 — 성적표 없는 벙개만 표시 */}
+                        {!record.hasScorecard && (
+                          <button
+                            onClick={() => handleDelete(record)}
+                            disabled={deleting === record.id}
+                            className={`text-xs font-bold px-3 py-1.5 rounded-lg ${
+                              deleting === record.id
+                                ? 'bg-gray-100 text-gray-400'
+                                : 'bg-red-50 text-red-500 active:bg-red-100'
+                            }`}
+                          >
+                            {deleting === record.id ? '삭제중...' : '🗑️ 삭제'}
+                          </button>
+                        )}
+                        <div
+                          className="cursor-pointer text-right"
+                          onClick={() => setExpandedId(isExpanded ? null : record.id)}
+                        >
+                          <p className="text-sm text-gray-500">{record.participants.length}명</p>
+                          <p className="text-gray-300 text-lg">{isExpanded ? '▲' : '▼'}</p>
+                        </div>
                       </div>
                     </div>
 
                     {/* 참여자 미리보기 */}
-                    <div className="flex flex-wrap gap-1.5 mt-3">
+                    <div
+                      className="flex flex-wrap gap-1.5 mt-3 cursor-pointer"
+                      onClick={() => setExpandedId(isExpanded ? null : record.id)}
+                    >
                       {record.participants.slice(0, 8).map((p, i) => (
                         <span key={i} className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-full font-bold">
                           {p.nickname || p.name}
