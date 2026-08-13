@@ -68,7 +68,7 @@ export default function TournamentListPage() {
           participantCount: (data.participants || []).length,
           round: data.round || 0,
         };
-      });
+      }).filter(t => t.status !== 'completed'); // ✅ 완료된 대회 숨김
       setTournaments(list);
     } catch (err) {
       console.error('대회 목록 로딩 실패:', err);
