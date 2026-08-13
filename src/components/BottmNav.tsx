@@ -13,6 +13,7 @@ export default function BottomNav({ active }: BottomNavProps) {
   const tabs = [
     { href: '/', icon: '⛳', label: '홈', key: 'home' },
     { href: '/meetups', icon: '📋', label: '벙개 목록', key: 'meetups' },
+    { href: '/tournament', icon: '🏆', label: '대회', key: 'tournament' },
     { href: '/my-meetups', icon: '📝', label: '내 벙개', key: 'my-meetups' },
     { href: '/mypage', icon: '👤', label: '마이', key: 'my' },
   ];
@@ -20,7 +21,7 @@ export default function BottomNav({ active }: BottomNavProps) {
   return (
     <nav className="sticky bottom-0 w-full bg-white border-t border-gray-100 flex justify-around p-3 z-50 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
       {tabs.map((tab) => {
-        const isActive = pathname === tab.href || active === tab.key;
+        const isActive = pathname === tab.href || pathname.startsWith(tab.href + '/') || active === tab.key;
         return (
           <Link
             key={tab.key}
@@ -28,7 +29,7 @@ export default function BottomNav({ active }: BottomNavProps) {
             className={`flex flex-col items-center gap-1 flex-1 ${isActive ? 'text-green-600' : 'text-gray-400'}`}
           >
             <span className="text-2xl">{tab.icon}</span>
-            <span className="text-[16px] font-bold">{tab.label}</span>
+            <span className="text-[11px] font-bold">{tab.label}</span>
           </Link>
         );
       })}
