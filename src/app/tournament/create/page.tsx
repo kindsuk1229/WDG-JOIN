@@ -101,6 +101,7 @@ const FORMAT_OPTIONS = [
     { value: 'team2', label: '2인1조 합산' },
     { value: 'team4', label: '4인1조 합산' },
     { value: 'teamCustom', label: '직접설정' },
+    { value: 'teamPoint', label: '팀 포인트 (이글+5/버디+3/파+1/보기0/더블-1/트리플-2)' },
   ]},
   { group: '2:2', options: [
     { value: 'matchplay', label: '베스트볼 매치플레이 (업&다운)' },

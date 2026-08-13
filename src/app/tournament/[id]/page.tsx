@@ -47,6 +47,7 @@ interface Tournament {
   title: string;
   type: 'field' | 'screen';
   format: string;
+  formats: string[];
   date: string;
   venue: string;
   entryFee: number;
@@ -74,6 +75,7 @@ export default function TournamentDetailPage() {
   const [myName, setMyName] = useState('');
   const [myNickname, setMyNickname] = useState('');
   const [isOwner, setIsOwner] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false); // ✅ 매니저 포함
   const [allMembers, setAllMembers] = useState<Participant[]>([]);
 
   // 참가자 추가
@@ -102,10 +104,16 @@ export default function TournamentDetailPage() {
 
   const fetchData = async () => {
     try {
-      const [tSnap, usersSnap] = await Promise.all([
+      const [tSnap, usersSnap, adminsSnap] = await Promise.all([
         getDoc(doc(db, 'tournaments', tournamentId)),
         getDocs(collection(db, 'users')),
+        getDocs(collection(db, 'admins')),
       ]);
+
+      // 매니저 확인
+      const myNameLocal = (localStorage.getItem('user_name') || '').trim();
+      const isAdminUser = myNameLocal === OWNER_NAME || adminsSnap.docs.some(d => d.id === myNameLocal);
+      setIsAdmin(isAdminUser);
 
       if (tSnap.exists()) {
         const data = { id: tSnap.id, ...tSnap.data() } as Tournament;
@@ -335,8 +343,26 @@ export default function TournamentDetailPage() {
           <button onClick={() => router.back()} className="mr-4 text-xl font-bold text-gray-600">←</button>
           <h1 className="text-lg font-black text-gray-800 truncate">{tournament.title}</h1>
         </div>
-        {isOwner && (
+        {isAdmin && (
           <div className="flex gap-2">
+            {/* 카카오톡 공유 — 오너만 */}
+            {isOwner && (
+              <button
+                onClick={() => {
+                  const url = `${window.location.origin}/tournament/${tournamentId}`;
+                  const text = `🏆 ${tournament?.title}\n📅 ${tournament?.date}\n📍 ${tournament?.venue}\n💰 ${tournament?.entryFee?.toLocaleString()}원\n\n참가 신청하기 👇`;
+                  if (navigator.share) {
+                    navigator.share({ title: tournament?.title, text, url });
+                  } else {
+                    navigator.clipboard.writeText(`${text}\n${url}`);
+                    alert('링크가 복사되었습니다! 카카오톡에 붙여넣기 하세요.');
+                  }
+                }}
+                className="text-sm font-bold px-3 py-1.5 bg-yellow-400 text-white rounded-lg"
+              >
+                📢 공유
+              </button>
+            )}
             <button onClick={() => router.push(`/tournament/${tournamentId}/edit`)}
               className="text-sm font-bold px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg">
               수정
@@ -399,8 +425,8 @@ export default function TournamentDetailPage() {
           </div>
         </div>
 
-        {/* 관리자 도구 */}
-        {isOwner && (
+        {/* 관리자 도구 — 오너 + 매니저 */}
+        {isAdmin && (
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
             <p className="font-black text-gray-500 text-sm">🔧 관리자 도구</p>
             <div className="flex flex-wrap gap-2">
@@ -462,26 +488,86 @@ export default function TournamentDetailPage() {
             {/* 결과 입력 */}
             {showResults && (
               <div className="space-y-3 border-t pt-3">
-                <p className="text-sm font-bold text-gray-600">순위 입력 (타수/점수)</p>
-                {tournament.participants.map((p, idx) => {
-                  const existing = results.find(r => r.name === p.name);
-                  return (
-                    <div key={p.name} className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-gray-500 w-16">{p.nickname || p.name}</span>
-                      <input type="text" placeholder="타수/점수"
-                        value={existing?.score || ''}
-                        onChange={e => {
-                          const val = e.target.value;
-                          setResults(prev => {
-                            const filtered = prev.filter(r => r.name !== p.name);
-                            if (val) return [...filtered, { rank: 0, name: p.name, nickname: p.nickname, score: val }];
-                            return filtered;
-                          });
-                        }}
-                        className="flex-1 p-2.5 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+                {/* ✅ 팀 포인트 방식 */}
+                {tournament?.formats?.includes('teamPoint') ? (
+                  <>
+                    <p className="text-sm font-bold text-gray-600">🏆 팀 포인트 입력</p>
+                    <div className="bg-yellow-50 rounded-xl p-3 text-xs text-yellow-700 font-bold">
+                      이글+5 / 버디+3 / 파+1 / 보기0 / 더블-1 / 트리플이상-2
                     </div>
-                  );
-                })}
+                    {Array.from({ length: 6 }, (_, i) => {
+                      const teamName = `${i + 1}팀`;
+                      const existing = results.find(r => r.name === teamName);
+                      return (
+                        <div key={i} className="flex items-center gap-3">
+                          <span className="text-sm font-black text-white w-12 text-center bg-green-600 rounded-lg py-1.5 flex-shrink-0">{teamName}</span>
+                          <input type="number" inputMode="numeric" placeholder="팀 포인트 합계"
+                            value={existing?.score || ''}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setResults(prev => {
+                                const filtered = prev.filter(r => r.name !== teamName);
+                                if (val) return [...filtered, { rank: 0, name: teamName, nickname: teamName, score: val }];
+                                return filtered;
+                              });
+                            }}
+                            className="flex-1 p-2.5 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-green-500 outline-none font-bold text-center" />
+                          <span className="text-xs text-gray-400 flex-shrink-0">포인트</span>
+                        </div>
+                      );
+                    })}
+                    {/* 개인전도 있으면 개인 성적 입력 */}
+                    {(tournament?.formats?.includes('stroke') || tournament?.formats?.includes('shinperio')) && (
+                      <>
+                        <p className="text-sm font-bold text-gray-600 mt-2">⛳ 개인전 성적 입력</p>
+                        {tournament.participants.map((p) => {
+                          const existing = results.find(r => r.name === p.name);
+                          return (
+                            <div key={p.name} className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-gray-500 w-20 truncate">{p.nickname || p.name}</span>
+                              <input type="number" inputMode="numeric" placeholder="타수"
+                                value={existing?.score || ''}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  setResults(prev => {
+                                    const filtered = prev.filter(r => r.name !== p.name);
+                                    if (val) return [...filtered, { rank: 0, name: p.name, nickname: p.nickname, score: val }];
+                                    return filtered;
+                                  });
+                                }}
+                                className="flex-1 p-2.5 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+                              <span className="text-xs text-gray-400">타</span>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                  </>
+                ) : (
+                  /* 기존 개인전/팀전 결과 입력 */
+                  <>
+                    <p className="text-sm font-bold text-gray-600">순위 입력 (타수/점수)</p>
+                    {tournament.participants.map((p, idx) => {
+                      const existing = results.find(r => r.name === p.name);
+                      return (
+                        <div key={p.name} className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-gray-500 w-16">{p.nickname || p.name}</span>
+                          <input type="text" placeholder="타수/점수"
+                            value={existing?.score || ''}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setResults(prev => {
+                                const filtered = prev.filter(r => r.name !== p.name);
+                                if (val) return [...filtered, { rank: 0, name: p.name, nickname: p.nickname, score: val }];
+                                return filtered;
+                              });
+                            }}
+                            className="flex-1 p-2.5 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
                 <button onClick={handleSaveResults}
                   className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold text-sm">
                   결과 저장
@@ -528,19 +614,55 @@ export default function TournamentDetailPage() {
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
             <p className="font-black text-gray-700 mb-3">📊 대회 결과</p>
             <div className="space-y-2">
-              {[...tournament.results]
-                .sort((a, b) => Number(a.score) - Number(b.score))
-                .map((r, idx) => (
-                  <div key={r.name} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50">
-                    <span className={`text-lg font-black w-8 text-center ${
-                      idx === 0 ? 'text-yellow-500' : idx === 1 ? 'text-gray-400' : idx === 2 ? 'text-orange-400' : 'text-gray-300'
-                    }`}>
-                      {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}
-                    </span>
-                    <span className="flex-1 font-bold text-gray-700">{r.nickname || r.name}</span>
-                    <span className="font-black text-gray-800">{r.score}</span>
-                  </div>
-                ))}
+              {/* 팀 포인트 방식 — 포인트 높을수록 좋음 */}
+              {tournament.formats?.includes('teamPoint') ? (
+                <>
+                  <p className="text-xs font-bold text-gray-400 mb-2">🏆 팀 포인트 순위</p>
+                  {[...tournament.results]
+                    .filter(r => ['1팀','2팀','3팀','4팀','5팀','6팀'].includes(r.name))
+                    .sort((a, b) => Number(b.score) - Number(a.score))
+                    .map((r, idx) => (
+                      <div key={r.name} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50">
+                        <span className={`text-lg font-black w-8 text-center ${
+                          idx === 0 ? 'text-yellow-500' : idx === 1 ? 'text-gray-400' : idx === 2 ? 'text-orange-400' : 'text-gray-300'
+                        }`}>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}</span>
+                        <span className="flex-1 font-bold text-gray-700">{r.name}</span>
+                        <span className="font-black text-green-600">{Number(r.score) > 0 ? '+' : ''}{r.score}pt</span>
+                      </div>
+                    ))}
+                  {/* 개인전 결과도 있으면 표시 */}
+                  {tournament.results.filter(r => !['1팀','2팀','3팀','4팀','5팀','6팀'].includes(r.name)).length > 0 && (
+                    <>
+                      <p className="text-xs font-bold text-gray-400 mt-4 mb-2">⛳ 개인전 순위</p>
+                      {[...tournament.results]
+                        .filter(r => !['1팀','2팀','3팀','4팀','5팀','6팀'].includes(r.name))
+                        .sort((a, b) => Number(a.score) - Number(b.score))
+                        .map((r, idx) => (
+                          <div key={r.name} className="flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-50">
+                            <span className={`text-base font-black w-8 text-center ${
+                              idx === 0 ? 'text-yellow-500' : idx === 1 ? 'text-gray-400' : idx === 2 ? 'text-orange-400' : 'text-gray-300'
+                            }`}>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}</span>
+                            <span className="flex-1 font-bold text-gray-700">{r.nickname || r.name}</span>
+                            <span className="font-black text-gray-800">{r.score}타</span>
+                          </div>
+                        ))}
+                    </>
+                  )}
+                </>
+              ) : (
+                /* 기존 개인전/팀전 결과 */
+                [...tournament.results]
+                  .sort((a, b) => Number(a.score) - Number(b.score))
+                  .map((r, idx) => (
+                    <div key={r.name} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50">
+                      <span className={`text-lg font-black w-8 text-center ${
+                        idx === 0 ? 'text-yellow-500' : idx === 1 ? 'text-gray-400' : idx === 2 ? 'text-orange-400' : 'text-gray-300'
+                      }`}>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}</span>
+                      <span className="flex-1 font-bold text-gray-700">{r.nickname || r.name}</span>
+                      <span className="font-black text-gray-800">{r.score}</span>
+                    </div>
+                  ))
+              )}
             </div>
           </div>
         )}
@@ -613,7 +735,7 @@ export default function TournamentDetailPage() {
         )}
 
         {/* 조 편성 버튼 */}
-        {isOwner && (
+        {isAdmin && (
           <button onClick={() => router.push(`/tournament/${tournamentId}/group-assign`)}
             className="w-full py-4 rounded-2xl font-bold text-base bg-blue-600 text-white shadow-lg shadow-blue-200 active:scale-95 transition-all">
             👥 조 편성하기
