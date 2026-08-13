@@ -84,10 +84,10 @@ export default function RatingRankingPage() {
         };
       });
 
-      // 3라운드 이상 → 정식 랭킹 (배치고사 완료)
-      const ranked = all.filter(p => p.rounds >= 3).sort((a, b) => b.rating - a.rating);
-      // 3라운드 미만 → 배치고사 중 (아이언)
-      const notRanked = all.filter(p => p.rounds > 0 && p.rounds < 3).sort((a, b) => b.rounds - a.rounds);
+      // 4라운드 이상 → 정식 랭킹 (배치고사 완료)
+      const ranked = all.filter(p => p.rounds >= 4).sort((a, b) => b.rating - a.rating);
+      // 4라운드 미만 → 배치고사 중 (아이언)
+      const notRanked = all.filter(p => p.rounds > 0 && p.rounds < 4).sort((a, b) => b.rounds - a.rounds);
 
       setPlayers(ranked);
       setUnranked(notRanked);
