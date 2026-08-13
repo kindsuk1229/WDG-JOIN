@@ -23,9 +23,10 @@ export function getScoreMultiplier(diff: number): number {
 }
 
 // ── 참가인원 가중치
+// 4명 = ×1.00, 48명 = ×2.00 선형 증가, 48명 이상 상한 고정
 export function getPlayerMultiplier(count: number): number {
   if (count <= 4) return 1.0;
-  return Math.min(3.0, Math.sqrt(count / 4));
+  return Math.min(2.0, 1.0 + (count - 4) / 44);
 }
 
 // ── 업셋 보너스 (약자가 강자를 이겼을 때 추가 가중)
@@ -91,10 +92,11 @@ export function calcDuel(
   // 타수차 가중
   const scoreMultiplier = getScoreMultiplier(diff);
 
-  // ✅ 업셋 보너스 (약자가 강자를 이겼을 때 추가 가중, 최대 ×4)
+  // ✅ 업셋 보너스 — 둘 중 큰 값만 사용 (중복 곱셈 방지)
   const upsetBonus = getUpsetBonus(myRating, oppRating, myScore, oppScore);
+  const multiplier = Math.max(scoreMultiplier, upsetBonus);
 
-  return K * (result - E) * scoreMultiplier * upsetBonus;
+  return K * (result - E) * multiplier;
 }
 
 // ── 한 라운드 전체 Rating 계산
