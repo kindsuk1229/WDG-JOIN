@@ -336,10 +336,16 @@ export default function TournamentDetailPage() {
           <h1 className="text-lg font-black text-gray-800 truncate">{tournament.title}</h1>
         </div>
         {isOwner && (
-          <button onClick={() => router.push(`/tournament/${tournamentId}/group-assign`)}
-            className="text-sm font-bold px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg">
-            조 편성
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => router.push(`/tournament/${tournamentId}/edit`)}
+              className="text-sm font-bold px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg">
+              수정
+            </button>
+            <button onClick={() => router.push(`/tournament/${tournamentId}/group-assign`)}
+              className="text-sm font-bold px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg">
+              조 편성
+            </button>
+          </div>
         )}
       </header>
 
