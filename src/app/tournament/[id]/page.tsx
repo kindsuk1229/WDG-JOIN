@@ -10,6 +10,7 @@ import { calcRoundRating, getInitialRating, RATING_MIN } from '@/lib/rating';
 import { initKakao, shareToKakao } from '@/lib/kakao';
 
 const OWNER_NAME = '김근석';
+const PAYMENT_MANAGERS = ['김근석', '양영빈']; // ✅ 입금 확인 권한자
 
 const FORMAT_LABEL: Record<string, string> = {
   stroke: '개인전 · 스트로크',
@@ -362,14 +363,20 @@ export default function TournamentDetailPage() {
                 💬 공유
               </button>
             )}
-            <button onClick={() => router.push(`/tournament/${tournamentId}/edit`)}
-              className="text-sm font-bold px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg">
-              수정
-            </button>
-            <button onClick={() => router.push(`/tournament/${tournamentId}/group-assign`)}
-              className="text-sm font-bold px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg">
-              조 편성
-            </button>
+            {/* 수정 — 오너만 */}
+            {isOwner && (
+              <button onClick={() => router.push(`/tournament/${tournamentId}/edit`)}
+                className="text-sm font-bold px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg">
+                수정
+              </button>
+            )}
+            {/* 조 편성 — 매니저 이상 */}
+            {isAdmin && (
+              <button onClick={() => router.push(`/tournament/${tournamentId}/group-assign`)}
+                className="text-sm font-bold px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg">
+                조 편성
+              </button>
+            )}
           </div>
         )}
       </header>
@@ -686,21 +693,21 @@ export default function TournamentDetailPage() {
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
           <p className="font-black text-gray-700 mb-3">
             참가자 ({tournament.participants.length}명)
-            {isOwner && <span className="text-sm font-normal text-gray-400 ml-2">· 탭하면 입금 확인</span>}
+            {PAYMENT_MANAGERS.includes(myName) && <span className="text-sm font-normal text-gray-400 ml-2">· 탭하면 입금 확인</span>}
           </p>
           <div className="flex flex-wrap gap-2">
             {tournament.participants.map((p, i) => (
               <div key={i} className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-bold ${
                 p.name === myName ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
               }`}>
-                {isOwner && (
+                {PAYMENT_MANAGERS.includes(myName) && (
                   <span onClick={() => handleTogglePaid(p)}
                     className={`text-xs cursor-pointer ${p.paid ? 'text-green-500' : 'text-gray-300'}`}>
                     {p.paid ? '✅' : '○'}
                   </span>
                 )}
                 <span>{p.nickname || p.name}</span>
-                {isOwner && (
+                {isAdmin && (
                   <button onClick={() => handleRemoveMember(p)}
                     className="text-gray-400 hover:text-red-400 ml-1 font-black">×</button>
                 )}
