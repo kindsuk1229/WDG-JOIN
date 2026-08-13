@@ -7,6 +7,7 @@ import {
   doc, getDoc, updateDoc, collection, getDocs, arrayUnion, arrayRemove
 } from 'firebase/firestore';
 import { calcRoundRating, getInitialRating, RATING_MIN } from '@/lib/rating';
+import { initKakao, shareToKakao } from '@/lib/kakao';
 
 const OWNER_NAME = '김근석';
 
@@ -350,13 +351,11 @@ export default function TournamentDetailPage() {
               <button
                 onClick={() => {
                   if (!tournament) return;
-                  const text = `🏆 제${tournament.round}회 ${tournament.title}\n📅 ${tournament.date}\n📍 ${tournament.venue}\n💰 참가비 ${tournament.entryFee?.toLocaleString()}원\n👥 ${tournament.participants?.length}/${tournament.maxPlayers}명 참가중\n\n참가 신청: ${window.location.href}`;
-                  if (navigator.share) {
-                    navigator.share({ title: tournament.title, text });
-                  } else {
-                    navigator.clipboard.writeText(text);
-                    alert('대회 정보가 복사되었습니다! 카카오톡에 붙여넣기 하세요.');
-                  }
+                  initKakao();
+                  const url = window.location.href;
+                  const title = `🏆 제${tournament.round}회 ${tournament.title}`;
+                  const desc = `📅 ${tournament.date} | 📍 ${tournament.venue}\n💰 참가비 ${tournament.entryFee?.toLocaleString()}원 | 👥 ${tournament.participants?.length}/${tournament.maxPlayers}명`;
+                  shareToKakao(url, title, desc);
                 }}
                 className="text-sm font-bold px-3 py-1.5 bg-yellow-400 text-white rounded-lg"
               >
