@@ -409,6 +409,22 @@ export default function TournamentDetailPage() {
             <div className="flex gap-2"><span>📅</span><span>{formatDate(tournament.date)}</span></div>
             <div className="flex gap-2"><span>📍</span><span>{tournament.venue}</span></div>
             <div className="flex gap-2"><span>💰</span><span className="font-bold text-green-600">{tournament.entryFee.toLocaleString()}원</span></div>
+            <div className="flex items-center gap-2 bg-yellow-50 rounded-xl px-3 py-2">
+              <span>🏦</span>
+              <div>
+                <p className="font-bold text-gray-700">카카오뱅크 3333-23-4366122</p>
+                <p className="text-xs text-gray-400">예금주: 양영빈</p>
+              </div>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText('3333234366122');
+                  alert('계좌번호가 복사되었습니다!');
+                }}
+                className="ml-auto text-xs bg-yellow-400 text-white px-2 py-1 rounded-lg font-bold flex-shrink-0"
+              >
+                복사
+              </button>
+            </div>
             {tournament.hasAward && tournament.awardDesc && (
               <div className="flex gap-2"><span>🎁</span><span>{tournament.awardDesc}</span></div>
             )}
