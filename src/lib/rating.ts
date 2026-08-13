@@ -1,5 +1,5 @@
 // ── WDG 골프 Rating 계산 엔진
-// 기획안 기준: Rating 차이 반영 + 타수차 가중 + 참가인원 가중 + 동적 K값
+// 기획안 기준: Rating 차이 반영 + 타수차 가중 + 참가인원 가중 + 동적 K값 + 업셋 보너스
 
 export interface RatingUser {
   name: string;
@@ -26,6 +26,23 @@ export function getScoreMultiplier(diff: number): number {
 export function getPlayerMultiplier(count: number): number {
   if (count <= 4) return 1.0;
   return Math.min(3.0, Math.sqrt(count / 4));
+}
+
+// ── 업셋 보너스 (약자가 강자를 이겼을 때 추가 가중)
+// 낮은 Rating이 높은 Rating을 이기면 → Rating 차이가 클수록 더 큰 보상
+export function getUpsetBonus(
+  myRating: number,
+  oppRating: number,
+  myScore: number,
+  oppScore: number,
+): number {
+  const iWon = myScore < oppScore;
+  const iAmUnderdog = myRating < oppRating;
+  if (iWon && iAmUnderdog) {
+    // 약자가 강자를 이긴 경우 → 보너스
+    return Math.min(4.0, 1 + (oppRating - myRating) / 50);
+  }
+  return 1.0;
 }
 
 // ── 신뢰도 배지
@@ -72,9 +89,12 @@ export function calcDuel(
   }
 
   // 타수차 가중
-  const multiplier = getScoreMultiplier(diff);
+  const scoreMultiplier = getScoreMultiplier(diff);
 
-  return K * (result - E) * multiplier;
+  // ✅ 업셋 보너스 (약자가 강자를 이겼을 때 추가 가중, 최대 ×4)
+  const upsetBonus = getUpsetBonus(myRating, oppRating, myScore, oppScore);
+
+  return K * (result - E) * scoreMultiplier * upsetBonus;
 }
 
 // ── 한 라운드 전체 Rating 계산
