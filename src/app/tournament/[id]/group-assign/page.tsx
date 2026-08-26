@@ -244,17 +244,28 @@ export default function TournamentGroupAssignPage() {
         <p className="font-bold text-gray-800 truncate text-sm">{player.nickname || player.name}</p>
         {getHandicapLabel(player) && <p className="text-xs text-gray-400">{getHandicapLabel(player)}</p>}
       </div>
-      <div className="flex gap-1 flex-shrink-0">
-        {groups.map(g => g.id !== fromGroupId && (
-          <button key={g.id} onClick={() => movePlayer(player, fromGroupId, g.id)}
-            className="text-xs px-1.5 py-0.5 bg-green-50 text-green-600 rounded-lg font-bold active:bg-green-100">
-            {g.label}
-          </button>
-        ))}
-        {fromGroupId !== null && (
-          <button onClick={() => movePlayer(player, fromGroupId, null)}
-            className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-lg font-bold">✕</button>
-        )}
+      <div className="flex items-center gap-1 flex-shrink-0">
+        {/* ✅ 드롭다운 선택 */}
+        <select
+          value=""
+          onChange={e => {
+            const val = e.target.value;
+            if (val === '__unassign__') movePlayer(player, fromGroupId, null);
+            else if (val) movePlayer(player, fromGroupId, val);
+          }}
+          className="text-xs px-2 py-1.5 bg-green-50 text-green-700 rounded-lg font-bold border border-green-100 outline-none cursor-pointer"
+        >
+          <option value="">이동 ▼</option>
+          {groups
+            .filter(g => g.id !== fromGroupId)
+            .map(g => (
+              <option key={g.id} value={g.id}>{g.label}</option>
+            ))
+          }
+          {fromGroupId !== null && (
+            <option value="__unassign__">미배정으로</option>
+          )}
+        </select>
       </div>
     </div>
   );
@@ -343,29 +354,27 @@ export default function TournamentGroupAssignPage() {
             <div className="px-4 py-2 bg-green-50 border-b border-green-100">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-green-700">팀 나누기</span>
-                <div className="flex gap-1">
-                  {[false, 2, 3, 4].map((v, i) => (
-                    <button key={i}
-                      onClick={() => {
-                        if (v === false) {
-                          if (group.useSubTeams) handleToggleSubTeams(group.id, 2);
-                        } else {
-                          if (!group.useSubTeams) {
-                            handleToggleSubTeams(group.id, v as number);
-                          } else {
-                            handleChangeTeamCount(group.id, v as number);
-                          }
-                        }
-                      }}
-                      className={`px-2 py-0.5 rounded-lg text-xs font-bold ${
-                        (!group.useSubTeams && v === false) ? 'bg-green-600 text-white' :
-                        (group.useSubTeams && group.subTeams?.length === v) ? 'bg-green-600 text-white' :
-                        'bg-white text-green-600 border border-green-200'
-                      }`}>
-                      {v === false ? '없음' : `${v}팀`}
-                    </button>
-                  ))}
-                </div>
+                <select
+                  value={group.useSubTeams ? (group.subTeams?.length || 2) : 0}
+                  onChange={e => {
+                    const val = Number(e.target.value);
+                    if (val === 0) {
+                      if (group.useSubTeams) handleToggleSubTeams(group.id, 2);
+                    } else {
+                      if (!group.useSubTeams) {
+                        handleToggleSubTeams(group.id, val);
+                      } else {
+                        handleChangeTeamCount(group.id, val);
+                      }
+                    }
+                  }}
+                  className="text-xs px-2 py-1.5 bg-white text-green-700 rounded-lg font-bold border border-green-200 outline-none cursor-pointer"
+                >
+                  <option value={0}>없음</option>
+                  <option value={2}>2팀</option>
+                  <option value={3}>3팀</option>
+                  <option value={4}>4팀</option>
+                </select>
               </div>
             </div>
 
@@ -402,16 +411,18 @@ export default function TournamentGroupAssignPage() {
                         team.members.map(player => (
                           <div key={player.name} className="flex items-center gap-2 bg-white rounded-lg border border-gray-100 px-2.5 py-1.5">
                             <p className="flex-1 text-sm font-bold text-gray-700 truncate">{player.nickname || player.name}</p>
-                            {/* 다른 팀으로 이동 */}
-                            <div className="flex gap-1">
+                            <select
+                              value=""
+                              onChange={e => {
+                                if (e.target.value) moveToSubTeam(group.id, player, team.id, e.target.value);
+                              }}
+                              className="text-xs px-2 py-1 bg-blue-50 text-blue-600 rounded-lg font-bold border border-blue-100 outline-none cursor-pointer"
+                            >
+                              <option value="">이동 ▼</option>
                               {group.subTeams!.filter(t => t.id !== team.id).map(t => (
-                                <button key={t.id}
-                                  onClick={() => moveToSubTeam(group.id, player, team.id, t.id)}
-                                  className="text-xs px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded-lg font-bold">
-                                  {t.label}
-                                </button>
+                                <option key={t.id} value={t.id}>{t.label}</option>
                               ))}
-                            </div>
+                            </select>
                           </div>
                         ))
                       )}
