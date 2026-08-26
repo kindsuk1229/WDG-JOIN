@@ -51,11 +51,16 @@ interface Tournament {
   format: string;
   formats: string[];
   date: string;
+  endDate?: string;
+  dateType?: 'single' | 'range';
   venue: string;
   entryFee: number;
   status: 'open' | 'closed' | 'completed';
   maxPlayers: number;
   teamSize?: number;
+  registrationType?: 'individual' | 'team';
+  teamMemberCount?: number;
+  tournamentType?: 'league' | 'knockout';
   hasAward: boolean;
   awardDesc: string;
   round: number;
@@ -965,6 +970,14 @@ export default function TournamentDetailPage() {
           <button onClick={() => router.push(`/tournament/${tournamentId}/score`)}
             className="w-full py-4 rounded-2xl font-bold text-base bg-blue-600 text-white shadow-lg shadow-blue-200 active:scale-95 transition-all">
             ⛳ 내 성적 입력하기
+          </button>
+        )}
+
+        {/* 대진표 버튼 — 토너먼트 방식일 때 */}
+        {tournament?.tournamentType === 'knockout' && (
+          <button onClick={() => router.push(`/tournament/${tournamentId}/bracket`)}
+            className="w-full py-4 rounded-2xl font-bold text-base bg-purple-600 text-white shadow-lg shadow-purple-200 active:scale-95 transition-all">
+            🏆 대진표 보기
           </button>
         )}
 

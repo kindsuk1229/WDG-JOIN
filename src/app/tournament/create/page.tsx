@@ -121,12 +121,17 @@ export default function TournamentCreatePage() {
 
   const [title, setTitle] = useState('');
   const [type, setType] = useState<'screen' | 'field'>('screen');
-  const [formats, setFormats] = useState<string[]>(['stroke']); // ✅ 복수 선택
+  const [formats, setFormats] = useState<string[]>(['stroke']);
+  const [dateType, setDateType] = useState<'single' | 'range'>('single');
   const [date, setDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [venue, setVenue] = useState('');
   const [entryFee, setEntryFee] = useState('');
   const [maxPlayers, setMaxPlayers] = useState('');
-  const [teamSize, setTeamSize] = useState(''); // 직접설정 팀 인원
+  const [teamSize, setTeamSize] = useState('');
+  const [registrationType, setRegistrationType] = useState<'individual' | 'team'>('individual');
+  const [teamMemberCount, setTeamMemberCount] = useState('2');
+  const [tournamentType, setTournamentType] = useState<'league' | 'knockout'>('league');
   const [hasAward, setHasAward] = useState(false);
   const [strokeAwards, setStrokeAwards] = useState<AwardItem[]>([
     { id: '1', rank: '1위', winner: '', prize: '' },
@@ -199,13 +204,18 @@ export default function TournamentCreatePage() {
       const docRef = await addDoc(collection(db, 'tournaments'), {
         title: title.trim(),
         type,
-        format: formats.join('+'), // ✅ 복수면 'stroke+shinperio'
-        formats,                    // ✅ 배열도 저장
+        format: formats.join('+'),
+        formats,
         date,
+        endDate: dateType === 'range' ? endDate : null,
+        dateType,
         venue: venue.trim(),
         entryFee: Number(entryFee) || 0,
         maxPlayers: Number(maxPlayers),
         teamSize: formats.includes('teamCustom') ? Number(teamSize) : null,
+        registrationType,
+        teamMemberCount: registrationType === 'team' ? Number(teamMemberCount) : null,
+        tournamentType,
         hasAward,
         awardDesc: '',
         awardsByCategory: {
@@ -340,15 +350,48 @@ export default function TournamentCreatePage() {
         {/* 일정 / 장소 */}
         <div className="bg-white rounded-2xl p-5 space-y-4 shadow-sm border border-gray-100">
           <p className="font-black text-gray-700">일정 · 장소</p>
+
+          {/* 날짜 방식 선택 */}
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-1.5">날짜</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)}
-              className="w-full p-3 bg-gray-50 rounded-xl font-bold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none" />
+            <label className="text-xs font-bold text-gray-400 block mb-1.5">날짜 방식</label>
+            <div className="flex gap-2">
+              <button onClick={() => setDateType('single')}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold ${dateType === 'single' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                📅 단일 날짜
+              </button>
+              <button onClick={() => setDateType('range')}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold ${dateType === 'range' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                📆 기간 설정
+              </button>
+            </div>
           </div>
+
+          {dateType === 'single' ? (
+            <div>
+              <label className="text-xs font-bold text-gray-400 block mb-1.5">날짜</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                className="w-full p-3 bg-gray-50 rounded-xl font-bold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none" />
+            </div>
+          ) : (
+            <div className="flex gap-2 items-center">
+              <div className="flex-1">
+                <label className="text-xs font-bold text-gray-400 block mb-1.5">시작일</label>
+                <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                  className="w-full p-3 bg-gray-50 rounded-xl font-bold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none" />
+              </div>
+              <span className="text-gray-400 font-bold mt-5">~</span>
+              <div className="flex-1">
+                <label className="text-xs font-bold text-gray-400 block mb-1.5">종료일</label>
+                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+                  className="w-full p-3 bg-gray-50 rounded-xl font-bold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none" />
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="text-xs font-bold text-gray-400 block mb-1.5">장소</label>
             <input type="text" value={venue} onChange={e => setVenue(e.target.value)}
-              placeholder="예: 골프존파크 장안온천점"
+              placeholder="예: 골프존파크 장안온천점 (또는 '일정 조율')"
               className="w-full p-3 bg-gray-50 rounded-xl font-bold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none" />
           </div>
         </div>
@@ -356,21 +399,86 @@ export default function TournamentCreatePage() {
         {/* 참가비 / 인원 */}
         <div className="bg-white rounded-2xl p-5 space-y-4 shadow-sm border border-gray-100">
           <p className="font-black text-gray-700">참가비 · 인원</p>
+
+          {/* 신청 방식 */}
+          <div>
+            <label className="text-xs font-bold text-gray-400 block mb-1.5">신청 방식</label>
+            <div className="flex gap-2">
+              <button onClick={() => setRegistrationType('individual')}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold ${registrationType === 'individual' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                👤 개인 신청
+              </button>
+              <button onClick={() => setRegistrationType('team')}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold ${registrationType === 'team' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                👥 팀 신청
+              </button>
+            </div>
+            {registrationType === 'individual' && tournamentType === 'knockout' && (
+              <p className="text-xs text-blue-500 mt-1.5 font-bold">💡 개인전 1:1 토너먼트로 진행돼요</p>
+            )}
+          </div>
+
+          {registrationType === 'team' && (
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-400 block">팀당 인원</label>
+              <div className="flex gap-2">
+                {[2, 3, 4].map(n => (
+                  <button key={n} onClick={() => setTeamMemberCount(String(n))}
+                    className={`flex-1 py-2 rounded-xl text-sm font-bold ${teamMemberCount === String(n) ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                    {n}인 1팀
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400">팀명으로 신청하며, 팀원을 직접 구성합니다</p>
+            </div>
+          )}
+
+          {/* 토너먼트 방식 */}
+          <div>
+            <label className="text-xs font-bold text-gray-400 block mb-1.5">진행 방식</label>
+            <div className="flex gap-2">
+              <button onClick={() => setTournamentType('league')}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold ${tournamentType === 'league' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                🔄 리그전
+              </button>
+              <button onClick={() => setTournamentType('knockout')}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold ${tournamentType === 'knockout' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                🏆 토너먼트
+              </button>
+            </div>
+          </div>
+
+          {tournamentType === 'knockout' && (
+            <div>
+              <label className="text-xs font-bold text-gray-400 block mb-1.5">참가 팀/인원 수</label>
+              <div className="flex gap-2 flex-wrap">
+                {['8', '16', '32'].map(n => (
+                  <button key={n} onClick={() => setMaxPlayers(n)}
+                    className={`flex-1 py-2 rounded-xl text-sm font-bold ${maxPlayers === n ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                    {n}강
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="text-xs font-bold text-gray-400 block mb-1.5">참가비 (원)</label>
+              <label className="text-xs font-bold text-gray-400 block mb-1.5">참가비 (원/인)</label>
               <input type="number" inputMode="numeric" value={entryFee}
                 onChange={e => setEntryFee(e.target.value)}
-                placeholder="35000"
+                placeholder="50000"
                 className="w-full p-3 bg-gray-50 rounded-xl font-bold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none" />
             </div>
-            <div className="flex-1">
-              <label className="text-xs font-bold text-gray-400 block mb-1.5">최대 인원</label>
-              <input type="number" inputMode="numeric" value={maxPlayers}
-                onChange={e => setMaxPlayers(e.target.value)}
-                placeholder="44"
-                className="w-full p-3 bg-gray-50 rounded-xl font-bold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none" />
-            </div>
+            {tournamentType !== 'knockout' && (
+              <div className="flex-1">
+                <label className="text-xs font-bold text-gray-400 block mb-1.5">최대 인원</label>
+                <input type="number" inputMode="numeric" value={maxPlayers}
+                  onChange={e => setMaxPlayers(e.target.value)}
+                  placeholder="32"
+                  className="w-full p-3 bg-gray-50 rounded-xl font-bold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none" />
+              </div>
+            )}
           </div>
         </div>
 

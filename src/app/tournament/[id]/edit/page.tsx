@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 const OWNER_NAME = '김근석';
 
@@ -270,6 +270,24 @@ export default function TournamentEditPage() {
             saving ? 'bg-gray-400' : 'bg-green-600 shadow-lg shadow-green-200 active:scale-95 transition-all'
           }`}>
           {saving ? '저장중...' : '✅ 수정 완료'}
+        </button>
+
+        {/* ✅ 대회 삭제 버튼 */}
+        <button
+          onClick={async () => {
+            if (!window.confirm('대회를 삭제하시겠습니까?\n모든 데이터가 삭제되며 복구할 수 없습니다.')) return;
+            if (!window.confirm('정말로 삭제하시겠습니까?')) return;
+            try {
+              await deleteDoc(doc(db, 'tournaments', tournamentId));
+              alert('삭제되었습니다.');
+              router.replace('/tournament');
+            } catch {
+              alert('삭제 중 오류가 발생했습니다.');
+            }
+          }}
+          className="w-full py-4 rounded-2xl font-bold text-red-500 text-base bg-red-50 border border-red-100 active:scale-95 transition-all"
+        >
+          🗑️ 대회 삭제
         </button>
       </div>
     </div>
