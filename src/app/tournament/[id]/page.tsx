@@ -749,6 +749,14 @@ export default function TournamentDetailPage() {
         )}
 
         {/* 조 편성 보기 버튼 */}
+        {/* 성적 입력 버튼 — 참가자 본인 */}
+        {tournament?.status === 'closed' && tournament?.participants?.some((p: any) => p.name === myName) && (
+          <button onClick={() => router.push(`/tournament/${tournamentId}/score`)}
+            className="w-full py-4 rounded-2xl font-bold text-base bg-blue-600 text-white shadow-lg shadow-blue-200 active:scale-95 transition-all">
+            ⛳ 내 성적 입력하기
+          </button>
+        )}
+
         {tournament?.groups?.length > 0 && (
           <button onClick={() => router.push(`/tournament/${tournamentId}/groups`)}
             className="w-full py-4 rounded-2xl font-bold text-base bg-green-50 text-green-700 border border-green-200 active:scale-95 transition-all">
