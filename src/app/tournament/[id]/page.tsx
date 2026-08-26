@@ -999,61 +999,92 @@ export default function TournamentDetailPage() {
 
         {/* ════ 참가자 탭 ════ */}
         {activeTab === 'participants' && (<>
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-3">
-              <p className="font-black text-gray-700">참가자 ({tournament.participants.length}명)</p>
-              <p className="text-sm text-green-600 font-bold">입금 {paidCount}/{tournament.participants.length}</p>
+
+          {/* 토너먼트 팀 신청 방식 */}
+          {tournament?.registrationType === 'team' ? (
+            <div className="space-y-3">
+              {/* 팀 신청 버튼 */}
+              {tournament.status === 'open' && (
+                <button onClick={() => router.push(`/tournament/${tournamentId}/bracket`)}
+                  className="w-full py-4 rounded-2xl font-bold text-base bg-green-600 text-white shadow-lg shadow-green-200 active:scale-95 transition-all">
+                  👥 팀 신청하기
+                </button>
+              )}
+
+              {/* 대진표/팀목록 바로가기 */}
+              <button onClick={() => router.push(`/tournament/${tournamentId}/bracket`)}
+                className="w-full py-3 rounded-2xl font-bold text-sm bg-purple-50 text-purple-600 border border-purple-100 active:scale-95 transition-all">
+                🏆 대진표 & 팀 목록 보기
+              </button>
             </div>
-            <div className="space-y-2">
-              {tournament.participants.map((p, i) => (
-                <div key={i} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
-                  {PAYMENT_MANAGERS.includes(myName) && (
-                    <span onClick={() => handleTogglePaid(p)}
-                      className={`text-lg cursor-pointer ${p.paid ? 'text-green-500' : 'text-gray-200'}`}>
-                      {p.paid ? '✅' : '○'}
-                    </span>
-                  )}
-                  <span className={`flex-1 font-bold ${p.name === myName ? 'text-green-700' : 'text-gray-700'}`}>
-                    {p.nickname || p.name}
-                    {p.name === myName && <span className="text-xs text-green-500 ml-1">(나)</span>}
-                  </span>
-                  {liveScores[p.name] && (
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                      liveScores[p.name].submitted ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
-                    }`}>
-                      {liveScores[p.name].submitted ? '제출완료' : '입력중'}
-                    </span>
-                  )}
-                  {!liveScores[p.name] && (
-                    <span className="text-xs text-gray-300 font-bold">미입력</span>
-                  )}
-                  {isAdmin && (
-                    <button onClick={() => handleRemoveMember(p)}
-                      className="text-gray-300 hover:text-red-400 font-black">×</button>
-                  )}
-                </div>
-              ))}
-            </div>
-            {isAdmin && showAddMember && (
-              <div className="mt-4 space-y-2 border-t pt-3">
-                <input type="text" placeholder="이름 또는 닉네임 검색"
-                  value={memberSearch} onChange={e => setMemberSearch(e.target.value)}
-                  className="w-full p-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-green-500 outline-none" />
-                <div className="max-h-40 overflow-y-auto space-y-1">
-                  {allMembers
-                    .filter(m => !tournament.participants.some(p => p.name === m.name))
-                    .filter(m => !memberSearch || m.name.includes(memberSearch) || m.nickname.includes(memberSearch))
-                    .map(m => (
-                      <button key={m.name} onClick={() => handleAddMember(m)}
-                        className="w-full text-left px-3 py-2.5 bg-gray-50 rounded-xl text-sm hover:bg-green-50 flex justify-between items-center">
-                        <span className="font-bold">{m.nickname || m.name}</span>
-                        <span className="text-gray-400 text-xs">{m.name}</span>
-                      </button>
-                    ))}
-                </div>
+          ) : (
+            /* 개인 신청 방식 — 기존 참가자 목록 */
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between mb-3">
+                <p className="font-black text-gray-700">참가자 ({tournament.participants.length}명)</p>
+                <p className="text-sm text-green-600 font-bold">입금 {paidCount}/{tournament.participants.length}</p>
               </div>
-            )}
-          </div>
+              <div className="space-y-2">
+                {tournament.participants.map((p, i) => (
+                  <div key={i} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+                    {PAYMENT_MANAGERS.includes(myName) && (
+                      <span onClick={() => handleTogglePaid(p)}
+                        className={`text-lg cursor-pointer ${p.paid ? 'text-green-500' : 'text-gray-200'}`}>
+                        {p.paid ? '✅' : '○'}
+                      </span>
+                    )}
+                    <span className={`flex-1 font-bold ${p.name === myName ? 'text-green-700' : 'text-gray-700'}`}>
+                      {p.nickname || p.name}
+                      {p.name === myName && <span className="text-xs text-green-500 ml-1">(나)</span>}
+                    </span>
+                    {liveScores[p.name] && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                        liveScores[p.name].submitted ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
+                      }`}>
+                        {liveScores[p.name].submitted ? '제출완료' : '입력중'}
+                      </span>
+                    )}
+                    {!liveScores[p.name] && (
+                      <span className="text-xs text-gray-300 font-bold">미입력</span>
+                    )}
+                    {isAdmin && (
+                      <button onClick={() => handleRemoveMember(p)}
+                        className="text-gray-300 hover:text-red-400 font-black">×</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {isAdmin && showAddMember && (
+                <div className="mt-4 space-y-2 border-t pt-3">
+                  <input type="text" placeholder="이름 또는 닉네임 검색"
+                    value={memberSearch} onChange={e => setMemberSearch(e.target.value)}
+                    className="w-full p-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+                  <div className="max-h-40 overflow-y-auto space-y-1">
+                    {allMembers
+                      .filter(m => !tournament.participants.some(p => p.name === m.name))
+                      .filter(m => !memberSearch || m.name.includes(memberSearch) || m.nickname.includes(memberSearch))
+                      .map(m => (
+                        <button key={m.name} onClick={() => handleAddMember(m)}
+                          className="w-full text-left px-3 py-2.5 bg-gray-50 rounded-xl text-sm hover:bg-green-50 flex justify-between items-center">
+                          <span className="font-bold">{m.nickname || m.name}</span>
+                          <span className="text-gray-400 text-xs">{m.name}</span>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 참가 신청/취소 버튼 */}
+              {tournament.status === 'open' && (
+                <button onClick={handleJoin} disabled={isFull && !isJoined}
+                  className={`w-full py-3 rounded-2xl font-bold text-sm mt-3 transition-all active:scale-95 ${
+                    isJoined ? 'bg-gray-200 text-gray-600' : isFull ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-green-600 text-white'
+                  }`}>
+                  {isJoined ? '참가 취소' : isFull ? '정원 마감' : '🏆 참가 신청하기'}
+                </button>
+              )}
+            </div>
+          )}
         </>)}
 
         {/* ════ 실시간 순위 탭 ════ */}
