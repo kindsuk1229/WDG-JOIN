@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import {
-  doc, getDoc, updateDoc, collection, getDocs, arrayUnion, arrayRemove
+  doc, getDoc, updateDoc, collection, getDocs, arrayUnion, arrayRemove, onSnapshot
 } from 'firebase/firestore';
 import { calcRoundRating, getInitialRating, RATING_MIN } from '@/lib/rating';
 import { initKakao, shareToKakao } from '@/lib/kakao';
@@ -77,7 +77,9 @@ export default function TournamentDetailPage() {
   const [myName, setMyName] = useState('');
   const [myNickname, setMyNickname] = useState('');
   const [isOwner, setIsOwner] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false); // ✅ 매니저 포함
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [activeTab, setActiveTab] = useState<'info' | 'participants' | 'standings'>('info');
+  const [liveScores, setLiveScores] = useState<Record<string, any>>({});
   const [allMembers, setAllMembers] = useState<Participant[]>([]);
 
   // 참가자 추가
@@ -112,7 +114,6 @@ export default function TournamentDetailPage() {
         getDocs(collection(db, 'admins')),
       ]);
 
-      // 매니저 확인
       const myNameLocal = (localStorage.getItem('user_name') || '').trim();
       const isAdminUser = myNameLocal === OWNER_NAME || adminsSnap.docs.some(d => d.id === myNameLocal);
       setIsAdmin(isAdminUser);
@@ -136,6 +137,17 @@ export default function TournamentDetailPage() {
       setLoading(false);
     }
   };
+
+  // ✅ 실시간 성적 구독
+  useEffect(() => {
+    const scoresRef = collection(db, 'tournaments', tournamentId, 'scores');
+    const unsub = onSnapshot(scoresRef, snap => {
+      const scores: Record<string, any> = {};
+      snap.docs.forEach(d => { scores[d.id] = d.data(); });
+      setLiveScores(scores);
+    });
+    return () => unsub();
+  }, [tournamentId]);
 
   // 참가 신청 / 취소
   const handleJoin = async () => {
@@ -331,6 +343,120 @@ export default function TournamentDetailPage() {
     return `${dateStr} (${days[d.getDay()]})`;
   };
 
+  // ✅ 실시간 순위 계산
+  const calcStandings = () => {
+    if (!tournament) return { individual: [], teams: [] };
+    const formats = tournament.formats || [];
+    const groups = (tournament as any).groups || [];
+
+    // 개인 순위 (스트로크/신페리오)
+    const individual = Object.entries(liveScores)
+      .map(([name, score]: [string, any]) => {
+        const p = tournament.participants.find(pp => pp.name === name);
+        return {
+          name,
+          nickname: p?.nickname || name,
+          total: score.total ?? 0,
+          holes: score.holes || [],
+          submitted: score.submitted,
+          myGroup: score.myGroup || '',
+          myTeam: score.myTeam || '',
+          totalTeamPoints: score.totalTeamPoints ?? 0,
+        };
+      })
+      .sort((a, b) => a.total - b.total);
+
+    // 팀 순위 계산
+    const teamMap: Record<string, { label: string; groupLabel: string; members: any[]; totalPoints: number; totalStrokes: number }> = {};
+
+    if (formats.includes('teamPoint')) {
+      // 팀포인트: 조편성 subTeams 기반
+      groups.forEach((g: any) => {
+        if (g.useSubTeams && g.subTeams) {
+          g.subTeams.forEach((team: any) => {
+            const key = `${g.label}-${team.label}`;
+            if (!teamMap[key]) teamMap[key] = { label: team.label, groupLabel: g.label, members: [], totalPoints: 0, totalStrokes: 0 };
+            team.members?.forEach((m: any) => {
+              const score = liveScores[m.name];
+              if (score) {
+                teamMap[key].members.push({ name: m.name, nickname: m.nickname || m.name, totalPoints: score.totalTeamPoints ?? 0, total: score.total ?? 0 });
+                teamMap[key].totalPoints += score.totalTeamPoints ?? 0;
+                teamMap[key].totalStrokes += score.total ?? 0;
+              }
+            });
+          });
+        } else {
+          // subTeams 없으면 조 전체를 하나의 팀으로
+          const key = g.id;
+          if (!teamMap[key]) teamMap[key] = { label: g.label, groupLabel: '', members: [], totalPoints: 0, totalStrokes: 0 };
+          g.members?.forEach((m: any) => {
+            const score = liveScores[m.name];
+            if (score) {
+              teamMap[key].members.push({ name: m.name, nickname: m.nickname || m.name, totalPoints: score.totalTeamPoints ?? 0, total: score.total ?? 0 });
+              teamMap[key].totalPoints += score.totalTeamPoints ?? 0;
+              teamMap[key].totalStrokes += score.total ?? 0;
+            }
+          });
+        }
+      });
+    } else if (formats.includes('highlow') || formats.includes('matchplay')) {
+      // 하이로우/매치플레이: subTeams 기반 홀별 계산
+      groups.forEach((g: any) => {
+        if (!g.useSubTeams || !g.subTeams || g.subTeams.length < 2) return;
+        const [teamA, teamB] = g.subTeams;
+
+        const getTeamHoles = (team: any) => {
+          const holes = Array(18).fill(0);
+          team.members?.forEach((m: any) => {
+            const score = liveScores[m.name];
+            if (score?.holes) {
+              score.holes.forEach((h: number, i: number) => { holes[i] += h; });
+            }
+          });
+          return holes;
+        };
+
+        const holesA = getTeamHoles(teamA);
+        const holesB = getTeamHoles(teamB);
+
+        if (formats.includes('highlow')) {
+          // 하이로우: 하이끼리, 로우끼리 비교
+          let pointsA = 0, pointsB = 0;
+          for (let i = 0; i < 18; i++) {
+            const membersA = teamA.members?.map((m: any) => liveScores[m.name]?.holes?.[i] ?? 0) || [];
+            const membersB = teamB.members?.map((m: any) => liveScores[m.name]?.holes?.[i] ?? 0) || [];
+            if (membersA.length >= 2 && membersB.length >= 2) {
+              const highA = Math.max(...membersA), lowA = Math.min(...membersA);
+              const highB = Math.max(...membersB), lowB = Math.min(...membersB);
+              if (highA < highB) pointsA += 1; else if (highB < highA) pointsB += 1;
+              if (lowA < lowB) pointsA += 1; else if (lowB < lowA) pointsB += 1;
+            }
+          }
+          const keyA = `${g.id}-A`, keyB = `${g.id}-B`;
+          teamMap[keyA] = { label: teamA.label, groupLabel: g.label, members: teamA.members || [], totalPoints: pointsA, totalStrokes: holesA.reduce((a: number, b: number) => a + b, 0) };
+          teamMap[keyB] = { label: teamB.label, groupLabel: g.label, members: teamB.members || [], totalPoints: pointsB, totalStrokes: holesB.reduce((a: number, b: number) => a + b, 0) };
+        } else {
+          // 매치플레이: 홀별 합산 비교 → 업다운
+          let updown = 0; // 양수=A팀 리드
+          for (let i = 0; i < 18; i++) {
+            if (holesA[i] < holesB[i]) updown++;
+            else if (holesB[i] < holesA[i]) updown--;
+          }
+          const keyA = `${g.id}-A`, keyB = `${g.id}-B`;
+          teamMap[keyA] = { label: teamA.label, groupLabel: g.label, members: teamA.members || [], totalPoints: updown, totalStrokes: holesA.reduce((a: number, b: number) => a + b, 0) };
+          teamMap[keyB] = { label: teamB.label, groupLabel: g.label, members: teamB.members || [], totalPoints: -updown, totalStrokes: holesB.reduce((a: number, b: number) => a + b, 0) };
+        }
+      });
+    }
+
+    const teams = Object.values(teamMap).sort((a, b) => b.totalPoints - a.totalPoints);
+    return { individual, teams };
+  };
+
+  const standings = calcStandings();
+  const hasTeamFormat = tournament?.formats?.some(f => ['teamPoint', 'highlow', 'matchplay', 'team2', 'team4', 'teamCustom'].includes(f));
+  const hasIndividualFormat = tournament?.formats?.some(f => ['stroke', 'shinperio'].includes(f));
+
   if (loading) return <div className="p-10 text-center text-gray-400">로딩 중...</div>;
   if (!tournament) return <div className="p-10 text-center text-gray-400">대회를 찾을 수 없습니다.</div>;
 
@@ -381,7 +507,26 @@ export default function TournamentDetailPage() {
         )}
       </header>
 
+      {/* ✅ 탭 네비게이션 */}
+      <div className="flex border-b border-gray-100 bg-white sticky top-[73px] z-10">
+        {[
+          { key: 'info', label: '대회 정보' },
+          { key: 'participants', label: `참가자 ${tournament.participants.length}명` },
+          { key: 'standings', label: '📊 실시간 순위' },
+        ].map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
+            className={`flex-1 py-3 text-sm font-bold border-b-2 transition-all ${
+              activeTab === tab.key ? 'border-green-600 text-green-600' : 'border-transparent text-gray-400'
+            }`}>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       <div className="p-4 space-y-4">
+
+        {/* ════ 대회 정보 탭 ════ */}
+        {activeTab === 'info' && (<>
 
         {/* 대회 정보 카드 */}
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-3">
@@ -736,11 +881,7 @@ export default function TournamentDetailPage() {
         {tournament.status === 'open' && (
           <button onClick={handleJoin}
             className={`w-full py-4 rounded-2xl font-bold text-base transition-all active:scale-95 ${
-              isJoined
-                ? 'bg-gray-200 text-gray-600'
-                : isFull
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-green-600 text-white shadow-lg shadow-green-200'
+              isJoined ? 'bg-gray-200 text-gray-600' : isFull ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-green-600 text-white shadow-lg shadow-green-200'
             }`}
             disabled={isFull && !isJoined}
           >
@@ -748,8 +889,7 @@ export default function TournamentDetailPage() {
           </button>
         )}
 
-        {/* 조 편성 보기 버튼 */}
-        {/* 성적 입력 버튼 — 참가자 본인 */}
+        {/* 성적 입력 버튼 */}
         {tournament?.status === 'closed' && tournament?.participants?.some((p: any) => p.name === myName) && (
           <button onClick={() => router.push(`/tournament/${tournamentId}/score`)}
             className="w-full py-4 rounded-2xl font-bold text-base bg-blue-600 text-white shadow-lg shadow-blue-200 active:scale-95 transition-all">
@@ -764,13 +904,168 @@ export default function TournamentDetailPage() {
           </button>
         )}
 
-        {/* 조 편성 버튼 */}
         {isAdmin && (
           <button onClick={() => router.push(`/tournament/${tournamentId}/group-assign`)}
             className="w-full py-4 rounded-2xl font-bold text-base bg-blue-600 text-white shadow-lg shadow-blue-200 active:scale-95 transition-all">
             👥 조 편성하기
           </button>
         )}
+
+        </>)}
+
+        {/* ════ 참가자 탭 ════ */}
+        {activeTab === 'participants' && (<>
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-3">
+              <p className="font-black text-gray-700">참가자 ({tournament.participants.length}명)</p>
+              <p className="text-sm text-green-600 font-bold">입금 {paidCount}/{tournament.participants.length}</p>
+            </div>
+            <div className="space-y-2">
+              {tournament.participants.map((p, i) => (
+                <div key={i} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+                  {PAYMENT_MANAGERS.includes(myName) && (
+                    <span onClick={() => handleTogglePaid(p)}
+                      className={`text-lg cursor-pointer ${p.paid ? 'text-green-500' : 'text-gray-200'}`}>
+                      {p.paid ? '✅' : '○'}
+                    </span>
+                  )}
+                  <span className={`flex-1 font-bold ${p.name === myName ? 'text-green-700' : 'text-gray-700'}`}>
+                    {p.nickname || p.name}
+                    {p.name === myName && <span className="text-xs text-green-500 ml-1">(나)</span>}
+                  </span>
+                  {liveScores[p.name] && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                      liveScores[p.name].submitted ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
+                    }`}>
+                      {liveScores[p.name].submitted ? '제출완료' : '입력중'}
+                    </span>
+                  )}
+                  {!liveScores[p.name] && (
+                    <span className="text-xs text-gray-300 font-bold">미입력</span>
+                  )}
+                  {isAdmin && (
+                    <button onClick={() => handleRemoveMember(p)}
+                      className="text-gray-300 hover:text-red-400 font-black">×</button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {isAdmin && showAddMember && (
+              <div className="mt-4 space-y-2 border-t pt-3">
+                <input type="text" placeholder="이름 또는 닉네임 검색"
+                  value={memberSearch} onChange={e => setMemberSearch(e.target.value)}
+                  className="w-full p-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+                <div className="max-h-40 overflow-y-auto space-y-1">
+                  {allMembers
+                    .filter(m => !tournament.participants.some(p => p.name === m.name))
+                    .filter(m => !memberSearch || m.name.includes(memberSearch) || m.nickname.includes(memberSearch))
+                    .map(m => (
+                      <button key={m.name} onClick={() => handleAddMember(m)}
+                        className="w-full text-left px-3 py-2.5 bg-gray-50 rounded-xl text-sm hover:bg-green-50 flex justify-between items-center">
+                        <span className="font-bold">{m.nickname || m.name}</span>
+                        <span className="text-gray-400 text-xs">{m.name}</span>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </>)}
+
+        {/* ════ 실시간 순위 탭 ════ */}
+        {activeTab === 'standings' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-400">
+                {Object.values(liveScores).filter((s: any) => s.submitted).length}/{tournament.participants.length}명 제출
+              </p>
+              <span className="text-xs bg-green-50 text-green-600 px-2 py-1 rounded-full font-bold">🔴 실시간</span>
+            </div>
+
+            {/* 팀 순위 */}
+            {hasTeamFormat && standings.teams.length > 0 && (
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <p className="font-black text-gray-700 mb-3">
+                  {tournament.formats?.includes('teamPoint') ? '🏆 팀 포인트 순위' :
+                   tournament.formats?.includes('matchplay') ? '⚔️ 매치플레이 순위' : '🎯 하이로우 순위'}
+                </p>
+                <div className="space-y-2">
+                  {standings.teams.map((team, idx) => (
+                    <div key={team.label} className="rounded-xl bg-gray-50 overflow-hidden">
+                      <div className="flex items-center gap-3 px-3 py-2.5">
+                        <span className={`text-lg font-black w-8 text-center ${
+                          idx === 0 ? 'text-yellow-500' : idx === 1 ? 'text-gray-400' : idx === 2 ? 'text-orange-400' : 'text-gray-300'
+                        }`}>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}</span>
+                        <div className="flex-1">
+                          <p className="font-black text-gray-800">{team.label}</p>
+                          {team.groupLabel && <p className="text-xs text-gray-400">{team.groupLabel}</p>}
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-xl font-black ${team.totalPoints > 0 ? 'text-green-600' : team.totalPoints < 0 ? 'text-red-500' : 'text-gray-600'}`}>
+                            {team.totalPoints > 0 ? `+${team.totalPoints}` : team.totalPoints}
+                            {tournament.formats?.includes('teamPoint') ? 'pt' : ''}
+                          </p>
+                        </div>
+                      </div>
+                      {/* 팀원 목록 */}
+                      <div className="px-3 pb-2 flex flex-wrap gap-1">
+                        {team.members.map((m: any) => {
+                          const s = liveScores[m.name];
+                          return (
+                            <span key={m.name} className="text-xs bg-white border border-gray-100 px-2 py-0.5 rounded-full text-gray-600 font-bold">
+                              {m.nickname || m.name}
+                              {s && <span className={`ml-1 ${s.total < 0 ? 'text-blue-500' : s.total > 0 ? 'text-red-400' : 'text-gray-400'}`}>
+                                ({s.total > 0 ? '+' : ''}{s.total})
+                              </span>}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 개인 순위 */}
+            {hasIndividualFormat && standings.individual.length > 0 && (
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <p className="font-black text-gray-700 mb-3">⛳ 개인 순위</p>
+                <div className="space-y-2">
+                  {standings.individual.map((p, idx) => (
+                    <div key={p.name} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50">
+                      <span className={`text-lg font-black w-8 text-center ${
+                        idx === 0 ? 'text-yellow-500' : idx === 1 ? 'text-gray-400' : idx === 2 ? 'text-orange-400' : 'text-gray-300'
+                      }`}>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}</span>
+                      <div className="flex-1">
+                        <p className={`font-bold ${p.name === myName ? 'text-green-700' : 'text-gray-700'}`}>
+                          {p.nickname}
+                          {p.name === myName && <span className="text-xs text-green-500 ml-1">(나)</span>}
+                        </p>
+                        {p.myGroup && <p className="text-xs text-gray-400">{p.myGroup} {p.myTeam && `· ${p.myTeam}`}</p>}
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-xl font-black ${p.total < 0 ? 'text-blue-500' : p.total > 0 ? 'text-red-500' : 'text-gray-600'}`}>
+                          {p.total > 0 ? `+${p.total}` : p.total === 0 ? 'E' : p.total}
+                        </p>
+                        {!p.submitted && <p className="text-xs text-yellow-500">입력중</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {standings.individual.length === 0 && standings.teams.length === 0 && (
+              <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-gray-200">
+                <p className="text-4xl mb-3">⛳</p>
+                <p className="text-gray-400 text-sm">아직 입력된 성적이 없어요.</p>
+                <p className="text-gray-300 text-xs mt-1">참가자들이 성적을 입력하면 실시간으로 표시돼요!</p>
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
     </div>
   );

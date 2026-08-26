@@ -109,8 +109,10 @@ const FORMAT_OPTIONS = [
   ]},
 ];
 
-// 개인전 중복 선택 가능한 값
+// 개인전 포맷
 const INDIVIDUAL_FORMATS = ['stroke', 'shinperio'];
+// 팀전 포맷
+const TEAM_FORMATS = ['team2', 'team4', 'teamCustom', 'teamPoint', 'matchplay', 'highlow'];
 
 export default function TournamentCreatePage() {
   const router = useRouter();
@@ -146,17 +148,19 @@ export default function TournamentCreatePage() {
   const [nextRound, setNextRound] = useState(1);
 
   const toggleFormat = (value: string) => {
-    if (INDIVIDUAL_FORMATS.includes(value)) {
-      // 개인전은 다중 선택 가능
-      setFormats(prev =>
-        prev.includes(value)
-          ? prev.filter(f => f !== value)
-          : [...prev.filter(f => INDIVIDUAL_FORMATS.includes(f)), value]
-      );
-    } else {
-      // 팀전/2:2는 단일 선택
-      setFormats([value]);
-    }
+    setFormats(prev => {
+      if (prev.includes(value)) {
+        // 이미 선택된 거면 제거 (최소 1개는 유지)
+        if (prev.length === 1) return prev;
+        return prev.filter(f => f !== value);
+      }
+      // 팀전끼리는 하나만 선택 (개인전과는 동시 선택 가능)
+      if (TEAM_FORMATS.includes(value)) {
+        return [...prev.filter(f => !TEAM_FORMATS.includes(f)), value];
+      }
+      // 개인전은 중복 선택 가능
+      return [...prev, value];
+    });
   };
 
   useEffect(() => {
@@ -298,6 +302,8 @@ export default function TournamentCreatePage() {
                   <p className="text-xs text-gray-400 mb-1">
                     {group.group}
                     {group.group === '개인전' && <span className="ml-1 text-green-500">(중복 선택 가능)</span>}
+                    {group.group === '팀전' && <span className="ml-1 text-blue-500">(개인전과 동시 선택 가능)</span>}
+                    {group.group === '2:2' && <span className="ml-1 text-blue-500">(개인전과 동시 선택 가능)</span>}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {group.options.map(opt => (

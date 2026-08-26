@@ -25,6 +25,7 @@ const FORMAT_OPTIONS = [
 ];
 
 const INDIVIDUAL_FORMATS = ['stroke', 'shinperio'];
+const TEAM_FORMATS = ['team2', 'team4', 'teamCustom', 'teamPoint', 'matchplay', 'highlow'];
 
 export default function TournamentEditPage() {
   const router = useRouter();
@@ -76,15 +77,16 @@ export default function TournamentEditPage() {
   };
 
   const toggleFormat = (value: string) => {
-    if (INDIVIDUAL_FORMATS.includes(value)) {
-      setFormats(prev =>
-        prev.includes(value)
-          ? prev.filter(f => f !== value)
-          : [...prev.filter(f => INDIVIDUAL_FORMATS.includes(f)), value]
-      );
-    } else {
-      setFormats([value]);
-    }
+    setFormats(prev => {
+      if (prev.includes(value)) {
+        if (prev.length === 1) return prev;
+        return prev.filter(f => f !== value);
+      }
+      if (TEAM_FORMATS.includes(value)) {
+        return [...prev.filter(f => !TEAM_FORMATS.includes(f)), value];
+      }
+      return [...prev, value];
+    });
   };
 
   const handleSave = async () => {
