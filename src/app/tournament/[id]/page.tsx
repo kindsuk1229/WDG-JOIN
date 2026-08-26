@@ -289,6 +289,72 @@ export default function TournamentDetailPage() {
     }
   };
 
+  // ✅ 결과 확정 — scores 컬렉션 기반으로 최종 순위 계산 후 저장
+  const handleFinalizeResults = async () => {
+    if (!tournament) return;
+    if (!window.confirm('성적 입력 현황을 기반으로 최종 결과를 확정하시겠습니까?\n확정 후 Rating이 자동으로 반영됩니다.')) return;
+
+    try {
+      const scoresSnap = await getDocs(collection(db, 'tournaments', tournamentId, 'scores'));
+      const scoresMap: Record<string, any> = {};
+      scoresSnap.docs.forEach(d => { scoresMap[d.id] = d.data(); });
+
+      const formats = tournament.formats || [];
+      const groups = (tournament as any).groups || [];
+      let finalResults: { rank: number; name: string; nickname: string; score: string }[] = [];
+
+      // 개인전 결과
+      if (formats.includes('stroke') || formats.includes('shinperio')) {
+        const individualScores = Object.entries(scoresMap)
+          .map(([name, s]: [string, any]) => {
+            const p = tournament.participants.find(pp => pp.name === name);
+            return { name, nickname: p?.nickname || name, score: String(s.total ?? 0) };
+          })
+          .sort((a, b) => Number(a.score) - Number(b.score))
+          .map((r, idx) => ({ ...r, rank: idx + 1 }));
+        finalResults = [...finalResults, ...individualScores];
+      }
+
+      // 팀포인트 결과
+      if (formats.includes('teamPoint')) {
+        const teamMap: Record<string, number> = {};
+        groups.forEach((g: any) => {
+          if (g.useSubTeams && g.subTeams) {
+            g.subTeams.forEach((team: any) => {
+              const key = `${g.label} ${team.label}`;
+              teamMap[key] = 0;
+              team.members?.forEach((m: any) => {
+                teamMap[key] += scoresMap[m.name]?.totalTeamPoints ?? 0;
+              });
+            });
+          }
+        });
+        const teamResults = Object.entries(teamMap)
+          .sort(([, a], [, b]) => b - a)
+          .map(([name, pts], idx) => ({ rank: idx + 1, name, nickname: name, score: String(pts) }));
+        finalResults = [...finalResults, ...teamResults];
+      }
+
+      // 결과 저장 + Rating 반영
+      const sorted = [...finalResults].sort((a, b) => Number(a.score) - Number(b.score));
+      await updateDoc(doc(db, 'tournaments', tournamentId), {
+        results: finalResults,
+        status: 'completed',
+      });
+
+      // Rating 반영 (개인전만)
+      if (formats.includes('stroke') || formats.includes('shinperio')) {
+        await updateRatingsFromTournament(sorted, tournament.participants.length);
+      }
+
+      alert('✅ 결과가 확정되었습니다! Rating이 반영되었어요.');
+      fetchData();
+    } catch (err) {
+      alert('오류가 발생했습니다.');
+      console.error(err);
+    }
+  };
+
   // 관리자: 결과 저장 + Rating 반영
   const handleSaveResults = async () => {
     if (results.length === 0) return alert('결과를 입력해주세요.');
@@ -612,6 +678,11 @@ export default function TournamentDetailPage() {
               <button onClick={() => setShowResults(!showResults)}
                 className="px-3 py-2 bg-blue-50 text-blue-600 rounded-xl text-sm font-bold">
                 📊 결과 입력
+              </button>
+              {/* ✅ 결과 확정 버튼 */}
+              <button onClick={handleFinalizeResults}
+                className="px-3 py-2 bg-purple-50 text-purple-600 rounded-xl text-sm font-bold">
+                ✅ 결과 확정
               </button>
               <button onClick={() => setShowAwards(!showAwards)}
                 className="px-3 py-2 bg-yellow-50 text-yellow-600 rounded-xl text-sm font-bold">
