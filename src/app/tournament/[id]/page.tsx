@@ -860,12 +860,38 @@ export default function TournamentDetailPage() {
             </div>
 
             {/* 입금 현황 */}
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-400">입금 현황:</span>
-              <span className="font-bold text-green-600">{paidCount}명</span>
-              <span className="text-gray-400">/ {tournament.participants.length}명</span>
-              <span className="text-gray-400 text-xs">(미납 {tournament.participants.length - paidCount}명)</span>
-            </div>
+            {(() => {
+              const isTeamReg = tournament.registrationType === 'team';
+              const teams = (tournament as any).teams || [];
+              const teamPaidCount = teams.filter((t: any) => t.paid).length;
+              const memberCount = tournament.teamMemberCount || 2;
+
+              if (isTeamReg) {
+                return (
+                  <div className="space-y-1 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400">입금 현황 (팀):</span>
+                      <span className="font-bold text-green-600">{teamPaidCount}팀</span>
+                      <span className="text-gray-400">/ {teams.length}팀</span>
+                      <span className="text-gray-400 text-xs">(미납 {teams.length - teamPaidCount}팀)</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                      <span>인원 기준:</span>
+                      <span className="font-bold text-green-600">{teamPaidCount * memberCount}명</span>
+                      <span>/ {teams.length * memberCount}명</span>
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-gray-400">입금 현황:</span>
+                  <span className="font-bold text-green-600">{paidCount}명</span>
+                  <span className="text-gray-400">/ {tournament.participants.length}명</span>
+                  <span className="text-gray-400 text-xs">(미납 {tournament.participants.length - paidCount}명)</span>
+                </div>
+              );
+            })()}
 
             {/* 참가자 추가 */}
             {showAddMember && (
@@ -1092,6 +1118,22 @@ export default function TournamentDetailPage() {
             </div>
           </div>
         )}
+
+        {/* ✅ 팀 신청 버튼 — 대회 정보 탭에도 표시 */}
+        {tournament?.registrationType === 'team' && tournament.status === 'open' && (() => {
+          const teams = (tournament as any).teams || [];
+          const myTeam = teams.find((t: any) => t.members?.some((m: any) => m.name === myName || m.nickname === myNickname));
+          return !myTeam ? (
+            <button onClick={() => { setActiveTab('participants'); }}
+              className="w-full py-4 rounded-2xl font-bold text-base bg-green-600 text-white shadow-lg shadow-green-200 active:scale-95 transition-all">
+              👥 팀 신청하기
+            </button>
+          ) : (
+            <div className="w-full py-3 rounded-2xl bg-green-50 border border-green-200 text-center">
+              <p className="text-sm font-bold text-green-700">✅ {myTeam.teamName} 신청완료</p>
+            </div>
+          );
+        })()}
 
         {/* 대진표 버튼 — 토너먼트 방식일 때 */}
         {tournament?.tournamentType === 'knockout' && (
