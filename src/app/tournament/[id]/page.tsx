@@ -10,7 +10,151 @@ import { calcRoundRating, getInitialRating, RATING_MIN } from '@/lib/rating';
 import { initKakao, shareToKakao } from '@/lib/kakao';
 
 const OWNER_NAME = '김근석';
-const PAYMENT_MANAGERS = ['김근석', '양영빈']; // ✅ 입금 확인 권한자
+const PAYMENT_MANAGERS = ['김근석', '양영빈'];
+
+// ✅ 팀 신청 섹션 컴포넌트
+function TeamRegistrationSection({
+  tournament, tournamentId, myName, myNickname, isAdmin, onRefresh, onViewBracket
+}: {
+  tournament: any; tournamentId: string; myName: string; myNickname: string;
+  isAdmin: boolean; onRefresh: () => void; onViewBracket: () => void;
+}) {
+  const [teams, setTeams] = useState<any[]>(tournament.teams || []);
+  const [showForm, setShowForm] = useState(false);
+  const [teamName, setTeamName] = useState('');
+  const [members, setMembers] = useState<string[]>(Array(tournament.teamMemberCount || 2).fill(''));
+  const [saving, setSaving] = useState(false);
+
+  const myTeam = teams.find((t: any) => t.members?.some((m: any) => m.name === myName || m.nickname === myNickname));
+  const memberCount = tournament.teamMemberCount || 2;
+
+  const handleRegister = async () => {
+    if (!teamName.trim()) return alert('팀명을 입력해주세요.');
+    const validMembers = members.filter(m => m.trim());
+    if (validMembers.length < memberCount) return alert(`팀원 ${memberCount}명을 모두 입력해주세요.`);
+    if (teams.some((t: any) => t.teamName === teamName.trim())) return alert('이미 사용 중인 팀명이에요.');
+
+    setSaving(true);
+    try {
+      const newTeam = {
+        id: Date.now().toString(),
+        teamName: teamName.trim(),
+        members: validMembers.map(m => ({ name: m.trim(), nickname: m.trim() })),
+        registeredAt: new Date().toISOString(),
+      };
+      await updateDoc(doc(db, 'tournaments', tournamentId), {
+        teams: arrayUnion(newTeam),
+      });
+      setTeams(prev => [...prev, newTeam]);
+      setTeamName('');
+      setMembers(Array(memberCount).fill(''));
+      setShowForm(false);
+      alert('팀 신청 완료! 🎉');
+      onRefresh();
+    } catch { alert('신청 중 오류가 발생했습니다.'); }
+    finally { setSaving(false); }
+  };
+
+  const handleCancel = async (team: any) => {
+    const isMyTeam = team.members?.some((m: any) => m.name === myName || m.nickname === myNickname);
+    if (!isMyTeam && !isAdmin) return;
+    if (!window.confirm(`"${team.teamName}" 팀을 취소하시겠습니까?`)) return;
+    await updateDoc(doc(db, 'tournaments', tournamentId), { teams: arrayRemove(team) });
+    setTeams(prev => prev.filter((t: any) => t.id !== team.id));
+    onRefresh();
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* 내 팀 상태 */}
+      {myTeam ? (
+        <div className="bg-green-50 rounded-2xl p-4 border border-green-200">
+          <p className="text-xs text-green-500 font-bold mb-1">✅ 신청 완료</p>
+          <p className="font-black text-green-800 text-lg">{myTeam.teamName}</p>
+          <p className="text-sm text-green-600 mt-1">
+            {myTeam.members?.map((m: any) => m.nickname || m.name).join(' · ')}
+          </p>
+          {tournament.status === 'open' && (
+            <button onClick={() => handleCancel(myTeam)}
+              className="mt-3 text-xs text-red-400 font-bold px-3 py-1.5 bg-red-50 rounded-lg">
+              신청 취소
+            </button>
+          )}
+        </div>
+      ) : tournament.status === 'open' ? (
+        <button onClick={() => setShowForm(!showForm)}
+          className={`w-full py-4 rounded-2xl font-bold text-base transition-all active:scale-95 ${
+            showForm ? 'bg-gray-200 text-gray-600' : 'bg-green-600 text-white shadow-lg shadow-green-200'
+          }`}>
+          {showForm ? '취소' : `👥 ${memberCount}인 팀 신청하기`}
+        </button>
+      ) : null}
+
+      {/* 팀 신청 폼 */}
+      {showForm && !myTeam && (
+        <div className="bg-green-50 rounded-2xl p-4 border border-green-100 space-y-3">
+          <p className="text-sm font-black text-green-700">팀 신청 ({memberCount}인 1팀)</p>
+          <input type="text" placeholder="팀명 (예: 낭빠팀)" value={teamName}
+            onChange={e => setTeamName(e.target.value)}
+            className="w-full p-3 bg-white rounded-xl text-sm font-bold focus:ring-2 focus:ring-green-500 outline-none" />
+          {Array.from({ length: memberCount }, (_, i) => (
+            <input key={i} type="text"
+              placeholder={`${i + 1}번 팀원 닉네임`}
+              value={members[i] || ''}
+              onChange={e => {
+                const updated = [...members];
+                updated[i] = e.target.value;
+                setMembers(updated);
+              }}
+              className="w-full p-3 bg-white rounded-xl text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+          ))}
+          <button onClick={handleRegister} disabled={saving}
+            className="w-full py-3 bg-green-600 text-white rounded-xl font-bold text-sm">
+            {saving ? '신청중...' : '신청하기'}
+          </button>
+        </div>
+      )}
+
+      {/* 팀 목록 */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
+          <p className="font-black text-gray-700">참가 팀 ({teams.length}팀)</p>
+          <button onClick={onViewBracket}
+            className="text-xs text-purple-600 font-bold px-3 py-1.5 bg-purple-50 rounded-lg">
+            🏆 대진표
+          </button>
+        </div>
+        {teams.length === 0 ? (
+          <p className="text-center text-gray-300 py-8 text-sm">아직 신청한 팀이 없어요</p>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {teams.map((team: any, i: number) => {
+              const isMyTeam = team.members?.some((m: any) => m.name === myName || m.nickname === myNickname);
+              return (
+                <div key={team.id} className={`flex items-center gap-3 px-4 py-3 ${isMyTeam ? 'bg-green-50' : ''}`}>
+                  <span className="text-sm font-black text-gray-300 w-6">{i + 1}</span>
+                  <div className="flex-1">
+                    <p className={`font-black ${isMyTeam ? 'text-green-700' : 'text-gray-800'}`}>
+                      {team.teamName}
+                      {isMyTeam && <span className="text-xs text-green-500 ml-1">(내 팀)</span>}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {team.members?.map((m: any) => m.nickname || m.name).join(' · ')}
+                    </p>
+                  </div>
+                  {(isMyTeam || isAdmin) && tournament.status === 'open' && (
+                    <button onClick={() => handleCancel(team)}
+                      className="text-xs text-red-400 font-bold px-2 py-1 bg-red-50 rounded-lg">취소</button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+} // ✅ 입금 확인 권한자
 
 const FORMAT_LABEL: Record<string, string> = {
   stroke: '개인전 · 스트로크',
@@ -910,18 +1054,25 @@ export default function TournamentDetailPage() {
           </div>
         )}
 
-        {/* 시상 내역 */}
-        {tournament.awards.length > 0 && (
+        {/* 시상 내역 — 수상자 입력된 것만 표시 */}
+        {tournament.awards.filter((a: any) => a.winner?.trim()).length > 0 && (
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
             <p className="font-black text-gray-700 mb-3">🏅 시상 내역</p>
             <div className="space-y-2">
-              {tournament.awards.map(a => (
-                <div key={a.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-yellow-50">
-                  <span className="text-sm font-black text-yellow-600 w-24 flex-shrink-0">{a.rank}</span>
-                  <span className="flex-1 font-bold text-gray-700">{a.winner}</span>
-                  {a.prize && <span className="text-sm text-gray-500">{a.prize}</span>}
-                </div>
-              ))}
+              {tournament.awards
+                .filter((a: any) => a.winner?.trim())
+                .map((a: any) => (
+                  <div key={a.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-yellow-50">
+                    {a.category && (
+                      <span className="text-xs text-gray-400 font-bold">
+                        {a.category === 'stroke' ? '스트로크' : a.category === 'shinperio' ? '신페리오' : a.category === 'team' ? '팀전' : '특별'}
+                      </span>
+                    )}
+                    <span className="text-sm font-black text-yellow-600 w-16 flex-shrink-0">{a.rank}</span>
+                    <span className="flex-1 font-bold text-gray-700">{a.winner}</span>
+                    {a.prize && <span className="text-sm text-gray-500">{a.prize}</span>}
+                  </div>
+                ))}
             </div>
           </div>
         )}
@@ -1002,21 +1153,15 @@ export default function TournamentDetailPage() {
 
           {/* 토너먼트 팀 신청 방식 */}
           {tournament?.registrationType === 'team' ? (
-            <div className="space-y-3">
-              {/* 팀 신청 버튼 */}
-              {tournament.status === 'open' && (
-                <button onClick={() => router.push(`/tournament/${tournamentId}/bracket`)}
-                  className="w-full py-4 rounded-2xl font-bold text-base bg-green-600 text-white shadow-lg shadow-green-200 active:scale-95 transition-all">
-                  👥 팀 신청하기
-                </button>
-              )}
-
-              {/* 대진표/팀목록 바로가기 */}
-              <button onClick={() => router.push(`/tournament/${tournamentId}/bracket`)}
-                className="w-full py-3 rounded-2xl font-bold text-sm bg-purple-50 text-purple-600 border border-purple-100 active:scale-95 transition-all">
-                🏆 대진표 & 팀 목록 보기
-              </button>
-            </div>
+            <TeamRegistrationSection
+              tournament={tournament}
+              tournamentId={tournamentId}
+              myName={myName}
+              myNickname={myNickname}
+              isAdmin={isAdmin}
+              onRefresh={fetchData}
+              onViewBracket={() => router.push(`/tournament/${tournamentId}/bracket`)}
+            />
           ) : (
             /* 개인 신청 방식 — 기존 참가자 목록 */
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">

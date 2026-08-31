@@ -131,7 +131,7 @@ export default function TournamentCreatePage() {
   const [teamSize, setTeamSize] = useState('');
   const [registrationType, setRegistrationType] = useState<'individual' | 'team'>('individual');
   const [teamMemberCount, setTeamMemberCount] = useState('2');
-  const [tournamentType, setTournamentType] = useState<'league' | 'knockout'>('league');
+  const [tournamentType, setTournamentType] = useState<'league' | 'knockout'>('knockout');
   const [hasAward, setHasAward] = useState(false);
   const [strokeAwards, setStrokeAwards] = useState<AwardItem[]>([
     { id: '1', rank: '1위', winner: '', prize: '' },
@@ -433,18 +433,11 @@ export default function TournamentCreatePage() {
             </div>
           )}
 
-          {/* 토너먼트 방식 */}
+          {/* 진행 방식 — 토너먼트만 */}
           <div>
             <label className="text-xs font-bold text-gray-400 block mb-1.5">진행 방식</label>
-            <div className="flex gap-2">
-              <button onClick={() => setTournamentType('league')}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-bold ${tournamentType === 'league' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
-                🔄 리그전
-              </button>
-              <button onClick={() => setTournamentType('knockout')}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-bold ${tournamentType === 'knockout' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
-                🏆 토너먼트
-              </button>
+            <div className="w-full py-2.5 rounded-xl text-sm font-bold bg-green-600 text-white text-center">
+              🏆 토너먼트 (녹아웃)
             </div>
           </div>
 
