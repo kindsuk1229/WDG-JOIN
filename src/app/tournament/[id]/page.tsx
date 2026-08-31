@@ -1099,6 +1099,53 @@ export default function TournamentDetailPage() {
           </button>
         )}
 
+        {/* ✅ 팀 신청 현황 — 대회 정보 탭에 표시 */}
+        {tournament?.registrationType === 'team' && (tournament as any).teams?.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
+              <p className="font-black text-gray-700">참가 팀 현황 ({(tournament as any).teams?.length}팀)</p>
+              {PAYMENT_MANAGERS.includes(myName) && (
+                <span className="text-xs text-gray-400">탭하면 입금 확인</span>
+              )}
+            </div>
+            <div className="divide-y divide-gray-50">
+              {(tournament as any).teams?.map((team: any, i: number) => {
+                const isMyTeam = team.members?.some((m: any) => m.name === myName || m.nickname === myNickname);
+                return (
+                  <div key={team.id} className={`px-4 py-3 ${isMyTeam ? 'bg-green-50' : ''}`}>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-black text-gray-300 w-6">{i + 1}</span>
+                      <div className="flex-1">
+                        <p className={`font-black ${isMyTeam ? 'text-green-700' : 'text-gray-800'}`}>
+                          {team.teamName}
+                          {isMyTeam && <span className="text-xs text-green-500 ml-1">(내 팀)</span>}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {team.members?.map((m: any) => m.nickname || m.name).join(' · ')}
+                        </p>
+                      </div>
+                      {/* 입금 확인 — 낭빠/양영빈만 */}
+                      {PAYMENT_MANAGERS.includes(myName) && (
+                        <button
+                          onClick={async () => {
+                            const updatedTeams = (tournament as any).teams.map((t: any) =>
+                              t.id === team.id ? { ...t, paid: !t.paid } : t
+                            );
+                            await updateDoc(doc(db, 'tournaments', tournamentId), { teams: updatedTeams });
+                            fetchData();
+                          }}
+                          className={`text-lg ${team.paid ? 'text-green-500' : 'text-gray-200'}`}>
+                          {team.paid ? '✅' : '○'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         </>)}
 
         {/* ════ 참가자 탭 ════ */}
