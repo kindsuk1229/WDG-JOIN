@@ -696,7 +696,10 @@ export default function TournamentDetailPage() {
                   initKakao();
                   const url = window.location.href;
                   const title = `🏆 제${tournament.round}회 ${tournament.title}`;
-                  const desc = `📅 ${tournament.date} | 📍 ${tournament.venue}\n💰 참가비 ${tournament.entryFee?.toLocaleString()}원 | 👥 ${tournament.participants?.length}/${tournament.maxPlayers}명`;
+                  const isTeamReg = tournament.registrationType === 'team';
+                  const currentCount = isTeamReg ? ((tournament as any).teams?.length || 0) : tournament.participants?.length;
+                  const unit = isTeamReg ? '팀' : '명';
+                  const desc = `📅 ${tournament.date} | 📍 ${tournament.venue}\n💰 참가비 ${tournament.entryFee?.toLocaleString()}원 | 👥 ${currentCount}/${tournament.maxPlayers}${unit}`;
                   shareToKakao(url, title, desc);
                 }}
                 className="text-sm font-bold px-3 py-1.5 bg-yellow-400 text-white rounded-lg"
@@ -726,7 +729,9 @@ export default function TournamentDetailPage() {
       <div className="flex border-b border-gray-100 bg-white sticky top-[73px] z-10">
         {[
           { key: 'info', label: '대회 정보' },
-          { key: 'participants', label: `참가자 ${tournament.participants.length}명` },
+          { key: 'participants', label: tournament.registrationType === 'team' 
+            ? `참가팀 ${(tournament as any).teams?.length || 0}팀`
+            : `참가자 ${tournament.participants.length}명` },
           { key: 'standings', label: '📊 실시간 순위' },
         ].map(tab => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
@@ -796,14 +801,25 @@ export default function TournamentDetailPage() {
 
           {/* 인원 진행바 */}
           <div>
-            <div className="flex justify-between text-xs text-gray-400 mb-1">
-              <span>참가 현황</span>
-              <span className="font-bold">{tournament.participants.length} / {tournament.maxPlayers}명</span>
-            </div>
-            <div className="w-full bg-gray-100 rounded-full h-2">
-              <div className={`h-2 rounded-full ${isFull ? 'bg-red-400' : 'bg-green-500'}`}
-                style={{ width: `${Math.min(100, (tournament.participants.length / tournament.maxPlayers) * 100)}%` }} />
-            </div>
+            {(() => {
+              const isTeamReg = tournament.registrationType === 'team';
+              const teamCount = (tournament as any).teams?.length || 0;
+              const current = isTeamReg ? teamCount : tournament.participants.length;
+              const max = tournament.maxPlayers;
+              const unit = isTeamReg ? '팀' : '명';
+              return (
+                <>
+                  <div className="flex justify-between text-xs text-gray-400 mb-1">
+                    <span>참가 현황</span>
+                    <span className="font-bold">{current} / {max}{unit}</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className={`h-2 rounded-full ${current >= max ? 'bg-red-400' : 'bg-green-500'}`}
+                      style={{ width: `${Math.min(100, (current / max) * 100)}%` }} />
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
 
