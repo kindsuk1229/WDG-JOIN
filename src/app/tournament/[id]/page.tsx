@@ -771,7 +771,7 @@ export default function TournamentDetailPage() {
           </div>
 
           <div className="space-y-2 text-sm text-gray-600 border-t pt-3">
-            <div className="flex gap-2"><span>📅</span><span>{formatDate(tournament.date)}</span></div>
+            <div className="flex gap-2"><span>📅</span><span>{formatDate(tournament.date)}{tournament.endDate ? ` ~ ${formatDate(tournament.endDate)}` : ''}</span></div>
             <div className="flex gap-2"><span>📍</span><span>{tournament.venue}</span></div>
             <div className="flex gap-2"><span>💰</span><span className="font-bold text-green-600">{tournament.entryFee.toLocaleString()}원</span></div>
             <div className="flex items-center gap-2 bg-yellow-50 rounded-xl px-3 py-2">

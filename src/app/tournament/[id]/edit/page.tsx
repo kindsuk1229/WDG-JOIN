@@ -38,7 +38,9 @@ export default function TournamentEditPage() {
   const [title, setTitle] = useState('');
   const [type, setType] = useState<'screen' | 'field'>('screen');
   const [formats, setFormats] = useState<string[]>(['stroke']);
+  const [dateType, setDateType] = useState<'single' | 'range'>('single');
   const [date, setDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [venue, setVenue] = useState('');
   const [entryFee, setEntryFee] = useState('');
   const [maxPlayers, setMaxPlayers] = useState('');
@@ -62,6 +64,8 @@ export default function TournamentEditPage() {
       setType(d.type || 'screen');
       setFormats(d.formats || (d.format ? d.format.split('+') : ['stroke']));
       setDate(d.date || '');
+      setEndDate(d.endDate || '');
+      setDateType(d.dateType || (d.endDate ? 'range' : 'single'));
       setVenue(d.venue || '');
       setEntryFee(String(d.entryFee || ''));
       setMaxPlayers(String(d.maxPlayers || ''));
@@ -102,6 +106,8 @@ export default function TournamentEditPage() {
         format: formats.join('+'),
         formats,
         date,
+        endDate: dateType === 'range' ? endDate : null,
+        dateType,
         venue: venue.trim(),
         entryFee: Number(entryFee) || 0,
         maxPlayers: Number(maxPlayers) || 0,
@@ -226,11 +232,44 @@ export default function TournamentEditPage() {
         {/* 일정/장소 */}
         <div className="bg-white rounded-2xl p-5 space-y-4 shadow-sm border border-gray-100">
           <p className="font-black text-gray-700">일정 · 장소</p>
+
+          {/* 날짜 방식 */}
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-1.5">날짜</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)}
-              className="w-full p-3 bg-gray-50 rounded-xl font-bold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none" />
+            <label className="text-xs font-bold text-gray-400 block mb-1.5">날짜 방식</label>
+            <div className="flex gap-2">
+              <button onClick={() => setDateType('single')}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold ${dateType === 'single' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                📅 단일 날짜
+              </button>
+              <button onClick={() => setDateType('range')}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold ${dateType === 'range' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                📆 기간 설정
+              </button>
+            </div>
           </div>
+
+          {dateType === 'single' ? (
+            <div>
+              <label className="text-xs font-bold text-gray-400 block mb-1.5">날짜</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                className="w-full p-3 bg-gray-50 rounded-xl font-bold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none" />
+            </div>
+          ) : (
+            <div className="flex gap-2 items-center">
+              <div className="flex-1">
+                <label className="text-xs font-bold text-gray-400 block mb-1.5">시작일</label>
+                <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                  className="w-full p-3 bg-gray-50 rounded-xl font-bold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none" />
+              </div>
+              <span className="text-gray-400 font-bold mt-5">~</span>
+              <div className="flex-1">
+                <label className="text-xs font-bold text-gray-400 block mb-1.5">종료일</label>
+                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+                  className="w-full p-3 bg-gray-50 rounded-xl font-bold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none" />
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="text-xs font-bold text-gray-400 block mb-1.5">장소</label>
             <input type="text" value={venue} onChange={e => setVenue(e.target.value)}
