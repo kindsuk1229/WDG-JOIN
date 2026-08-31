@@ -1077,53 +1077,6 @@ export default function TournamentDetailPage() {
           </div>
         )}
 
-        {/* 참가자 목록 */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-          <p className="font-black text-gray-700 mb-3">
-            참가자 ({tournament.participants.length}명)
-            {PAYMENT_MANAGERS.includes(myName) && <span className="text-sm font-normal text-gray-400 ml-2">· 탭하면 입금 확인</span>}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {tournament.participants.map((p, i) => (
-              <div key={i} className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-bold ${
-                p.name === myName ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
-              }`}>
-                {PAYMENT_MANAGERS.includes(myName) && (
-                  <span onClick={() => handleTogglePaid(p)}
-                    className={`text-xs cursor-pointer ${p.paid ? 'text-green-500' : 'text-gray-300'}`}>
-                    {p.paid ? '✅' : '○'}
-                  </span>
-                )}
-                <span>{p.nickname || p.name}</span>
-                {isAdmin && (
-                  <button onClick={() => handleRemoveMember(p)}
-                    className="text-gray-400 hover:text-red-400 ml-1 font-black">×</button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 참가 신청 버튼 */}
-        {tournament.status === 'open' && (
-          <button onClick={handleJoin}
-            className={`w-full py-4 rounded-2xl font-bold text-base transition-all active:scale-95 ${
-              isJoined ? 'bg-gray-200 text-gray-600' : isFull ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-green-600 text-white shadow-lg shadow-green-200'
-            }`}
-            disabled={isFull && !isJoined}
-          >
-            {isJoined ? '참가 취소' : isFull ? '정원 마감' : '🏆 참가 신청하기'}
-          </button>
-        )}
-
-        {/* 성적 입력 버튼 */}
-        {tournament?.status === 'closed' && tournament?.participants?.some((p: any) => p.name === myName) && (
-          <button onClick={() => router.push(`/tournament/${tournamentId}/score`)}
-            className="w-full py-4 rounded-2xl font-bold text-base bg-blue-600 text-white shadow-lg shadow-blue-200 active:scale-95 transition-all">
-            ⛳ 내 성적 입력하기
-          </button>
-        )}
-
         {/* 대진표 버튼 — 토너먼트 방식일 때 */}
         {tournament?.tournamentType === 'knockout' && (
           <button onClick={() => router.push(`/tournament/${tournamentId}/bracket`)}
