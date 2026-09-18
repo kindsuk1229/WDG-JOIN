@@ -210,6 +210,7 @@ interface Tournament {
   round: number;
   description: string;
   participants: Participant[];
+  waitlist: Participant[]; // ✅ 대기자 명단
   groups: Group[];
   results: { rank: number; name: string; nickname: string; score: string }[];
   awards: Award[];
@@ -298,24 +299,45 @@ export default function TournamentDetailPage() {
     return () => unsub();
   }, [tournamentId]);
 
-  // 참가 신청 / 취소
+  // 참가 신청 / 취소 (대기자 포함)
   const handleJoin = async () => {
     if (!tournament) return;
     const tRef = doc(db, 'tournaments', tournamentId);
     const isJoined = tournament.participants.some(p => p.name === myName);
+    const isWaiting = (tournament.waitlist || []).some(p => p.name === myName);
+    const newParticipant = { name: myName, nickname: myNickname, paid: false };
 
     if (isJoined) {
+      // 참가 취소 → 대기자 1순위 자동 승격
       if (!window.confirm('참가를 취소하시겠습니까?')) return;
-      await updateDoc(tRef, {
-        participants: arrayRemove(tournament.participants.find(p => p.name === myName)),
-      });
-    } else {
-      if (tournament.participants.length >= tournament.maxPlayers) {
-        return alert('정원이 마감되었습니다.');
+      const waitlist = tournament.waitlist || [];
+      const updatedParticipants = tournament.participants.filter(p => p.name !== myName);
+
+      if (waitlist.length > 0) {
+        // 대기자 1순위 승격
+        const [promoted, ...remainingWaitlist] = waitlist;
+        await updateDoc(tRef, {
+          participants: [...updatedParticipants, promoted],
+          waitlist: remainingWaitlist,
+        });
+        alert(`✅ 취소되었습니다.\n대기자 ${promoted.nickname || promoted.name}님이 자동으로 참가 확정되었습니다!`);
+      } else {
+        await updateDoc(tRef, { participants: updatedParticipants });
+        alert('참가가 취소되었습니다.');
       }
+    } else if (isWaiting) {
+      // 대기 취소
+      if (!window.confirm('대기를 취소하시겠습니까?')) return;
       await updateDoc(tRef, {
-        participants: arrayUnion({ name: myName, nickname: myNickname, paid: false }),
+        waitlist: arrayRemove(tournament.waitlist.find(p => p.name === myName)),
       });
+    } else if (tournament.participants.length >= tournament.maxPlayers) {
+      // 정원 초과 → 대기자 등록
+      if (!window.confirm(`정원이 마감되었습니다.\n대기자로 등록하시겠습니까?\n현재 대기: ${(tournament.waitlist || []).length}명`)) return;
+      await updateDoc(tRef, { waitlist: arrayUnion(newParticipant) });
+      alert(`대기자로 등록되었습니다! (${(tournament.waitlist || []).length + 1}번 대기)`);
+    } else {
+      await updateDoc(tRef, { participants: arrayUnion(newParticipant) });
     }
     fetchData();
   };
@@ -636,15 +658,27 @@ export default function TournamentDetailPage() {
 
         if (formats.includes('highlow')) {
           // 하이로우: 하이끼리, 로우끼리 비교
+          // 이글(-2이하)로 이기면 5점, 버디(-1)로 이기면 2점, 그 외 1점
           let pointsA = 0, pointsB = 0;
+
+          const getWinPoints = (winner: number) => {
+            if (winner <= -2) return 3; // 이글 이상
+            if (winner === -1) return 2; // 버디
+            return 1; // 파/보기 등
+          };
+
           for (let i = 0; i < 18; i++) {
             const membersA = teamA.members?.map((m: any) => liveScores[m.name]?.holes?.[i] ?? 0) || [];
             const membersB = teamB.members?.map((m: any) => liveScores[m.name]?.holes?.[i] ?? 0) || [];
             if (membersA.length >= 2 && membersB.length >= 2) {
               const highA = Math.max(...membersA), lowA = Math.min(...membersA);
               const highB = Math.max(...membersB), lowB = Math.min(...membersB);
-              if (highA < highB) pointsA += 1; else if (highB < highA) pointsB += 1;
-              if (lowA < lowB) pointsA += 1; else if (lowB < lowA) pointsB += 1;
+              // 하이끼리 (타수 낮을수록 승)
+              if (highA < highB) pointsA += getWinPoints(highA);
+              else if (highB < highA) pointsB += getWinPoints(highB);
+              // 로우끼리 (타수 낮을수록 승)
+              if (lowA < lowB) pointsA += getWinPoints(lowA);
+              else if (lowB < lowA) pointsB += getWinPoints(lowB);
             }
           }
           const keyA = `${g.id}-A`, keyB = `${g.id}-B`;
@@ -1119,12 +1153,12 @@ export default function TournamentDetailPage() {
           </div>
         )}
 
-        {/* ✅ 팀 신청 버튼 — 대회 정보 탭에도 표시 */}
+        {/* ✅ 팀 신청 버튼 or 개인 신청 버튼 — 대회 정보 탭 */}
         {tournament?.registrationType === 'team' && tournament.status === 'open' && (() => {
           const teams = (tournament as any).teams || [];
           const myTeam = teams.find((t: any) => t.members?.some((m: any) => m.name === myName || m.nickname === myNickname));
           return !myTeam ? (
-            <button onClick={() => { setActiveTab('participants'); }}
+            <button onClick={() => setActiveTab('participants')}
               className="w-full py-4 rounded-2xl font-bold text-base bg-green-600 text-white shadow-lg shadow-green-200 active:scale-95 transition-all">
               👥 팀 신청하기
             </button>
@@ -1132,6 +1166,38 @@ export default function TournamentDetailPage() {
             <div className="w-full py-3 rounded-2xl bg-green-50 border border-green-200 text-center">
               <p className="text-sm font-bold text-green-700">✅ {myTeam.teamName} 신청완료</p>
             </div>
+          );
+        })()}
+
+        {tournament?.registrationType !== 'team' && tournament?.status === 'open' && (() => {
+          const isJoined = tournament.participants.some(p => p.name === myName);
+          const isWaiting = (tournament.waitlist || []).some(p => p.name === myName);
+          const isFull = tournament.participants.length >= tournament.maxPlayers;
+          const waitRank = (tournament.waitlist || []).findIndex(p => p.name === myName) + 1;
+
+          if (isJoined) return (
+            <button onClick={handleJoin}
+              className="w-full py-4 rounded-2xl font-bold text-base bg-gray-200 text-gray-600 active:scale-95 transition-all">
+              참가 취소
+            </button>
+          );
+          if (isWaiting) return (
+            <div className="w-full py-3 rounded-2xl bg-yellow-50 border border-yellow-200 text-center">
+              <p className="font-bold text-yellow-700">⏳ {waitRank}번 대기 중</p>
+              <button onClick={handleJoin} className="text-xs text-red-400 underline mt-1">대기 취소</button>
+            </div>
+          );
+          if (isFull) return (
+            <button onClick={handleJoin}
+              className="w-full py-4 rounded-2xl font-bold text-base bg-yellow-500 text-white shadow-lg active:scale-95 transition-all">
+              ⏳ 대기자 등록 ({(tournament.waitlist || []).length}명 대기중)
+            </button>
+          );
+          return (
+            <button onClick={handleJoin}
+              className="w-full py-4 rounded-2xl font-bold text-base bg-green-600 text-white shadow-lg shadow-green-200 active:scale-95 transition-all">
+              🏆 참가 신청하기
+            </button>
           );
         })()}
 
@@ -1277,14 +1343,74 @@ export default function TournamentDetailPage() {
                 </div>
               )}
 
-              {/* 참가 신청/취소 버튼 */}
-              {tournament.status === 'open' && (
-                <button onClick={handleJoin} disabled={isFull && !isJoined}
-                  className={`w-full py-3 rounded-2xl font-bold text-sm mt-3 transition-all active:scale-95 ${
-                    isJoined ? 'bg-gray-200 text-gray-600' : isFull ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-green-600 text-white'
-                  }`}>
-                  {isJoined ? '참가 취소' : isFull ? '정원 마감' : '🏆 참가 신청하기'}
-                </button>
+              {/* 참가 신청/취소/대기 버튼 */}
+              {tournament.status === 'open' && (() => {
+                const isJoined = tournament.participants.some(p => p.name === myName);
+                const isWaiting = (tournament.waitlist || []).some(p => p.name === myName);
+                const isFull = tournament.participants.length >= tournament.maxPlayers;
+                const waitRank = (tournament.waitlist || []).findIndex(p => p.name === myName) + 1;
+
+                if (isJoined) return (
+                  <button onClick={handleJoin}
+                    className="w-full py-3 rounded-2xl font-bold text-sm mt-3 bg-gray-200 text-gray-600 active:scale-95 transition-all">
+                    참가 취소
+                  </button>
+                );
+                if (isWaiting) return (
+                  <div className="mt-3 space-y-2">
+                    <div className="w-full py-3 rounded-2xl bg-yellow-50 border border-yellow-200 text-center">
+                      <p className="text-sm font-bold text-yellow-700">⏳ {waitRank}번 대기 중</p>
+                    </div>
+                    <button onClick={handleJoin}
+                      className="w-full py-2 rounded-xl text-xs font-bold text-red-400 bg-red-50">
+                      대기 취소
+                    </button>
+                  </div>
+                );
+                if (isFull) return (
+                  <button onClick={handleJoin}
+                    className="w-full py-3 rounded-2xl font-bold text-sm mt-3 bg-yellow-500 text-white active:scale-95 transition-all">
+                    ⏳ 대기자 등록 ({(tournament.waitlist || []).length}명 대기중)
+                  </button>
+                );
+                return (
+                  <button onClick={handleJoin}
+                    className="w-full py-3 rounded-2xl font-bold text-sm mt-3 bg-green-600 text-white active:scale-95 transition-all">
+                    🏆 참가 신청하기
+                  </button>
+                );
+              })()}
+
+              {/* 대기자 목록 */}
+              {(tournament.waitlist || []).length > 0 && (
+                <div className="mt-4 border-t pt-3">
+                  <p className="text-xs font-bold text-gray-400 mb-2">⏳ 대기자 ({tournament.waitlist.length}명)</p>
+                  <div className="space-y-1">
+                    {tournament.waitlist.map((p, i) => (
+                      <div key={p.name} className="flex items-center gap-2 py-1">
+                        <span className="text-xs font-bold text-yellow-600 w-8">{i + 1}번</span>
+                        <span className={`flex-1 text-sm font-bold ${p.name === myName ? 'text-yellow-700' : 'text-gray-500'}`}>
+                          {p.nickname || p.name}
+                          {p.name === myName && <span className="text-xs ml-1">(나)</span>}
+                        </span>
+                        {isAdmin && (
+                          <button onClick={async () => {
+                            // 관리자: 대기자 강제 승격
+                            if (!window.confirm(`${p.nickname || p.name}님을 참가자로 승격하시겠습니까?`)) return;
+                            const updatedWaitlist = tournament.waitlist.filter(w => w.name !== p.name);
+                            await updateDoc(doc(db, 'tournaments', tournamentId), {
+                              participants: arrayUnion(p),
+                              waitlist: updatedWaitlist,
+                            });
+                            fetchData();
+                          }} className="text-xs text-green-600 font-bold px-2 py-0.5 bg-green-50 rounded-lg">
+                            승격
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}
