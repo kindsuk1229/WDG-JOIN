@@ -342,14 +342,11 @@ export default function TournamentDetailPage() {
     fetchData();
   };
 
-  // 관리자: 회원 추가
+  // 관리자: 회원 추가 (정원 초과 가능)
   const handleAddMember = async (member: Participant) => {
     if (!tournament) return;
     if (tournament.participants.some(p => p.name === member.name)) {
       return alert('이미 참가 중인 회원이에요.');
-    }
-    if (tournament.participants.length >= tournament.maxPlayers) {
-      return alert('정원이 마감되었습니다.');
     }
     await updateDoc(doc(db, 'tournaments', tournamentId), {
       participants: arrayUnion({ name: member.name, nickname: member.nickname, paid: false }),
