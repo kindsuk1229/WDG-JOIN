@@ -342,15 +342,27 @@ export default function TournamentDetailPage() {
     fetchData();
   };
 
-  // 관리자: 회원 추가 (정원 초과 가능)
+  // 관리자: 회원 추가 (정원 초과 시 대기자로)
   const handleAddMember = async (member: Participant) => {
     if (!tournament) return;
     if (tournament.participants.some(p => p.name === member.name)) {
       return alert('이미 참가 중인 회원이에요.');
     }
-    await updateDoc(doc(db, 'tournaments', tournamentId), {
-      participants: arrayUnion({ name: member.name, nickname: member.nickname, paid: false }),
-    });
+    if ((tournament.waitlist || []).some(p => p.name === member.name)) {
+      return alert('이미 대기 중인 회원이에요.');
+    }
+    const isFull = tournament.participants.length >= tournament.maxPlayers;
+    if (isFull) {
+      // 정원 초과 → 대기자로 추가
+      await updateDoc(doc(db, 'tournaments', tournamentId), {
+        waitlist: arrayUnion({ name: member.name, nickname: member.nickname, paid: false }),
+      });
+      alert(`정원 초과로 대기자로 등록했어요. (${(tournament.waitlist || []).length + 1}번 대기)`);
+    } else {
+      await updateDoc(doc(db, 'tournaments', tournamentId), {
+        participants: arrayUnion({ name: member.name, nickname: member.nickname, paid: false }),
+      });
+    }
     setMemberSearch('');
     fetchData();
   };
