@@ -14,7 +14,7 @@ export default function BottomNav({ active }: BottomNavProps) {
     { href: '/', icon: '⛳', label: '홈', key: 'home' },
     { href: '/meetups', icon: '📋', label: '벙개 목록', key: 'meetups' },
     { href: '/tournament', icon: '🏆', label: '대회', key: 'tournament' },
-    { href: '/my-meetups', icon: '📝', label: '내 벙개', key: 'my-meetups' },
+    { href: '/market', icon: '🥕', label: '마켓', key: 'market' },
     { href: '/mypage', icon: '👤', label: '마이', key: 'my' },
   ];
 

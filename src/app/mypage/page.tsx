@@ -202,13 +202,13 @@ export default function MyPage() {
       log(`✅ 유효 성적표 ${validScorecards.length}개 확인`);
 
       // Smart-Score 기반 초기 Rating 세팅
-      const ratingState: Record<string, { rating: number; rounds: number; lastDelta: number }> = {};
+      const ratingState: Record<string, { rating: number; rounds: number; lastDelta: number; recentOpponents: string[] }> = {};
 
       Object.keys(allScoresMap).forEach(name => {
         const scores = allScoresMap[name];
         const avg = Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length);
         const initial = getInitialRating(avg, 0);
-        ratingState[name] = { rating: initial.rating, rounds: 0, lastDelta: 0 };
+        ratingState[name] = { rating: initial.rating, rounds: 0, lastDelta: 0, recentOpponents: [] };
       });
 
       log(`👥 ${Object.keys(ratingState).length}명 초기 Rating 세팅 완료`);
@@ -252,12 +252,21 @@ export default function MyPage() {
           score: p.score,
         }));
 
-        const deltas = calcRoundRating(calcPlayers);
+        // ✅ 최근 7라운드 상대 기록 구성 (현재까지 누적된 기록 기반)
+        const recentOpponents: Record<string, string[]> = {};
+        calcPlayers.forEach((p: { name: string; rating: number; rounds: number; score: number }) => {
+          recentOpponents[p.name] = (ratingState[p.name]?.recentOpponents || []);
+        });
 
-        const deltaStr = deltas.map(({ name, delta }) => {
-          if (!ratingState[name]) ratingState[name] = { rating: 1000, rounds: 0, lastDelta: 0 };
+        const deltas = calcRoundRating(calcPlayers, recentOpponents);
+
+        const deltaStr = deltas.map(({ name, delta }: { name: string; delta: number }) => {
+          if (!ratingState[name]) ratingState[name] = { rating: 1000, rounds: 0, lastDelta: 0, recentOpponents: [] };
           const newRating = Math.max(RATING_MIN, ratingState[name].rating + delta);
-          ratingState[name] = { rating: newRating, rounds: ratingState[name].rounds + 1, lastDelta: delta };
+          // 최근 7라운드 상대 업데이트
+          const opponents = calcPlayers.filter((p: { name: string; rating: number; rounds: number; score: number }) => p.name !== name).map((p: { name: string; rating: number; rounds: number; score: number }) => p.name);
+          const updatedOpponents = [...(ratingState[name].recentOpponents || []), ...opponents].slice(-(7 * (calcPlayers.length - 1)));
+          ratingState[name] = { rating: newRating, rounds: ratingState[name].rounds + 1, lastDelta: delta, recentOpponents: updatedOpponents };
           return `${name} ${delta >= 0 ? '+' : ''}${delta}→${newRating}`;
         }).join(' / ');
 
@@ -336,7 +345,7 @@ export default function MyPage() {
   const isOwner = userName === OWNER_NAME;
 
   const menus = [
-    { label: '내 벙개 내역', icon: '📋', href: '/my-meetups' },
+    { label: '내 벙개 내역', icon: '📝', href: '/my-meetups' },
     { label: '필드 벙개 히스토리', icon: '🏌️', href: '/meetup-history' },
     { label: '벙 점수 랭킹', icon: '🏅', href: '/bung-ranking' },
     { label: 'Rating 랭킹', icon: '🎯', href: '/rating-ranking' },

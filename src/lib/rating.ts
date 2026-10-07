@@ -1,10 +1,10 @@
 // ── WDG 골프 Rating 계산 엔진
-// 기획안 기준: Rating 차이 반영 + 타수차 가중 + 참가인원 가중 + 동적 K값 + 업셋 보너스
+// 기획안 기준: Rating 차이 반영 + 타수차 가중 + 참가인원 가중 + 동적 K값 + 업셋 보너스 + 반복 상대 가중
 
 export interface RatingUser {
   name: string;
   rating: number;
-  rounds: number; // 누적 라운드 수
+  rounds: number;
 }
 
 // ── 동적 K값
@@ -16,7 +16,7 @@ export function getK(rounds: number): number {
 
 // ── 타수차 가중치
 export function getScoreMultiplier(diff: number): number {
-  if (diff === 0) return 1.0; // 동타
+  if (diff === 0) return 1.0;
   if (diff === 1) return 1.0;
   if (diff >= 13) return 4.0;
   return Math.pow(3, (diff - 1) / 9);
@@ -30,7 +30,6 @@ export function getPlayerMultiplier(count: number): number {
 }
 
 // ── 업셋 보너스 (약자가 강자를 이겼을 때 추가 가중)
-// 낮은 Rating이 높은 Rating을 이기면 → Rating 차이가 클수록 더 큰 보상
 export function getUpsetBonus(
   myRating: number,
   oppRating: number,
@@ -40,10 +39,20 @@ export function getUpsetBonus(
   const iWon = myScore < oppScore;
   const iAmUnderdog = myRating < oppRating;
   if (iWon && iAmUnderdog) {
-    // 약자가 강자를 이긴 경우 → 보너스
     return Math.min(4.0, 1 + (oppRating - myRating) / 50);
   }
   return 1.0;
+}
+
+// ── 반복 상대 가중치 (최근 7라운드 기준)
+// 같은 상대와 자주 경기할수록 점수 감소 (어뷰징 방지)
+// 처음 만나는 상대는 보너스
+export function getRepeatOpponentMultiplier(meetCount: number): number {
+  if (meetCount <= 1) return 1.3;  // 처음/두번째 → 보너스
+  if (meetCount === 2) return 1.0; // 세번째 → 정상
+  if (meetCount === 3) return 0.8; // 네번째 → 감소
+  if (meetCount === 4) return 0.6; // 다섯번째 → 감소
+  return 0.5;                      // 여섯번+  → 최대 패널티
 }
 
 // ── 신뢰도 배지
@@ -57,7 +66,6 @@ export function getReliabilityBadge(rounds: number): { label: string; stars: num
 // ── Smart-Score 초기 Rating 산정
 export function getInitialRating(avgScore: number | null, rounds: number): { rating: number; k: number } {
   if (!avgScore || avgScore === 0) return { rating: 1000, k: 64 };
-  // 기준타 90, 타수차 × 6점
   const rating = Math.round(1000 + (90 - avgScore) * 6);
   const clampedRating = Math.max(700, Math.min(1300, rating));
   const k = rounds >= 10 ? 32 : 64;
@@ -68,42 +76,39 @@ export function getInitialRating(avgScore: number | null, rounds: number): { rat
 export function calcDuel(
   myRating: number,
   oppRating: number,
-  myScore: number,    // 타수 (낮을수록 좋음)
+  myScore: number,
   oppScore: number,
   myRounds: number,
+  meetCount: number = 1, // 최근 7라운드 내 해당 상대와 만난 횟수
 ): number {
   const K = getK(myRounds);
-
-  // 기대 승률 (255 사용)
   const E = 1 / (1 + Math.pow(10, (oppRating - myRating) / 255));
 
-  // 실제 결과
   let result: number;
   const diff = Math.abs(myScore - oppScore);
 
-  if (myScore < oppScore) {
-    result = 1; // 승
-  } else if (myScore > oppScore) {
-    result = 0; // 패
-  } else {
-    result = 0.5; // 무
-  }
+  if (myScore < oppScore) result = 1;
+  else if (myScore > oppScore) result = 0;
+  else result = 0.5;
 
   // 타수차 가중
   const scoreMultiplier = getScoreMultiplier(diff);
 
-  // ✅ 업셋 보너스 — 둘 중 큰 값만 사용 (중복 곱셈 방지)
+  // 업셋 보너스 — 둘 중 큰 값만 사용
   const upsetBonus = getUpsetBonus(myRating, oppRating, myScore, oppScore);
-  const multiplier = Math.max(scoreMultiplier, upsetBonus);
+  const matchMultiplier = Math.max(scoreMultiplier, upsetBonus);
 
-  return K * (result - E) * multiplier;
+  // ✅ 반복 상대 가중치 적용
+  const repeatMultiplier = getRepeatOpponentMultiplier(meetCount);
+
+  return K * (result - E) * matchMultiplier * repeatMultiplier;
 }
 
 // ── 한 라운드 전체 Rating 계산
-// players: { name, rating, rounds, score }[]
-// 반환: { name, delta }[] — 각 플레이어의 Rating 변동량
+// recentOpponents: 각 플레이어별 최근 7라운드 상대 목록 { [name]: string[] }
 export function calcRoundRating(
   players: { name: string; rating: number; rounds: number; score: number }[],
+  recentOpponents: Record<string, string[]> = {}, // ✅ 최근 7라운드 상대 기록
 ): { name: string; delta: number }[] {
   const n = players.length;
   const playerMultiplier = getPlayerMultiplier(n);
@@ -111,21 +116,25 @@ export function calcRoundRating(
 
   players.forEach(p => { deltas[p.name] = 0; });
 
-  // 모든 1:1 조합
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
       const a = players[i];
       const b = players[j];
 
-      const deltaA = calcDuel(a.rating, b.rating, a.score, b.score, a.rounds);
-      const deltaB = calcDuel(b.rating, a.rating, b.score, a.score, b.rounds);
+      // 최근 7라운드 내 서로 만난 횟수
+      const aRecentOpps = recentOpponents[a.name] || [];
+      const bRecentOpps = recentOpponents[b.name] || [];
+      const meetCountA = aRecentOpps.filter(name => name === b.name).length;
+      const meetCountB = bRecentOpps.filter(name => name === a.name).length;
+
+      const deltaA = calcDuel(a.rating, b.rating, a.score, b.score, a.rounds, meetCountA);
+      const deltaB = calcDuel(b.rating, a.rating, b.score, a.score, b.rounds, meetCountB);
 
       deltas[a.name] += deltaA;
       deltas[b.name] += deltaB;
     }
   }
 
-  // 평균 내고 참가인원 가중 적용
   const opponentCount = n - 1;
   return players.map(p => ({
     name: p.name,
