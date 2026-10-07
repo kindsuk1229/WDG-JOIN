@@ -395,7 +395,7 @@ export default function MarketPage() {
               </div>
             </div>
 
-            <div className="flex gap-3 px-6 pt-4 pb-8 shrink-0 border-t border-gray-100">
+            <div className="flex gap-3 px-6 pt-4 pb-20 shrink-0 border-t border-gray-100">
               <button onClick={() => setShowForm(false)}
                 className="flex-1 p-4 bg-gray-100 rounded-2xl font-bold text-gray-500">취소</button>
               <button onClick={handleSubmit} disabled={saving}
