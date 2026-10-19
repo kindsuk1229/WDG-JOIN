@@ -184,11 +184,12 @@ export default function MyPage() {
         });
       });
 
-      // 유효 성적표 필터 & 날짜순 정렬
+      // 유효 성적표 필터 & 날짜순 정렬 (스크린 벙개 제외)
       const validScorecards = scorecardsSnap.docs
         .map(d => ({ id: d.id, ...d.data() } as any))
         .filter(sc => {
-          if (sc.isDay2) return false; // 2일차는 건너뜀 (1일차에서 합산)
+          if (sc.isDay2) return false; // 2일차는 건너뜀
+          if (sc.meetupType === 'screen') return false; // ✅ 스크린 제외
           const validPlayers = (sc.players || []).filter((p: any) => {
             const total = (p.totalOverride || 0) > 0
               ? p.totalOverride
