@@ -42,7 +42,7 @@ export default function TournamentListPage() {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const [myName, setMyName] = useState('');
-  const [tab, setTab] = useState<'all' | 'screen' | 'field'>('all');
+  const [tab, setTab] = useState<'active' | 'screen' | 'field' | 'completed'>('active');
 
   useEffect(() => {
     const name = (localStorage.getItem('user_name') || '').trim();
@@ -68,7 +68,7 @@ export default function TournamentListPage() {
           participantCount: (data.participants || []).length,
           round: data.round || 0,
         };
-      }).filter(t => t.status !== 'completed'); // ✅ 완료된 대회 숨김
+      }); // ✅ 전체 목록 유지 (탭으로 필터링)
       setTournaments(list);
     } catch (err) {
       console.error('대회 목록 로딩 실패:', err);
@@ -79,9 +79,13 @@ export default function TournamentListPage() {
 
   const isOwner = myName === OWNER_NAME;
 
-  const filtered = tournaments.filter(t =>
-    tab === 'all' ? true : t.type === tab
-  );
+  const filtered = tournaments.filter(t => {
+    if (tab === 'active') return t.status !== 'completed';
+    if (tab === 'screen') return t.type === 'screen' && t.status !== 'completed';
+    if (tab === 'field') return t.type === 'field' && t.status !== 'completed';
+    if (tab === 'completed') return t.status === 'completed';
+    return true;
+  });
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '-';
@@ -110,14 +114,15 @@ export default function TournamentListPage() {
         </div>
 
         {/* 탭 */}
-        <div className="flex gap-2 mt-3">
+        <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
           {[
-            { key: 'all', label: '전체' },
+            { key: 'active', label: '진행중' },
             { key: 'screen', label: '🖥️ 스크린' },
             { key: 'field', label: '🏌️ 필드' },
+            { key: 'completed', label: '✅ 완료' },
           ].map(t => (
             <button key={t.key} onClick={() => setTab(t.key as any)}
-              className={`px-4 py-1.5 rounded-full text-sm font-bold ${
+              className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold ${
                 tab === t.key ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500'
               }`}>
               {t.label}
