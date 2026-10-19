@@ -228,19 +228,37 @@ function ScorecardContent() {
     if (valid.length < 2) return;
 
     try {
-      // 모든 성적표에서 각 플레이어 평균타수 계산 (Smart-Score 초기값용)
+      // 모든 성적표에서 각 플레이어 평균타수 + 최근 7라운드 상대 계산
       const scorecardSnap = await getDocs(collection(db, 'scorecards'));
       const allScoresMap: Record<string, number[]> = {};
-      scorecardSnap.docs.forEach(d => {
-        const sc = d.data();
-        (sc.players || []).forEach((pl: any) => {
-          const total = (pl.totalOverride || 0) > 0
-            ? pl.totalOverride
-            : (pl.scores || []).reduce((a: number, b: number) => a + b, 0);
-          if (total > 0) {
-            if (!allScoresMap[pl.name]) allScoresMap[pl.name] = [];
-            allScoresMap[pl.name].push(total);
-          }
+      // 성적표를 날짜순으로 정렬
+      const sortedScorecards = scorecardSnap.docs
+        .map(d => ({ id: d.id, ...d.data() } as any))
+        .filter(sc => !sc.isDay2)
+        .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+      // 각 플레이어의 최근 7라운드 상대 기록
+      const recentOpponents: Record<string, string[]> = {};
+
+      sortedScorecards.forEach(sc => {
+        const scPlayers = (sc.players || [])
+          .map((pl: any) => {
+            const total = (pl.totalOverride || 0) > 0
+              ? pl.totalOverride
+              : (pl.scores || []).reduce((a: number, b: number) => a + b, 0);
+            if (total > 0) {
+              if (!allScoresMap[pl.name]) allScoresMap[pl.name] = [];
+              allScoresMap[pl.name].push(total);
+            }
+            return pl.name;
+          })
+          .filter(Boolean);
+
+        // 이 라운드의 상대 기록 추가 (최근 7라운드만 유지)
+        scPlayers.forEach((name: string) => {
+          if (!recentOpponents[name]) recentOpponents[name] = [];
+          const opponents = scPlayers.filter((n: string) => n !== name);
+          recentOpponents[name] = [...recentOpponents[name], ...opponents].slice(-7 * (scPlayers.length - 1));
         });
       });
 
@@ -253,7 +271,6 @@ function ScorecardContent() {
           let rating: number = data.rating ?? -1;
           const rounds: number = data.ratingRounds ?? 0;
 
-          // Rating 없으면 Smart-Score로 초기값 산정
           if (rating === -1) {
             const scores = allScoresMap[p.name] || [];
             const avg = scores.length > 0
@@ -266,8 +283,8 @@ function ScorecardContent() {
         })
       );
 
-      // Rating 변동 계산
-      const deltas = calcRoundRating(playerData);
+      // ✅ 반복 상대 가중치 포함하여 Rating 계산
+      const deltas = calcRoundRating(playerData, recentOpponents);
 
       // Firebase 업데이트
       await Promise.all(
@@ -348,15 +365,16 @@ function ScorecardContent() {
 
       await Promise.all(savePromises);
 
-      // ✅ Rating 계산 — 성적표 저장 성공 후 자동 실행
-      // 1박2일은 합산 타수로 계산
-      const scorePlayers = players.map(p => ({
-        name: p.name,
-        score: isOvernight
-          ? getOvernightTotal(p.name)
-          : getPlayerTotal(p),
-      }));
-      await updateRatings(scorePlayers);
+      // ✅ Rating 계산 — 필드/1박2일만 적용 (스크린 제외)
+      if (meetup?.meetupType !== 'screen') {
+        const scorePlayers = players.map(p => ({
+          name: p.name,
+          score: isOvernight
+            ? getOvernightTotal(p.name)
+            : getPlayerTotal(p),
+        }));
+        await updateRatings(scorePlayers);
+      }
 
       alert('성적표가 저장되었습니다! ⛳');
     } catch (error) {
