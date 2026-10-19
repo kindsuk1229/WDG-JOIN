@@ -185,13 +185,22 @@ export default function MyPage() {
       });
 
       // 유효 성적표 필터 & 날짜순 정렬 (스크린 벙개 제외)
+      // ✅ meetups 컬렉션에서 meetupType 가져오기
+      const meetupsSnap = await getDocs(collection(db, 'meetups'));
+      const meetupTypeMap: Record<string, string> = {};
+      meetupsSnap.docs.forEach(d => {
+        meetupTypeMap[d.id] = d.data().meetupType || 'field';
+      });
+
       const validScorecards = scorecardsSnap.docs
         .map(d => ({ id: d.id, ...d.data() } as any))
         .filter(sc => {
           if (sc.isDay2) return false; // 2일차는 건너뜀
-          if (sc.meetupType === 'screen') return false; // ✅ 스크린 제외
-          // 기존 성적표 중 제목에 '스크린' 포함된 것도 제외
-          if ((sc.meetupTitle || '').includes('스크린')) return false;
+          // meetupType 직접 저장된 경우
+          if (sc.meetupType === 'screen') return false;
+          // meetupId로 meetups 컬렉션에서 확인
+          const meetupType = meetupTypeMap[sc.meetupId] || 'field';
+          if (meetupType === 'screen') return false; // ✅ 스크린 제외
           const validPlayers = (sc.players || []).filter((p: any) => {
             const total = (p.totalOverride || 0) > 0
               ? p.totalOverride
