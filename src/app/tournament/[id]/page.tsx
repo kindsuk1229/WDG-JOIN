@@ -522,8 +522,8 @@ export default function TournamentDetailPage() {
         status: 'completed',
       });
 
-      // Rating 반영 (개인전만)
-      if (formats.includes('stroke') || formats.includes('shinperio')) {
+      // Rating 반영 (필드 대회 + 개인전만, 스크린 제외)
+      if (tournament.type !== 'screen' && (formats.includes('stroke') || formats.includes('shinperio'))) {
         await updateRatingsFromTournament(sorted, tournament.participants.length);
       }
 
@@ -1016,28 +1016,64 @@ export default function TournamentDetailPage() {
                     )}
                   </>
                 ) : (
-                  /* 기존 개인전/팀전 결과 입력 */
+                  /* 기존 개인전/팀전 결과 입력 + 수동 수정 */
                   <>
-                    <p className="text-sm font-bold text-gray-600">순위 입력 (타수/점수)</p>
-                    {tournament.participants.map((p, idx) => {
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-bold text-gray-600">순위 입력 (타수/점수)</p>
+                      {tournament.results?.length > 0 && (
+                        <button onClick={() => {
+                          // 기존 결과 불러오기
+                          setResults(tournament.results.map(r => ({ ...r })));
+                        }}
+                          className="text-xs text-blue-500 font-bold px-2 py-1 bg-blue-50 rounded-lg">
+                          기존 결과 불러오기
+                        </button>
+                      )}
+                    </div>
+                    {/* 기존 결과가 있으면 수정 모드, 없으면 신규 입력 */}
+                    {(results.length > 0 ? results.sort((a, b) => Number(a.score) - Number(b.score)) : tournament.participants).map((p: any) => {
                       const existing = results.find(r => r.name === p.name);
                       return (
                         <div key={p.name} className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-gray-500 w-16">{p.nickname || p.name}</span>
+                          <span className="text-sm font-bold text-gray-500 w-20 truncate flex-shrink-0">{p.nickname || p.name}</span>
                           <input type="text" placeholder="타수/점수"
                             value={existing?.score || ''}
                             onChange={e => {
                               const val = e.target.value;
                               setResults(prev => {
                                 const filtered = prev.filter(r => r.name !== p.name);
-                                if (val) return [...filtered, { rank: 0, name: p.name, nickname: p.nickname, score: val }];
+                                if (val) return [...filtered, { rank: 0, name: p.name, nickname: p.nickname || p.name, score: val }];
                                 return filtered;
                               });
                             }}
                             className="flex-1 p-2.5 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+                          {existing?.score && (
+                            <button onClick={() => setResults(prev => prev.filter(r => r.name !== p.name))}
+                              className="text-gray-300 hover:text-red-400 font-black flex-shrink-0">×</button>
+                          )}
                         </div>
                       );
                     })}
+                    {/* 참가자 목록에 없는 결과도 추가 입력 가능 */}
+                    <div className="flex items-center gap-2 pt-2 border-t border-gray-50">
+                      <input type="text" placeholder="닉네임 직접 입력"
+                        id="manual-name-input"
+                        className="flex-1 p-2.5 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+                      <input type="text" placeholder="타수"
+                        id="manual-score-input"
+                        className="w-20 p-2.5 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+                      <button onClick={() => {
+                        const nameEl = document.getElementById('manual-name-input') as HTMLInputElement;
+                        const scoreEl = document.getElementById('manual-score-input') as HTMLInputElement;
+                        if (!nameEl.value || !scoreEl.value) return;
+                        setResults(prev => [...prev.filter(r => r.name !== nameEl.value),
+                          { rank: 0, name: nameEl.value, nickname: nameEl.value, score: scoreEl.value }]);
+                        nameEl.value = ''; scoreEl.value = '';
+                      }}
+                        className="text-xs px-3 py-2.5 bg-green-600 text-white rounded-xl font-bold flex-shrink-0">
+                        + 추가
+                      </button>
+                    </div>
                   </>
                 )}
                 <button onClick={handleSaveResults}
