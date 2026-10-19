@@ -335,6 +335,7 @@ function ScorecardContent() {
           meetupTitle: meetup?.title + (isOvernight ? ' (1일차)' : ''),
           golfCourse: meetup?.golfCourse,
           date: meetup?.date,
+          meetupType: meetup?.meetupType || 'field', // ✅ 스크린/필드 구분 저장
           pars,
           players,
           totalPar: pars.reduce((a, b) => a + b, 0),

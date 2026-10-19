@@ -190,6 +190,8 @@ export default function MyPage() {
         .filter(sc => {
           if (sc.isDay2) return false; // 2일차는 건너뜀
           if (sc.meetupType === 'screen') return false; // ✅ 스크린 제외
+          // 기존 성적표 중 제목에 '스크린' 포함된 것도 제외
+          if ((sc.meetupTitle || '').includes('스크린')) return false;
           const validPlayers = (sc.players || []).filter((p: any) => {
             const total = (p.totalOverride || 0) > 0
               ? p.totalOverride
