@@ -204,6 +204,7 @@ export default function MyPage() {
     { label: '내 성적 히스토리', icon: '⛳', href: '/my-scores' },
     { label: '성적 랭킹', icon: '🏆', href: '/score-ranking' },
     { label: '정산 내역', icon: '💰', href: '/settlement/history' },
+    { label: '우동골 회계장부', icon: '📒', href: '/accounting' },
     { label: '알림 설정', icon: '🔔', href: '/notification-settings' },
     { label: '프로필 수정', icon: '✏️', onClick: () => setIsEditing(true) },
     { label: '앱 정보', icon: 'ℹ️', href: '#' },
