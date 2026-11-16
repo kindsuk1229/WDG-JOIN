@@ -137,7 +137,7 @@ export default function RatingRankingPage() {
             ))}
           </div>
           <div className="mt-3 pt-3 border-t border-gray-50">
-            <p className="text-xs text-gray-400 text-center">3라운드 완료 시 랭킹 등록 (배치고사) · 1개월 미참여 −10점</p>
+            <p className="text-xs text-gray-400 text-center">4라운드 완료 시 랭킹 등록 (배치고사) · 1개월 미참여 −10점</p>
           </div>
         </div>
 
@@ -147,7 +147,7 @@ export default function RatingRankingPage() {
           <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-200">
             <p className="text-4xl mb-3">🏌️</p>
             <p className="text-gray-400 text-sm">아직 랭킹에 오른 회원이 없어요.</p>
-            <p className="text-gray-300 text-xs mt-1">필드 벙개 3라운드 완료 시 랭킹에 등록돼요!</p>
+            <p className="text-gray-300 text-xs mt-1">필드 벙개 4라운드 완료 시 랭킹에 등록돼요!</p>
           </div>
         ) : (
           <>
@@ -237,10 +237,10 @@ export default function RatingRankingPage() {
                                 {isMe && <span className="text-xs text-green-600 font-bold">(나)</span>}
                                 {badge && <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${badge.cls}`}>{badge.label}</span>}
                               </div>
-                              <p className="text-xs text-gray-400 mt-0.5">{player.rounds}/3 라운드 완료</p>
+                              <p className="text-xs text-gray-400 mt-0.5">{player.rounds}/4 라운드 완료</p>
                             </div>
                             <div className="text-right flex-shrink-0">
-                              <p className="text-sm font-black text-gray-400">{3 - player.rounds}라운드 남음</p>
+                              <p className="text-sm font-black text-gray-400">{4 - player.rounds}라운드 남음</p>
                             </div>
                           </div>
                         </div>
