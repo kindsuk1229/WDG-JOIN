@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Avatar } from '@/components/UI';
-import { getReliabilityBadge, RATING_DEFAULT } from '@/lib/rating';
+import { getReliabilityBadge, RATING_DEFAULT, RATING_MIN, calcRoundRating, getInitialRating } from '@/lib/rating';
 
 const OWNER_NAME = '김근석';
 
@@ -52,6 +52,8 @@ export default function RatingRankingPage() {
   const [loading, setLoading] = useState(true);
   const [myName, setMyName] = useState('');
   const [showUnranked, setShowUnranked] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
+  const [recalcMsg, setRecalcMsg] = useState('');
 
   useEffect(() => {
     const name = (localStorage.getItem('user_name') || '').trim();
@@ -98,6 +100,136 @@ export default function RatingRankingPage() {
     }
   };
 
+  // ✅ 전체 레이팅 재계산 (벙개 성적표 + 대회 타수 포함)
+  const handleRecalculate = async () => {
+    if (!window.confirm('모든 성적표(벙개+대회)를 바탕으로 레이팅을 처음부터 재계산합니다.\n시간이 걸릴 수 있어요. 계속할까요?')) return;
+    setRecalculating(true);
+    setRecalcMsg('데이터 불러오는 중...');
+    try {
+      const [scorecardsSnap, tournamentsSnap, usersSnap] = await Promise.all([
+        getDocs(collection(db, 'scorecards')),
+        getDocs(collection(db, 'tournaments')),
+        getDocs(collection(db, 'users')),
+      ]);
+
+      // 벙개 성적표 → 라운드 목록
+      const rounds: { date: string; players: { name: string; score: number }[] }[] = [];
+
+      scorecardsSnap.docs.forEach(d => {
+        const data = d.data();
+        const date = data.date || data.savedAt?.substring(0, 10) || '2000-01-01';
+        const playerList: { name: string; score: number }[] = [];
+        (data.players || []).forEach((p: any) => {
+          const total = (p.totalOverride || 0) > 0
+            ? p.totalOverride
+            : (p.scores || []).reduce((a: number, b: number) => a + b, 0);
+          if (p.name && total > 0) playerList.push({ name: p.name, score: total });
+        });
+        if (playerList.length >= 2) rounds.push({ date, players: playerList });
+      });
+
+      // 완료된 필드 대회 → 라운드 목록 (스크린 제외)
+      tournamentsSnap.docs.forEach(d => {
+        const data = d.data();
+        if (data.status !== 'completed') return;
+        if (data.type === 'screen') return;
+        const date = data.date || '2000-01-01';
+        const participants: string[] = (data.participants || []).map((p: any) => p.name);
+        const results = data.results || [];
+        const playerList: { name: string; score: number }[] = [];
+        results.forEach((r: any, idx: number) => {
+          if (!participants.includes(r.name)) return;
+          const scoreNum = Number(r.score);
+          const score = isNaN(scoreNum) || scoreNum === 0 ? 72 + idx * 2 : scoreNum;
+          if (r.name) playerList.push({ name: r.name, score });
+        });
+        if (playerList.length >= 2) rounds.push({ date, players: playerList });
+      });
+
+      // 날짜 오름차순 정렬
+      rounds.sort((a, b) => a.date.localeCompare(b.date));
+      setRecalcMsg(`${rounds.length}개 라운드 계산 중...`);
+
+      // 플레이어별 전체 성적 (Smart-Score 초기값 계산용)
+      const allScoresMap: Record<string, number[]> = {};
+      rounds.forEach(r => {
+        r.players.forEach(p => {
+          if (!allScoresMap[p.name]) allScoresMap[p.name] = [];
+          allScoresMap[p.name].push(p.score);
+        });
+      });
+
+      // 플레이어 상태 맵 초기화
+      const ratingMap: Record<string, { rating: number; rounds: number; recentOpponents: string[]; lastDelta: number }> = {};
+
+      const initPlayer = (name: string) => {
+        if (ratingMap[name]) return;
+        const scores = allScoresMap[name] || [];
+        const avg = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
+        ratingMap[name] = {
+          rating: getInitialRating(avg, 0).rating,
+          rounds: 0,
+          recentOpponents: [],
+          lastDelta: 0,
+        };
+      };
+
+      // 라운드별 순차 계산
+      for (const round of rounds) {
+        round.players.forEach(p => initPlayer(p.name));
+
+        const recentOpponentsMap: Record<string, string[]> = {};
+        round.players.forEach(p => { recentOpponentsMap[p.name] = ratingMap[p.name].recentOpponents; });
+
+        const deltas = calcRoundRating(
+          round.players.map(p => ({
+            name: p.name,
+            rating: ratingMap[p.name].rating,
+            rounds: ratingMap[p.name].rounds,
+            score: p.score,
+          })),
+          recentOpponentsMap,
+        );
+
+        const allNames = round.players.map(p => p.name);
+        deltas.forEach(({ name, delta }) => {
+          const cur = ratingMap[name];
+          const newRating = Math.max(RATING_MIN, Math.round(cur.rating + delta));
+          const newRounds = cur.rounds + 1;
+          const opponents = allNames.filter(n => n !== name);
+          const updatedRecentOpponents = [...opponents, ...cur.recentOpponents]
+            .slice(0, Math.min(newRounds, 7) * 4);
+          ratingMap[name] = { rating: newRating, rounds: newRounds, recentOpponents: updatedRecentOpponents, lastDelta: delta };
+        });
+      }
+
+      // Firebase 업데이트
+      setRecalcMsg('Firebase 저장 중...');
+      const updates = Object.entries(ratingMap);
+      for (const [name, data] of updates) {
+        const userRef = doc(db, 'users', name);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          await updateDoc(userRef, {
+            rating: data.rating,
+            ratingRounds: data.rounds,
+            ratingDelta: data.lastDelta,
+            recentOpponents: data.recentOpponents,
+            ratingUpdatedAt: new Date().toISOString(),
+          });
+        }
+      }
+
+      setRecalcMsg(`✅ 완료! ${updates.length}명 업데이트`);
+      await fetchRankings();
+    } catch (err) {
+      console.error('재계산 실패:', err);
+      setRecalcMsg('❌ 재계산 실패');
+    } finally {
+      setRecalculating(false);
+    }
+  };
+
   const getRoleBadge = (p: RatingPlayer) => {
     if (p.isOwner) return { label: '오너', cls: 'bg-yellow-100 text-yellow-700' };
     if (p.role === 'manager') return { label: '매니저', cls: 'bg-blue-100 text-blue-700' };
@@ -111,18 +243,35 @@ export default function RatingRankingPage() {
   };
 
   const total = players.length;
+  const isAdmin = myName === OWNER_NAME;
 
   return (
     <div className="bg-gray-50 text-gray-900 min-h-screen">
       <header className="p-4 bg-white border-b flex items-center sticky top-0 z-10 shadow-sm">
         <button onClick={() => router.back()} className="mr-4 text-xl font-bold text-gray-600">←</button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-xl font-bold text-gray-800">골프 Rating 랭킹</h1>
           <p className="text-xs text-gray-400">강한 상대를 이길수록 · 큰 타수 차일수록 · 많은 인원일수록</p>
         </div>
       </header>
 
       <div className="p-4 space-y-4">
+
+        {/* ✅ 관리자 재계산 버튼 */}
+        {isAdmin && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-2">
+            <p className="text-xs font-bold text-gray-400">관리자 도구</p>
+            <button
+              onClick={handleRecalculate}
+              disabled={recalculating}
+              className="w-full py-2.5 rounded-xl bg-purple-600 text-white text-sm font-bold disabled:bg-gray-300"
+            >
+              {recalculating ? '계산 중...' : '🔄 전체 레이팅 재계산'}
+            </button>
+            {recalcMsg && <p className="text-xs text-center text-gray-500">{recalcMsg}</p>}
+            <p className="text-xs text-gray-400">모든 벙개+대회 성적표를 날짜순으로 처음부터 재계산해요.</p>
+          </div>
+        )}
 
         {/* 등급 안내 */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
@@ -137,7 +286,7 @@ export default function RatingRankingPage() {
             ))}
           </div>
           <div className="mt-3 pt-3 border-t border-gray-50">
-            <p className="text-xs text-gray-400 text-center">4라운드 완료 시 랭킹 등록 (배치고사) · 1개월 미참여 −10점</p>
+            <p className="text-xs text-gray-400 text-center">3라운드 완료 시 랭킹 등록 (배치고사) · 1개월 미참여 −10점</p>
           </div>
         </div>
 
@@ -147,7 +296,7 @@ export default function RatingRankingPage() {
           <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-200">
             <p className="text-4xl mb-3">🏌️</p>
             <p className="text-gray-400 text-sm">아직 랭킹에 오른 회원이 없어요.</p>
-            <p className="text-gray-300 text-xs mt-1">필드 벙개 4라운드 완료 시 랭킹에 등록돼요!</p>
+            <p className="text-gray-300 text-xs mt-1">필드 벙개 3라운드 완료 시 랭킹에 등록돼요!</p>
           </div>
         ) : (
           <>
@@ -237,10 +386,10 @@ export default function RatingRankingPage() {
                                 {isMe && <span className="text-xs text-green-600 font-bold">(나)</span>}
                                 {badge && <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${badge.cls}`}>{badge.label}</span>}
                               </div>
-                              <p className="text-xs text-gray-400 mt-0.5">{player.rounds}/4 라운드 완료</p>
+                              <p className="text-xs text-gray-400 mt-0.5">{player.rounds}/3 라운드 완료</p>
                             </div>
                             <div className="text-right flex-shrink-0">
-                              <p className="text-sm font-black text-gray-400">{4 - player.rounds}라운드 남음</p>
+                              <p className="text-sm font-black text-gray-400">{3 - player.rounds}라운드 남음</p>
                             </div>
                           </div>
                         </div>
