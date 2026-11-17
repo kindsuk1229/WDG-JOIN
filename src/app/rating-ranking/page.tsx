@@ -122,7 +122,9 @@ export default function RatingRankingPage() {
           const total = (p.totalOverride || 0) > 0
             ? p.totalOverride
             : (p.scores || []).reduce((a: number, b: number) => a + b, 0);
-          if (p.name && total > 0) playerList.push({ name: p.name, score: total });
+          const pname = (p.name || '').trim();
+          if (pname && pname !== '.' && pname !== '..' && !pname.includes('/') && total > 0)
+            playerList.push({ name: pname, score: total });
         });
         if (playerList.length >= 2) rounds.push({ date, players: playerList });
       });
@@ -140,7 +142,9 @@ export default function RatingRankingPage() {
           if (!participants.includes(r.name)) return;
           const scoreNum = Number(r.score);
           const score = isNaN(scoreNum) || scoreNum === 0 ? 72 + idx * 2 : scoreNum;
-          if (r.name) playerList.push({ name: r.name, score });
+          const rname = (r.name || '').trim();
+          if (rname && rname !== '.' && rname !== '..' && !rname.includes('/'))
+            playerList.push({ name: rname, score });
         });
         if (playerList.length >= 2) rounds.push({ date, players: playerList });
       });
@@ -153,8 +157,10 @@ export default function RatingRankingPage() {
       const ratingMap: Record<string, { rating: number; rounds: number; recentOpponents: string[]; lastDelta: number }> = {};
 
       const initPlayer = (name: string) => {
-        if (ratingMap[name]) return;
-        ratingMap[name] = {
+        const n = name?.trim() || '';
+        if (!n || n === '.' || n === '..' || n.includes('/')) return; // 유효하지 않은 이름 무시
+        if (ratingMap[n]) return;
+        ratingMap[n] = {
           rating: RATING_DEFAULT,  // 첫 라운드 전에는 항상 1000으로 시작
           rounds: 0,
           recentOpponents: [],
@@ -191,13 +197,17 @@ export default function RatingRankingPage() {
         });
       }
 
-      // Firebase 업데이트
-      const updates = Object.entries(ratingMap);
+      // Firebase 업데이트 (빈 문자열, 점(.), 슬래시 등 유효하지 않은 ID 제거)
+      const isValidDocId = (name: string) => {
+        const n = name.trim();
+        return n.length > 0 && n !== '.' && n !== '..' && !n.includes('/');
+      };
+      const updates = Object.entries(ratingMap).filter(([name]) => isValidDocId(name));
       setRecalcMsg(`계산 완료 (${updates.length}명), Firebase 저장 중...`);
       let savedCount = 0;
       for (const [name, data] of updates) {
         try {
-          const userRef = doc(db, 'users', name);
+          const userRef = doc(db, 'users', name.trim());
           const userSnap = await getDoc(userRef);
           if (userSnap.exists()) {
             await updateDoc(userRef, {
