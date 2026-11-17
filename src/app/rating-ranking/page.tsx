@@ -104,12 +104,12 @@ export default function RatingRankingPage() {
   const handleRecalculate = async () => {
     if (!window.confirm('모든 성적표(벙개+대회)를 바탕으로 레이팅을 처음부터 재계산합니다.\n시간이 걸릴 수 있어요. 계속할까요?')) return;
     setRecalculating(true);
-    setRecalcMsg('데이터 불러오는 중...');
+    setRecalcMsg('성적표 불러오는 중...');
     try {
-      const [scorecardsSnap, tournamentsSnap] = await Promise.all([
-        getDocs(collection(db, 'scorecards')),
-        getDocs(collection(db, 'tournaments')),
-      ]);
+      const scorecardsSnap = await getDocs(collection(db, 'scorecards'));
+      setRecalcMsg(`성적표 ${scorecardsSnap.size}개 로드 완료, 대회 불러오는 중...`);
+      const tournamentsSnap = await getDocs(collection(db, 'tournaments'));
+      setRecalcMsg(`대회 ${tournamentsSnap.size}개 로드 완료, 계산 중...`);
 
       // 벙개 성적표 → 라운드 목록
       const rounds: { date: string; players: { name: string; score: number }[] }[] = [];
@@ -192,27 +192,34 @@ export default function RatingRankingPage() {
       }
 
       // Firebase 업데이트
-      setRecalcMsg('Firebase 저장 중...');
       const updates = Object.entries(ratingMap);
+      setRecalcMsg(`계산 완료 (${updates.length}명), Firebase 저장 중...`);
+      let savedCount = 0;
       for (const [name, data] of updates) {
-        const userRef = doc(db, 'users', name);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-          await updateDoc(userRef, {
-            rating: data.rating,
-            ratingRounds: data.rounds,
-            ratingDelta: data.lastDelta,
-            recentOpponents: data.recentOpponents,
-            ratingUpdatedAt: new Date().toISOString(),
-          });
+        try {
+          const userRef = doc(db, 'users', name);
+          const userSnap = await getDoc(userRef);
+          if (userSnap.exists()) {
+            await updateDoc(userRef, {
+              rating: data.rating,
+              ratingRounds: data.rounds,
+              ratingDelta: data.lastDelta,
+              recentOpponents: data.recentOpponents,
+              ratingUpdatedAt: new Date().toISOString(),
+            });
+            savedCount++;
+          }
+        } catch (writeErr: any) {
+          console.error(`${name} 저장 실패:`, writeErr);
+          throw new Error(`${name} 저장 실패: ${writeErr?.message}`);
         }
       }
 
-      setRecalcMsg(`✅ 완료! ${updates.length}명 업데이트`);
+      setRecalcMsg(`✅ 완료! ${savedCount}명 업데이트`);
       await fetchRankings();
-    } catch (err) {
+    } catch (err: any) {
       console.error('재계산 실패:', err);
-      setRecalcMsg('❌ 재계산 실패');
+      setRecalcMsg(`❌ 재계산 실패: ${err?.message || String(err)}`);
     } finally {
       setRecalculating(false);
     }
