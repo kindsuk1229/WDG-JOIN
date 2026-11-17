@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Avatar } from '@/components/UI';
-import { getReliabilityBadge, RATING_DEFAULT, RATING_MIN, calcRoundRating, getInitialRating } from '@/lib/rating';
+import { getReliabilityBadge, RATING_DEFAULT, RATING_MIN, calcRoundRating } from '@/lib/rating';
 
 const OWNER_NAME = '김근석';
 
@@ -106,10 +106,9 @@ export default function RatingRankingPage() {
     setRecalculating(true);
     setRecalcMsg('데이터 불러오는 중...');
     try {
-      const [scorecardsSnap, tournamentsSnap, usersSnap] = await Promise.all([
+      const [scorecardsSnap, tournamentsSnap] = await Promise.all([
         getDocs(collection(db, 'scorecards')),
         getDocs(collection(db, 'tournaments')),
-        getDocs(collection(db, 'users')),
       ]);
 
       // 벙개 성적표 → 라운드 목록
@@ -150,24 +149,13 @@ export default function RatingRankingPage() {
       rounds.sort((a, b) => a.date.localeCompare(b.date));
       setRecalcMsg(`${rounds.length}개 라운드 계산 중...`);
 
-      // 플레이어별 전체 성적 (Smart-Score 초기값 계산용)
-      const allScoresMap: Record<string, number[]> = {};
-      rounds.forEach(r => {
-        r.players.forEach(p => {
-          if (!allScoresMap[p.name]) allScoresMap[p.name] = [];
-          allScoresMap[p.name].push(p.score);
-        });
-      });
-
-      // 플레이어 상태 맵 초기화
+      // 플레이어 상태 맵 (첫 등장 시 기본값 1000으로 시작 — 미래 성적 반영 방지)
       const ratingMap: Record<string, { rating: number; rounds: number; recentOpponents: string[]; lastDelta: number }> = {};
 
       const initPlayer = (name: string) => {
         if (ratingMap[name]) return;
-        const scores = allScoresMap[name] || [];
-        const avg = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
         ratingMap[name] = {
-          rating: getInitialRating(avg, 0).rating,
+          rating: RATING_DEFAULT,  // 첫 라운드 전에는 항상 1000으로 시작
           rounds: 0,
           recentOpponents: [],
           lastDelta: 0,
