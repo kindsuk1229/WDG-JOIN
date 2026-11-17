@@ -204,7 +204,7 @@ export default function MyPage() {
     { label: '내 성적 히스토리', icon: '⛳', href: '/my-scores' },
     { label: '성적 랭킹', icon: '🏆', href: '/score-ranking' },
     { label: '레이팅 랭킹', icon: '⭐', href: '/rating-ranking' },
-    { label: '필드 기록 관리', icon: '📝', href: '/field-records' },
+    ...(userName === '김근석' ? [{ label: '필드 기록 관리', icon: '📝', href: '/field-records' }] : []),
     { label: '정산 내역', icon: '💰', href: '/settlement/history' },
     { label: '우동골 회계장부', icon: '📒', href: '/accounting' },
     { label: '알림 설정', icon: '🔔', href: '/notification-settings' },
