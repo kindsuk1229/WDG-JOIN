@@ -8,6 +8,42 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ── 유저 ──
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // ── 성적표 ──
+    match /scorecards/{scorecardId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // ── 대회 ──
+    match /tournaments/{tournamentId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // ── 회계 ──
+    match /accounting/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // ── 어드민 ──
+    match /admins/{adminId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // ── 알림 ──
+    match /notifications/{notifId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
     // ── 벙개 ──
     match /meetups/{meetupId} {
       allow read: if request.auth != null;
